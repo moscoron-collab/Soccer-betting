@@ -308,7 +308,7 @@ function Game({
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
+    <main className="mx-auto max-w-5xl px-4 py-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -381,9 +381,11 @@ function Game({
         {predictions.length === 0 ? (
           <Empty text="You haven't predicted anything yet. Pick a match below!" />
         ) : (
-          predictions.map((p) => (
-            <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
-          ))
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {predictions.map((p) => (
+              <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
+            ))}
+          </div>
         )}
       </Section>
 
@@ -407,16 +409,18 @@ function Game({
               </div>
             )}
 
-            {shown.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                token={token}
-                coins={player.coins}
-                myPrediction={predByMatch.get(m.id)}
-                onPlaced={onRefresh}
-              />
-            ))}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {shown.map((m) => (
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  token={token}
+                  coins={player.coins}
+                  myPrediction={predByMatch.get(m.id)}
+                  onPlaced={onRefresh}
+                />
+              ))}
+            </div>
 
             {filtered.length > visible && (
               <button
