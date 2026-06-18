@@ -1,0 +1,23 @@
+name: Sync matches & settle predictions
+
+# Runs every hour. This (1) pulls new fixtures and results from football-data.org,
+# (2) settles finished matches and pays out coins, and (3) keeps the free Supabase
+# database awake so it never sleeps. Everything here is free.
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour, on the hour (UTC)
+  workflow_dispatch: {} # lets you run it manually from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the sync endpoint
+        run: |
+          echo "Triggering sync…"
+          code=$(curl -s -o /tmp/out.txt -w "%{http_code}" \
+            -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/sync")
+          echo "HTTP $code"
+          cat /tmp/out.txt
+          if [ "$code" -ne 200 ]; then exit 1; fi

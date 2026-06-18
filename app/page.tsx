@@ -1,0 +1,566 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+const TOKEN_KEY = "spg_token";
+
+type Player = { id: string; username: string; coins: number };
+type Match = {
+  id: number;
+  competition: string;
+  home_team: string;
+  away_team: string;
+  kickoff_at: string;
+};
+type Prediction = {
+  id: string;
+  type: "WINNER" | "EXACT";
+  pick: string | null;
+  exact_home: number | null;
+  exact_away: number | null;
+  stake: number;
+  payout: number;
+  status: "PENDING" | "WON" | "LOST";
+  matches: {
+    home_team: string;
+    away_team: string;
+    competition: string;
+    kickoff_at: string;
+    status: string;
+    home_score: number | null;
+    away_score: number | null;
+  } | null;
+};
+type LeaderRow = { username: string; coins: number };
+
+function authHeaders(token: string): HeadersInit {
+  return { "Content-Type": "application/json", "x-player-token": token };
+}
+
+export default function Home() {
+  const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [canBailout, setCanBailout] = useState(false);
+
+  // Load token from storage on first render.
+  useEffect(() => {
+    const t = localStorage.getItem(TOKEN_KEY);
+    setToken(t);
+    setReady(true);
+  }, []);
+
+  const loadMe = useCallback(async (t: string) => {
+    const res = await fetch("/api/me", { headers: authHeaders(t) });
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setPlayer(null);
+      return;
+    }
+    const data = await res.json();
+    setPlayer(data.player);
+    setPredictions(data.predictions ?? []);
+    setCanBailout(!!data.canBailout);
+  }, []);
+
+  useEffect(() => {
+    if (token) loadMe(token);
+  }, [token, loadMe]);
+
+  function onSignedIn(t: string) {
+    localStorage.setItem(TOKEN_KEY, t);
+    setToken(t);
+  }
+
+  function signOut() {
+    localStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+    setPlayer(null);
+    setPredictions([]);
+  }
+
+  if (!ready) return null;
+
+  if (!token || !player) {
+    return <AuthScreen onSignedIn={onSignedIn} />;
+  }
+
+  return (
+    <Game
+      token={token}
+      player={player}
+      predictions={predictions}
+      canBailout={canBailout}
+      onRefresh={() => loadMe(token)}
+      onSignOut={signOut}
+    />
+  );
+}
+
+/* ------------------------------- Auth screen ------------------------------- */
+
+function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
+  const [mode, setMode] = useState<"new" | "recover">("new");
+  const [username, setUsername] = useState("");
+  const [recovery, setRecovery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function createAccount() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong.");
+        return;
+      }
+      onSignedIn(data.token);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recover() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/me", { headers: authHeaders(recovery.trim()) });
+      if (!res.ok) {
+        setError("That recovery code didn't work.");
+        return;
+      }
+      onSignedIn(recovery.trim());
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-md px-5 py-10">
+      <h1 className="text-3xl font-extrabold text-center">⚽ Soccer Predictor</h1>
+      <p className="mt-2 text-center text-emerald-100/80">
+        Predict real matches. Win coins. Top the leaderboard.
+      </p>
+
+      <div className="mt-8 rounded-2xl bg-black/25 p-5 shadow-lg backdrop-blur">
+        <div className="mb-4 flex gap-2 rounded-xl bg-black/20 p-1">
+          <button
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "new" ? "bg-emerald-500 text-white" : "text-emerald-100"}`}
+            onClick={() => setMode("new")}
+          >
+            New player
+          </button>
+          <button
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "recover" ? "bg-emerald-500 text-white" : "text-emerald-100"}`}
+            onClick={() => setMode("recover")}
+          >
+            I have a code
+          </button>
+        </div>
+
+        {mode === "new" ? (
+          <>
+            <label className="text-sm font-medium">Pick a username</label>
+            <input
+              className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
+              value={username}
+              maxLength={20}
+              placeholder="e.g. GoalMachine"
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createAccount()}
+            />
+            <button
+              disabled={busy || username.trim().length < 2}
+              onClick={createAccount}
+              className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+            >
+              {busy ? "Creating…" : "Start playing (1,000 coins)"}
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="text-sm font-medium">Your recovery code</label>
+            <input
+              className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
+              value={recovery}
+              placeholder="paste your code"
+              onChange={(e) => setRecovery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && recover()}
+            />
+            <button
+              disabled={busy || recovery.trim().length < 6}
+              onClick={recover}
+              className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+            >
+              {busy ? "Checking…" : "Log back in"}
+            </button>
+          </>
+        )}
+
+        {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+      </div>
+      <p className="mt-6 text-center text-xs text-emerald-100/60">
+        Free to play • Virtual coins only • No real money
+      </p>
+    </main>
+  );
+}
+
+/* --------------------------------- Game ----------------------------------- */
+
+function Game({
+  token,
+  player,
+  predictions,
+  canBailout,
+  onRefresh,
+  onSignOut,
+}: {
+  token: string;
+  player: Player;
+  predictions: Prediction[];
+  canBailout: boolean;
+  onRefresh: () => void;
+  onSignOut: () => void;
+}) {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [showCode, setShowCode] = useState(false);
+
+  const loadMatches = useCallback(async () => {
+    const res = await fetch("/api/matches");
+    const data = await res.json();
+    setMatches(data.matches ?? []);
+  }, []);
+
+  const loadLeaderboard = useCallback(async () => {
+    const res = await fetch("/api/leaderboard");
+    const data = await res.json();
+    setLeaderboard(data.leaderboard ?? []);
+  }, []);
+
+  useEffect(() => {
+    loadMatches();
+    loadLeaderboard();
+  }, [loadMatches, loadLeaderboard]);
+
+  async function share() {
+    const url =
+      process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== "http://localhost:3000"
+        ? process.env.NEXT_PUBLIC_SITE_URL
+        : window.location.origin;
+    const text = "Play the Soccer Prediction Game with me! ⚽";
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Soccer Predictor", text, url });
+        return;
+      } catch {
+        /* user cancelled */
+      }
+    }
+    await navigator.clipboard.writeText(url);
+    alert("Link copied! Send it to your friends.");
+  }
+
+  async function bailout() {
+    await fetch("/api/me", { method: "POST", headers: authHeaders(token) });
+    onRefresh();
+  }
+
+  const matchIdsPredicted = new Set(
+    predictions.map((p) => (p as any).match_id as number)
+  );
+  const openMatches = matches.filter((m) => !matchIdsPredicted.has(m.id));
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 py-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-emerald-100/70">Playing as</p>
+          <h1 className="text-xl font-bold">{player.username}</h1>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-emerald-100/70">Coins</p>
+          <p className="text-2xl font-extrabold text-yellow-300">
+            🪙 {player.coins.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={share} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold">
+          🔗 Invite a friend
+        </button>
+        <button
+          onClick={() => setShowCode((v) => !v)}
+          className="rounded-lg bg-black/30 px-3 py-1.5 text-sm font-semibold"
+        >
+          {showCode ? "Hide" : "Show"} recovery code
+        </button>
+        <button onClick={onSignOut} className="rounded-lg bg-black/30 px-3 py-1.5 text-sm">
+          Sign out
+        </button>
+      </div>
+
+      {showCode && (
+        <div className="mt-2 break-all rounded-lg bg-black/30 p-3 text-xs text-emerald-100">
+          Save this to log in on another device:
+          <br />
+          <span className="font-mono text-yellow-200">{token}</span>
+        </div>
+      )}
+
+      {canBailout && (
+        <div className="mt-4 rounded-xl bg-yellow-500/20 p-4">
+          <p className="text-sm">You're low on coins! Grab a free daily top-up.</p>
+          <button
+            onClick={bailout}
+            className="mt-2 rounded-lg bg-yellow-400 px-3 py-1.5 text-sm font-bold text-gray-900"
+          >
+            Get 100 coins
+          </button>
+        </div>
+      )}
+
+      {/* Matches */}
+      <Section title="Upcoming matches">
+        {openMatches.length === 0 ? (
+          <Empty text="No open matches right now. Check back soon — new fixtures load automatically." />
+        ) : (
+          openMatches.map((m) => (
+            <MatchCard key={m.id} match={m} token={token} coins={player.coins} onPlaced={onRefresh} />
+          ))
+        )}
+      </Section>
+
+      {/* My predictions */}
+      <Section title="My predictions">
+        {predictions.length === 0 ? (
+          <Empty text="You haven't predicted anything yet. Pick a match above!" />
+        ) : (
+          predictions.map((p) => <PredictionCard key={p.id} p={p} />)
+        )}
+      </Section>
+
+      {/* Leaderboard */}
+      <Section title="🏆 Leaderboard">
+        <div className="overflow-hidden rounded-xl bg-black/20">
+          {leaderboard.map((row, i) => (
+            <div
+              key={row.username + i}
+              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-emerald-500/30" : ""}`}
+            >
+              <span>
+                <span className="inline-block w-6 text-emerald-100/60">{i + 1}.</span>
+                {row.username}
+              </span>
+              <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <p className="mt-8 text-center text-xs text-emerald-100/50">
+        Free to play • Virtual coins only • No real money gambling
+      </p>
+    </main>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-7">
+      <h2 className="mb-2 text-lg font-bold">{title}</h2>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <p className="rounded-xl bg-black/20 p-4 text-sm text-emerald-100/70">{text}</p>;
+}
+
+/* ------------------------------ Match card -------------------------------- */
+
+function MatchCard({
+  match,
+  token,
+  coins,
+  onPlaced,
+}: {
+  match: Match;
+  token: string;
+  coins: number;
+  onPlaced: () => void;
+}) {
+  const [type, setType] = useState<"WINNER" | "EXACT">("WINNER");
+  const [pick, setPick] = useState<"HOME" | "DRAW" | "AWAY" | null>(null);
+  const [eh, setEh] = useState("");
+  const [ea, setEa] = useState("");
+  const [stake, setStake] = useState(100);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const kickoff = new Date(match.kickoff_at);
+
+  async function place() {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: any = { matchId: match.id, type, stake };
+      if (type === "WINNER") body.pick = pick;
+      else {
+        body.exactHome = Number(eh);
+        body.exactAway = Number(ea);
+      }
+      const res = await fetch("/api/predictions", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not place prediction.");
+        return;
+      }
+      onPlaced();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canPlace =
+    stake > 0 &&
+    stake <= coins &&
+    (type === "WINNER" ? pick !== null : eh !== "" && ea !== "");
+
+  return (
+    <div className="rounded-xl bg-black/25 p-4">
+      <div className="flex items-center justify-between text-xs text-emerald-100/60">
+        <span>{match.competition}</span>
+        <span>
+          {kickoff.toLocaleDateString()}{" "}
+          {kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      <div className="mt-1 text-center text-base font-bold">
+        {match.home_team} <span className="text-emerald-100/60">vs</span> {match.away_team}
+      </div>
+
+      <div className="mt-3 flex gap-2 text-xs">
+        <button
+          onClick={() => setType("WINNER")}
+          className={`flex-1 rounded-lg px-2 py-1 font-semibold ${type === "WINNER" ? "bg-emerald-500" : "bg-black/30"}`}
+        >
+          Winner / Draw (2×)
+        </button>
+        <button
+          onClick={() => setType("EXACT")}
+          className={`flex-1 rounded-lg px-2 py-1 font-semibold ${type === "EXACT" ? "bg-emerald-500" : "bg-black/30"}`}
+        >
+          Exact score (5×)
+        </button>
+      </div>
+
+      {type === "WINNER" ? (
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {(["HOME", "DRAW", "AWAY"] as const).map((opt) => (
+            <button
+              key={opt}
+              onClick={() => setPick(opt)}
+              className={`rounded-lg px-2 py-2 text-sm font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-black/30"}`}
+            >
+              {opt === "HOME" ? match.home_team : opt === "AWAY" ? match.away_team : "Draw"}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <input
+            type="number"
+            min={0}
+            value={eh}
+            onChange={(e) => setEh(e.target.value)}
+            className="w-16 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
+          />
+          <span>:</span>
+          <input
+            type="number"
+            min={0}
+            value={ea}
+            onChange={(e) => setEa(e.target.value)}
+            className="w-16 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
+          />
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs text-emerald-100/70">Stake</span>
+        <input
+          type="number"
+          min={1}
+          max={coins}
+          value={stake}
+          onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
+          className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
+        />
+        <button
+          onClick={place}
+          disabled={busy || !canPlace}
+          className="ml-auto rounded-lg bg-emerald-500 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+        >
+          {busy ? "…" : "Predict"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+    </div>
+  );
+}
+
+/* --------------------------- Prediction card ------------------------------ */
+
+function PredictionCard({ p }: { p: Prediction }) {
+  const m = p.matches;
+  const statusColor =
+    p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-emerald-100/70";
+  const yourCall =
+    p.type === "WINNER"
+      ? p.pick === "HOME"
+        ? m?.home_team
+        : p.pick === "AWAY"
+          ? m?.away_team
+          : "Draw"
+      : `${p.exact_home}–${p.exact_away}`;
+
+  return (
+    <div className="rounded-xl bg-black/20 p-3 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">
+          {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+        </span>
+        <span className={`font-bold ${statusColor}`}>
+          {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `Won +${p.payout}` : "Lost"}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center justify-between text-xs text-emerald-100/70">
+        <span>
+          Your call: <b>{yourCall}</b> · Stake {p.stake} · {p.type === "EXACT" ? "Exact" : "Winner"}
+        </span>
+        {m && m.home_score != null && (
+          <span>
+            Final {m.home_score}–{m.away_score}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
