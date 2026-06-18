@@ -160,20 +160,20 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
   return (
     <main className="mx-auto max-w-md px-5 py-10">
       <h1 className="text-3xl font-extrabold text-center">⚽ Soccer Predictor</h1>
-      <p className="mt-2 text-center text-emerald-100/80">
+      <p className="mt-2 text-center text-blue-100/80">
         Predict real matches. Win coins. Top the leaderboard.
       </p>
 
-      <div className="mt-8 rounded-2xl bg-black/25 p-5 shadow-lg backdrop-blur">
-        <div className="mb-4 flex gap-2 rounded-xl bg-black/20 p-1">
+      <div className="mt-8 rounded-2xl bg-white/5 p-5 shadow-lg backdrop-blur">
+        <div className="mb-4 flex gap-2 rounded-xl bg-white/5 p-1">
           <button
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "new" ? "bg-emerald-500 text-white" : "text-emerald-100"}`}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "new" ? "bg-blue-600 text-white" : "text-blue-100"}`}
             onClick={() => setMode("new")}
           >
             New player
           </button>
           <button
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "recover" ? "bg-emerald-500 text-white" : "text-emerald-100"}`}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "recover" ? "bg-blue-600 text-white" : "text-blue-100"}`}
             onClick={() => setMode("recover")}
           >
             I have a code
@@ -194,7 +194,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
             <button
               disabled={busy || username.trim().length < 2}
               onClick={createAccount}
-              className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
             >
               {busy ? "Creating…" : "Start playing (1,000 coins)"}
             </button>
@@ -212,7 +212,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
             <button
               disabled={busy || recovery.trim().length < 6}
               onClick={recover}
-              className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
             >
               {busy ? "Checking…" : "Log back in"}
             </button>
@@ -221,7 +221,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
 
         {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
       </div>
-      <p className="mt-6 text-center text-xs text-emerald-100/60">
+      <p className="mt-6 text-center text-xs text-blue-100/60">
         Free to play • Virtual coins only • No real money
       </p>
     </main>
@@ -248,6 +248,8 @@ function Game({
   const [matches, setMatches] = useState<Match[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [showCode, setShowCode] = useState(false);
+  const [comp, setComp] = useState("All");
+  const [visible, setVisible] = useState(10);
 
   const loadMatches = useCallback(async () => {
     const res = await fetch("/api/matches");
@@ -295,16 +297,26 @@ function Game({
     predictions.map((p) => [(p as any).match_id as number, p])
   );
 
+  // Competition filter + "show more" to keep the match list short.
+  const competitions = Array.from(new Set(matches.map((m) => m.competition)));
+  const filtered = comp === "All" ? matches : matches.filter((m) => m.competition === comp);
+  const shown = filtered.slice(0, visible);
+
+  function pickComp(c: string) {
+    setComp(c);
+    setVisible(10);
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm text-emerald-100/70">Playing as</p>
+          <p className="text-sm text-blue-100/70">Playing as</p>
           <h1 className="text-xl font-bold">{player.username}</h1>
         </div>
         <div className="text-right">
-          <p className="text-sm text-emerald-100/70">Coins</p>
+          <p className="text-sm text-blue-100/70">Coins</p>
           <p className="text-2xl font-extrabold text-yellow-300">
             🪙 {player.coins.toLocaleString()}
           </p>
@@ -312,22 +324,22 @@ function Game({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <button onClick={share} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-semibold">
+        <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           🔗 Invite a friend
         </button>
         <button
           onClick={() => setShowCode((v) => !v)}
-          className="rounded-lg bg-black/30 px-3 py-1.5 text-sm font-semibold"
+          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
         >
           {showCode ? "Hide" : "Show"} recovery code
         </button>
-        <button onClick={onSignOut} className="rounded-lg bg-black/30 px-3 py-1.5 text-sm">
+        <button onClick={onSignOut} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
           Sign out
         </button>
       </div>
 
       {showCode && (
-        <div className="mt-2 break-all rounded-lg bg-black/30 p-3 text-xs text-emerald-100">
+        <div className="mt-2 break-all rounded-lg bg-white/10 p-3 text-xs text-blue-100">
           Save this to log in on another device:
           <br />
           <span className="font-mono text-yellow-200">{token}</span>
@@ -348,14 +360,14 @@ function Game({
 
       {/* Leaderboard */}
       <Section title="🏆 Leaderboard">
-        <div className="overflow-hidden rounded-xl bg-black/20">
+        <div className="overflow-hidden rounded-xl bg-white/5">
           {leaderboard.map((row, i) => (
             <div
               key={row.username + i}
-              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-emerald-500/30" : ""}`}
+              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-blue-600/30" : ""}`}
             >
               <span>
-                <span className="inline-block w-6 text-emerald-100/60">{i + 1}.</span>
+                <span className="inline-block w-6 text-blue-100/60">{i + 1}.</span>
                 {row.username}
               </span>
               <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
@@ -380,20 +392,45 @@ function Game({
         {matches.length === 0 ? (
           <Empty text="No open matches right now. Check back soon — new fixtures load automatically." />
         ) : (
-          matches.map((m) => (
-            <MatchCard
-              key={m.id}
-              match={m}
-              token={token}
-              coins={player.coins}
-              myPrediction={predByMatch.get(m.id)}
-              onPlaced={onRefresh}
-            />
-          ))
+          <>
+            {competitions.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {["All", ...competitions].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => pickComp(c)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${comp === c ? "bg-blue-600 text-white" : "bg-white/10 text-blue-100"}`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {shown.map((m) => (
+              <MatchCard
+                key={m.id}
+                match={m}
+                token={token}
+                coins={player.coins}
+                myPrediction={predByMatch.get(m.id)}
+                onPlaced={onRefresh}
+              />
+            ))}
+
+            {filtered.length > visible && (
+              <button
+                onClick={() => setVisible((v) => v + 10)}
+                className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-blue-100"
+              >
+                Show more ({filtered.length - visible} more)
+              </button>
+            )}
+          </>
         )}
       </Section>
 
-      <p className="mt-8 text-center text-xs text-emerald-100/50">
+      <p className="mt-8 text-center text-xs text-blue-100/50">
         Free to play • Virtual coins only • No real money gambling
       </p>
     </main>
@@ -410,7 +447,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-xl bg-black/20 p-4 text-sm text-emerald-100/70">{text}</p>;
+  return <p className="rounded-xl bg-white/5 p-4 text-sm text-blue-100/70">{text}</p>;
 }
 
 /* ------------------------------ Shared bits ------------------------------- */
@@ -443,7 +480,7 @@ function TeamLine({
   return (
     <div className="mt-1 flex items-center justify-center gap-2 text-base font-bold">
       <Crest url={homeCrest} /> {home}
-      <span className="text-emerald-100/60">vs</span>
+      <span className="text-blue-100/60">vs</span>
       {away} <Crest url={awayCrest} />
     </div>
   );
@@ -549,7 +586,7 @@ function BetForm({
           <button
             key={t}
             onClick={() => setType(t)}
-            className={`rounded-lg px-2 py-1.5 font-semibold ${type === t ? "bg-emerald-500" : "bg-black/30"}`}
+            className={`rounded-lg px-2 py-1.5 font-semibold ${type === t ? "bg-blue-600" : "bg-white/10"}`}
           >
             {BET_LABELS[t]}
           </button>
@@ -580,7 +617,7 @@ function BetForm({
             <button
               key={opt}
               onClick={() => setPick(opt)}
-              className={`rounded-lg px-2 py-2 text-sm font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-black/30"}`}
+              className={`rounded-lg px-2 py-2 text-sm font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-white/10"}`}
             >
               {label}
             </button>
@@ -589,7 +626,7 @@ function BetForm({
       )}
 
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-xs text-emerald-100/70">Stake</span>
+        <span className="text-xs text-blue-100/70">Stake</span>
         <input
           type="number"
           min={1}
@@ -599,14 +636,14 @@ function BetForm({
           className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
         />
         {onCancel && (
-          <button onClick={onCancel} className="rounded-lg bg-black/30 px-3 py-1.5 text-sm">
+          <button onClick={onCancel} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
             Close
           </button>
         )}
         <button
           onClick={submit}
           disabled={busy || !canSubmit}
-          className="ml-auto rounded-lg bg-emerald-500 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+          className="ml-auto rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
         >
           {busy ? "…" : submitLabel}
         </button>
@@ -668,7 +705,7 @@ function BetEditor({
 
   if (editing) {
     return (
-      <div className="mt-3 rounded-lg bg-black/20 p-3">
+      <div className="mt-3 rounded-lg bg-white/5 p-3">
         <BetForm
           home={home}
           away={away}
@@ -692,14 +729,14 @@ function BetEditor({
     <div className="mt-2 flex gap-2">
       <button
         onClick={() => setEditing(true)}
-        className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold"
+        className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
       >
         ✏️ Edit
       </button>
       <button
         onClick={cancelBet}
         disabled={busy}
-        className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
+        className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
       >
         🗑 Cancel / Undo
       </button>
@@ -737,8 +774,8 @@ function MatchCard({
   }
 
   return (
-    <div className="rounded-xl bg-black/25 p-4">
-      <div className="flex items-center justify-between text-xs text-emerald-100/60">
+    <div className="rounded-xl bg-white/5 p-4">
+      <div className="flex items-center justify-between text-xs text-blue-100/60">
         <span>{match.competition}</span>
         <span>
           {kickoff.toLocaleDateString()}{" "}
@@ -753,7 +790,7 @@ function MatchCard({
       />
 
       {myPrediction ? (
-        <div className="mt-3 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm">
+        <div className="mt-3 rounded-lg bg-blue-600/20 px-3 py-2 text-sm">
           ✅ Your pick:{" "}
           <b>
             {describeCall(
@@ -833,26 +870,26 @@ function CommunityBets({ match }: { match: Match }) {
 
   return (
     <div className="mt-3 border-t border-white/10 pt-2">
-      <button onClick={toggle} className="text-xs font-semibold text-emerald-200">
+      <button onClick={toggle} className="text-xs font-semibold text-blue-200">
         👥 {open ? "Hide" : "Who's betting?"}
       </button>
 
       {open && (
         <div className="mt-2 text-xs">
           {loading ? (
-            <p className="text-emerald-100/60">Loading…</p>
+            <p className="text-blue-100/60">Loading…</p>
           ) : bets.length === 0 ? (
-            <p className="text-emerald-100/60">No one has bet on this match yet — be the first!</p>
+            <p className="text-blue-100/60">No one has bet on this match yet — be the first!</p>
           ) : (
             <>
               {totalHDA > 0 && (
                 <div className="mb-3">
                   <div className="flex h-3 overflow-hidden rounded-full">
                     <div className="bg-yellow-400" style={{ width: `${pct(counts.HOME)}%` }} />
-                    <div className="bg-emerald-300" style={{ width: `${pct(counts.DRAW)}%` }} />
+                    <div className="bg-blue-300" style={{ width: `${pct(counts.DRAW)}%` }} />
                     <div className="bg-sky-400" style={{ width: `${pct(counts.AWAY)}%` }} />
                   </div>
-                  <div className="mt-1 flex justify-between text-emerald-100/80">
+                  <div className="mt-1 flex justify-between text-blue-100/80">
                     <span>🟨 {match.home_team} {pct(counts.HOME)}%</span>
                     <span>🟩 Draw {pct(counts.DRAW)}%</span>
                     <span>🟦 {match.away_team} {pct(counts.AWAY)}%</span>
@@ -860,12 +897,12 @@ function CommunityBets({ match }: { match: Match }) {
                 </div>
               )}
 
-              <p className="mb-1 font-semibold text-emerald-100/80">{bets.length} player{bets.length > 1 ? "s" : ""} betting:</p>
+              <p className="mb-1 font-semibold text-blue-100/80">{bets.length} player{bets.length > 1 ? "s" : ""} betting:</p>
               <div className="space-y-1">
                 {bets.map((b, i) => (
-                  <div key={i} className="flex justify-between rounded bg-black/20 px-2 py-1">
+                  <div key={i} className="flex justify-between rounded bg-white/5 px-2 py-1">
                     <span className="font-medium">{b.username}</span>
-                    <span className="text-emerald-100/70">
+                    <span className="text-blue-100/70">
                       {describeCall(b.type, b.pick, b.exact_home, b.exact_away, match.home_team, match.away_team)} · 🪙{b.stake}
                     </span>
                   </div>
@@ -895,7 +932,7 @@ function PredictionCard({
   const m = p.matches;
 
   const statusColor =
-    p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-emerald-100/70";
+    p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-blue-100/70";
 
   // Editable while the bet is pending and the match hasn't kicked off yet.
   const editable = p.status === "PENDING" && !!m && new Date(m.kickoff_at) > new Date();
@@ -910,7 +947,7 @@ function PredictionCard({
   );
 
   return (
-    <div className="rounded-xl bg-black/20 p-3 text-sm">
+    <div className="rounded-xl bg-white/5 p-3 text-sm">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 font-semibold">
           <Crest url={m?.home_crest ?? null} />
@@ -921,7 +958,7 @@ function PredictionCard({
           {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `Won +${p.payout}` : "Lost"}
         </span>
       </div>
-      <div className="mt-1 flex items-center justify-between text-xs text-emerald-100/70">
+      <div className="mt-1 flex items-center justify-between text-xs text-blue-100/70">
         <span>
           <b>{yourCall}</b> · Stake {p.stake}
         </span>
