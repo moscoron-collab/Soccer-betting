@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
+import { computeBonusMult } from "@/lib/bonus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,6 +124,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not place prediction." }, { status: 500 });
   }
 
+  const bonusMult = await computeBonusMult(matchId, p.type, p.pick);
+
   const { data: created, error: insertErr } = await supabase
     .from("predictions")
     .insert({
@@ -133,6 +136,7 @@ export async function POST(req: Request) {
       exact_home: p.exactHome,
       exact_away: p.exactAway,
       stake: p.stake,
+      bonus_mult: bonusMult,
       status: "PENDING",
     })
     .select("id")
@@ -200,6 +204,8 @@ export async function PUT(req: Request) {
     .eq("id", player.id);
   if (coinErr) return NextResponse.json({ error: "Could not update bet." }, { status: 500 });
 
+  const bonusMult = await computeBonusMult(old.match_id, p.type, p.pick);
+
   const { error: updErr } = await supabase
     .from("predictions")
     .update({
@@ -208,6 +214,7 @@ export async function PUT(req: Request) {
       exact_home: p.exactHome,
       exact_away: p.exactAway,
       stake: p.stake,
+      bonus_mult: bonusMult,
       status: "PENDING",
       payout: 0,
     })

@@ -23,6 +23,7 @@ type Prediction = {
   exact_away: number | null;
   stake: number;
   payout: number;
+  bonus_mult: number;
   status: "PENDING" | "WON" | "LOST";
   matches: {
     home_team: string;
@@ -45,6 +46,13 @@ const BET_LABELS: Record<BetType, string> = {
   HALFTIME: "Half-time leader (2×)",
   GOALS3: "3+ goals (2×)",
 };
+const BASE_MULT: Record<BetType, number> = { WINNER: 2, EXACT: 5, HALFTIME: 2, GOALS3: 2 };
+
+// Coins a pending bet would return if it wins (base × locked-in bonus).
+function potentialWin(p: Prediction): number {
+  return Math.round(p.stake * BASE_MULT[p.type] * (p.bonus_mult ?? 1));
+}
+
 type LeaderRow = { username: string; coins: number };
 
 function authHeaders(token: string): HeadersInit {
@@ -57,6 +65,7 @@ export default function Home() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [canBailout, setCanBailout] = useState(false);
+  const [canSpin, setCanSpin] = useState(false);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -77,6 +86,7 @@ export default function Home() {
     setPlayer(data.player);
     setPredictions(data.predictions ?? []);
     setCanBailout(!!data.canBailout);
+    setCanSpin(!!data.canSpin);
   }, []);
 
   useEffect(() => {
@@ -107,6 +117,7 @@ export default function Home() {
       player={player}
       predictions={predictions}
       canBailout={canBailout}
+      canSpin={canSpin}
       onRefresh={() => loadMe(token)}
       onSignOut={signOut}
     />
@@ -229,6 +240,7 @@ function Game({
   player,
   predictions,
   canBailout,
+  canSpin,
   onRefresh,
   onSignOut,
 }: {
@@ -236,6 +248,7 @@ function Game({
   player: Player;
   predictions: Prediction[];
   canBailout: boolean;
+  canSpin: boolean;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -295,9 +308,23 @@ function Game({
   const filtered = comp === "All" ? matches : matches.filter((m) => m.competition === comp);
   const shown = filtered.slice(0, visible);
 
+  // Match of the Day = soonest upcoming match (list arrives sorted by kickoff).
+  const motdId = matches[0]?.id;
+
   function pickComp(c: string) {
     setComp(c);
     setVisible(10);
+  }
+
+  async function spin() {
+    const res = await fetch("/api/spin", { method: "POST", headers: authHeaders(token) });
+    const data = await res.json();
+    if (res.ok) {
+      alert(`🎰 You won ${data.reward} coins!`);
+      onRefresh();
+    } else {
+      alert(data.error ?? "Try again.");
+    }
   }
 
   return (
@@ -368,6 +395,26 @@ function Game({
         )}
       </Section>
 
+      {/* Mini-games */}
+      <Section title="🎮 Mini-games">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-white/5 p-4">
+            <p className="font-bold">🎰 Daily Spin</p>
+            <p className="mt-1 text-xs text-blue-100/70">
+              Spin once a day for free bonus coins.
+            </p>
+            <button
+              onClick={spin}
+              disabled={!canSpin}
+              className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+            >
+              {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
+            </button>
+          </div>
+          <CrowdGame token={token} matches={matches} />
+        </div>
+      </Section>
+
       {/* Matches */}
       <Section title="Upcoming matches">
         {matches.length === 0 ? (
@@ -396,6 +443,7 @@ function Game({
                   token={token}
                   coins={player.coins}
                   myPrediction={predByMatch.get(m.id)}
+                  isMotd={m.id === motdId}
                   onPlaced={onRefresh}
                 />
               ))}
@@ -734,12 +782,14 @@ function MatchCard({
   token,
   coins,
   myPrediction,
+  isMotd,
   onPlaced,
 }: {
   match: Match;
   token: string;
   coins: number;
   myPrediction?: Prediction;
+  isMotd?: boolean;
   onPlaced: () => void;
 }) {
   const kickoff = new Date(match.kickoff_at);
@@ -757,7 +807,7 @@ function MatchCard({
   }
 
   return (
-    <div className="rounded-xl bg-white/5 p-4">
+    <div className={`rounded-xl bg-white/5 p-4 ${isMotd ? "ring-2 ring-yellow-400/70" : ""}`}>
       <div className="flex items-center justify-between text-xs text-blue-100/60">
         <span>{match.competition}</span>
         <span>
@@ -765,6 +815,11 @@ function MatchCard({
           {kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
+      {isMotd && (
+        <div className="mt-1 text-center text-xs font-bold text-yellow-300">
+          ⭐ Match of the Day — winning bets get a bonus!
+        </div>
+      )}
       <TeamLine
         home={match.home_team}
         away={match.away_team}
@@ -787,6 +842,12 @@ function MatchCard({
           </b>{" "}
           · 🪙{myPrediction.stake}
           {myPrediction.status === "PENDING" && (
+            <span className="block text-xs text-blue-100/70">
+              Could win 🪙{potentialWin(myPrediction)}
+              {myPrediction.bonus_mult > 1 && ` (bonus ×${myPrediction.bonus_mult})`}
+            </span>
+          )}
+          {myPrediction.status === "PENDING" && (
             <BetEditor
               p={myPrediction}
               home={match.home_team}
@@ -799,6 +860,9 @@ function MatchCard({
         </div>
       ) : (
         <div className="mt-3">
+          <p className="mb-2 text-center text-xs text-blue-100/60">
+            💡 Win more by backing the unpopular pick — underdog bets pay a bonus.
+          </p>
           <BetForm
             home={match.home_team}
             away={match.away_team}
@@ -944,6 +1008,13 @@ function PredictionCard({
       <div className="mt-1 flex items-center justify-between text-xs text-blue-100/70">
         <span>
           <b>{yourCall}</b> · Stake {p.stake}
+          {p.status === "PENDING" && (
+            <>
+              {" "}
+              · could win 🪙{potentialWin(p)}
+              {p.bonus_mult > 1 && ` (×${p.bonus_mult})`}
+            </>
+          )}
         </span>
         {m && m.home_score != null && (
           <span>
@@ -962,6 +1033,118 @@ function PredictionCard({
           coins={coins}
           onChange={onChange}
         />
+      )}
+    </div>
+  );
+}
+
+/* --------------------------- Beat the Crowd ------------------------------- */
+// Guess what % of players will back the favourite; closest guess wins coins.
+// Resolves at kickoff (via the sync job), so no AI can know the answer ahead.
+
+type CrowdGuess = {
+  id: string;
+  match_id: number;
+  guess_pct: number;
+  reward: number;
+  status: "PENDING" | "SETTLED";
+  matches: { home_team: string; away_team: string; kickoff_at: string } | null;
+};
+
+function CrowdGame({ token, matches }: { token: string; matches: Match[] }) {
+  const [guesses, setGuesses] = useState<CrowdGuess[]>([]);
+  const [sel, setSel] = useState<number | "">("");
+  const [pct, setPct] = useState(50);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/crowd", { headers: authHeaders(token) });
+    if (res.ok) setGuesses((await res.json()).guesses ?? []);
+  }, [token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const guessedIds = new Set(guesses.map((g) => g.match_id));
+  const available = matches.filter((m) => !guessedIds.has(m.id)).slice(0, 20);
+
+  async function submit() {
+    if (sel === "") return;
+    setMsg(null);
+    const res = await fetch("/api/crowd", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ matchId: sel, guessPct: pct }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setMsg(data.error ?? "Try again.");
+      return;
+    }
+    setSel("");
+    setPct(50);
+    load();
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-4">
+      <p className="font-bold">🎯 Beat the Crowd</p>
+      <p className="mt-1 text-xs text-blue-100/70">
+        Guess what % of players will back the favourite. Closest guess wins coins (settled at
+        kickoff).
+      </p>
+
+      <select
+        value={sel}
+        onChange={(e) => setSel(e.target.value ? Number(e.target.value) : "")}
+        className="mt-3 w-full rounded-lg bg-white/95 px-2 py-1.5 text-sm text-gray-900"
+      >
+        <option value="">Pick a match…</option>
+        {available.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.home_team} vs {m.away_team}
+          </option>
+        ))}
+      </select>
+
+      {sel !== "" && (
+        <div className="mt-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span>Favourite backed by</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={pct}
+              onChange={(e) => setPct(Number(e.target.value))}
+              className="flex-1"
+            />
+            <b className="w-10 text-right">{pct}%</b>
+          </div>
+          <button
+            onClick={submit}
+            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold"
+          >
+            Submit guess
+          </button>
+        </div>
+      )}
+      {msg && <p className="mt-2 text-xs text-red-300">{msg}</p>}
+
+      {guesses.length > 0 && (
+        <div className="mt-3 space-y-1 text-xs">
+          {guesses.slice(0, 5).map((g) => (
+            <div key={g.id} className="flex justify-between rounded bg-white/5 px-2 py-1">
+              <span>
+                {g.matches ? `${g.matches.home_team} v ${g.matches.away_team}` : "Match"} · {g.guess_pct}%
+              </span>
+              <span className={g.status === "SETTLED" ? (g.reward > 0 ? "text-green-300" : "text-blue-100/60") : "text-blue-100/60"}>
+                {g.status === "PENDING" ? "Pending" : g.reward > 0 ? `Won +${g.reward}` : "No win"}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

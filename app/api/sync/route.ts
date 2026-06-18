@@ -62,7 +62,7 @@ async function runSync() {
 
     const { data: preds } = await supabase
       .from("predictions")
-      .select("id, player_id, type, pick, exact_home, exact_away, stake")
+      .select("id, player_id, type, pick, exact_home, exact_away, stake, bonus_mult")
       .eq("match_id", match.id)
       .eq("status", "PENDING");
 
@@ -76,7 +76,8 @@ async function runSync() {
         homeScore,
         awayScore,
         halfHome,
-        halfAway
+        halfAway,
+        Number(p.bonus_mult ?? 1)
       );
 
       await supabase
@@ -94,7 +95,45 @@ async function runSync() {
     settledMatches++;
   }
 
-  return { upserted, settledMatches, settledPredictions };
+  // 3) Settle "Beat the Crowd" guesses for matches that have kicked off.
+  let settledGuesses = 0;
+  const { data: guesses } = await supabase
+    .from("crowd_guesses")
+    .select("id, player_id, match_id, guess_pct, matches(kickoff_at)")
+    .eq("status", "PENDING");
+
+  const now = new Date();
+  for (const g of guesses ?? []) {
+    const ko = (g as any).matches?.kickoff_at;
+    if (!ko || new Date(ko) > now) continue; // not started yet
+
+    const { data: rows } = await supabase
+      .from("predictions")
+      .select("pick")
+      .eq("match_id", g.match_id)
+      .in("type", ["WINNER", "HALFTIME"]);
+    const counts: Record<string, number> = { HOME: 0, DRAW: 0, AWAY: 0 };
+    for (const r of rows ?? []) if (r.pick && r.pick in counts) counts[r.pick]++;
+    const total = counts.HOME + counts.DRAW + counts.AWAY;
+    const favShare = total ? Math.max(counts.HOME, counts.DRAW, counts.AWAY) / total : 0;
+    const actualPct = Math.round(favShare * 100);
+    const diff = Math.abs(g.guess_pct - actualPct);
+
+    let reward = 0;
+    if (total > 0) {
+      if (diff <= 5) reward = 200;
+      else if (diff <= 15) reward = 100;
+      else if (diff <= 30) reward = 50;
+    }
+
+    await supabase.from("crowd_guesses").update({ status: "SETTLED", reward }).eq("id", g.id);
+    if (reward > 0) {
+      await supabase.rpc("increment_coins", { p_player: g.player_id, p_amount: reward });
+    }
+    settledGuesses++;
+  }
+
+  return { upserted, settledMatches, settledPredictions, settledGuesses };
 }
 
 export async function POST(req: Request) {

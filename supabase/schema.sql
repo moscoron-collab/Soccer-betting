@@ -9,6 +9,7 @@ create table if not exists players (
   password_hash   text,                            -- scrypt "salt:hash" (set on signup/first login)
   coins           integer not null default 1000,
   last_bailout_at timestamptz,                       -- for the "keep playing" top-up
+  last_spin_at    timestamptz,                       -- for the daily spin
   created_at      timestamptz not null default now()
 );
 
@@ -44,6 +45,7 @@ create table if not exists predictions (
   exact_away  integer,                               -- (for EXACT)
   stake       integer not null,
   payout      integer not null default 0,
+  bonus_mult  numeric not null default 1,            -- underdog + Match of the Day bonus, locked at bet time
   status      text not null default 'PENDING',       -- PENDING | WON | LOST
   created_at  timestamptz not null default now(),
   unique (player_id, match_id)                       -- one prediction per match per player (V1)
@@ -51,6 +53,18 @@ create table if not exists predictions (
 
 create index if not exists predictions_player_idx on predictions (player_id);
 create index if not exists predictions_match_idx on predictions (match_id);
+
+-- ---------- crowd_guesses ("Beat the Crowd" mini-game) ----------
+create table if not exists crowd_guesses (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  match_id    bigint not null references matches(id) on delete cascade,
+  guess_pct   integer not null,                      -- guessed % backing the favourite
+  reward      integer not null default 0,
+  status      text not null default 'PENDING',       -- PENDING | SETTLED
+  created_at  timestamptz not null default now(),
+  unique (player_id, match_id)
+);
 
 -- ---------- helper: atomic coin increment (used when settling winnings) ----------
 create or replace function increment_coins(p_player uuid, p_amount integer)

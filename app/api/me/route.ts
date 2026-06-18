@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const { data: predictions } = await supabase
     .from("predictions")
     .select(
-      "id, match_id, type, pick, exact_home, exact_away, stake, payout, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
+      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
     )
     .eq("player_id", player.id)
     .order("created_at", { ascending: false })
@@ -27,7 +27,11 @@ export async function GET(req: Request) {
     (!player.last_bailout_at ||
       Date.now() - new Date(player.last_bailout_at).getTime() > 86400000);
 
-  return NextResponse.json({ player, predictions: predictions ?? [], canBailout });
+  const canSpin =
+    !player.last_spin_at ||
+    Date.now() - new Date(player.last_spin_at).getTime() > 86400000;
+
+  return NextResponse.json({ player, predictions: predictions ?? [], canBailout, canSpin });
 }
 
 // POST /api/me/bailout-style top-up: if broke, top up to the floor once per day.
