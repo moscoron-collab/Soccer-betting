@@ -659,6 +659,93 @@ function MatchCard({
           onSubmit={place}
         />
       </div>
+
+      <CommunityBets match={match} />
+    </div>
+  );
+}
+
+/* --------------------------- Community bets ------------------------------- */
+// Shows who has bet on a match and the Home/Draw/Away split.
+
+type MatchBet = {
+  username: string;
+  type: BetType;
+  pick: string | null;
+  exact_home: number | null;
+  exact_away: number | null;
+  stake: number;
+};
+
+function CommunityBets({ match }: { match: Match }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [bets, setBets] = useState<MatchBet[]>([]);
+  const [counts, setCounts] = useState({ HOME: 0, DRAW: 0, AWAY: 0 });
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/match-bets?matchId=${match.id}`);
+        const data = await res.json();
+        setBets(data.bets ?? []);
+        setCounts(data.counts ?? { HOME: 0, DRAW: 0, AWAY: 0 });
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  const totalHDA = counts.HOME + counts.DRAW + counts.AWAY;
+  const pct = (n: number) => (totalHDA ? Math.round((n / totalHDA) * 100) : 0);
+
+  return (
+    <div className="mt-3 border-t border-white/10 pt-2">
+      <button onClick={toggle} className="text-xs font-semibold text-emerald-200">
+        👥 {open ? "Hide" : "Who's betting?"}
+      </button>
+
+      {open && (
+        <div className="mt-2 text-xs">
+          {loading ? (
+            <p className="text-emerald-100/60">Loading…</p>
+          ) : bets.length === 0 ? (
+            <p className="text-emerald-100/60">No one has bet on this match yet — be the first!</p>
+          ) : (
+            <>
+              {totalHDA > 0 && (
+                <div className="mb-3">
+                  <div className="flex h-3 overflow-hidden rounded-full">
+                    <div className="bg-yellow-400" style={{ width: `${pct(counts.HOME)}%` }} />
+                    <div className="bg-emerald-300" style={{ width: `${pct(counts.DRAW)}%` }} />
+                    <div className="bg-sky-400" style={{ width: `${pct(counts.AWAY)}%` }} />
+                  </div>
+                  <div className="mt-1 flex justify-between text-emerald-100/80">
+                    <span>🟨 {match.home_team} {pct(counts.HOME)}%</span>
+                    <span>🟩 Draw {pct(counts.DRAW)}%</span>
+                    <span>🟦 {match.away_team} {pct(counts.AWAY)}%</span>
+                  </div>
+                </div>
+              )}
+
+              <p className="mb-1 font-semibold text-emerald-100/80">{bets.length} player{bets.length > 1 ? "s" : ""} betting:</p>
+              <div className="space-y-1">
+                {bets.map((b, i) => (
+                  <div key={i} className="flex justify-between rounded bg-black/20 px-2 py-1">
+                    <span className="font-medium">{b.username}</span>
+                    <span className="text-emerald-100/70">
+                      {describeCall(b.type, b.pick, b.exact_home, b.exact_away, match.home_team, match.away_team)} · 🪙{b.stake}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
