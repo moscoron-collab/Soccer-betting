@@ -23,3 +23,10 @@ export async function getPlayerFromRequest(req: Request): Promise<Player | null>
   if (error || !data) return null;
   return data as Player;
 }
+
+// Escapes LIKE wildcards so an exact (case-insensitive) username match via ilike
+// can't be fooled by "%" or "_" in a name.
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => "\\" + c);
+}
+

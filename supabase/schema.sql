@@ -5,7 +5,8 @@
 create table if not exists players (
   id              uuid primary key default gen_random_uuid(),
   username        text unique not null,
-  secret_token    text unique not null,            -- also used as the recovery code
+  secret_token    text unique not null,            -- session token stored in the browser
+  password_hash   text,                            -- scrypt "salt:hash" (set on signup/first login)
   coins           integer not null default 1000,
   last_bailout_at timestamptz,                       -- for the "keep playing" top-up
   created_at      timestamptz not null default now()

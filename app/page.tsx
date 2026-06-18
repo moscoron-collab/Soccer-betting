@@ -116,20 +116,21 @@ export default function Home() {
 /* ------------------------------- Auth screen ------------------------------- */
 
 function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
-  const [mode, setMode] = useState<"new" | "recover">("new");
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
-  const [recovery, setRecovery] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function createAccount() {
+  async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/players", {
+      const endpoint = mode === "signup" ? "/api/players" : "/api/login";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -142,20 +143,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
     }
   }
 
-  async function recover() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/me", { headers: authHeaders(recovery.trim()) });
-      if (!res.ok) {
-        setError("That recovery code didn't work.");
-        return;
-      }
-      onSignedIn(recovery.trim());
-    } finally {
-      setBusy(false);
-    }
-  }
+  const canSubmit = username.trim().length >= 2 && password.length >= 4;
 
   return (
     <main className="mx-auto max-w-md px-5 py-10">
@@ -167,59 +155,65 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
       <div className="mt-8 rounded-2xl bg-white/5 p-5 shadow-lg backdrop-blur">
         <div className="mb-4 flex gap-2 rounded-xl bg-white/5 p-1">
           <button
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "new" ? "bg-blue-600 text-white" : "text-blue-100"}`}
-            onClick={() => setMode("new")}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "login" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+            onClick={() => {
+              setMode("login");
+              setError(null);
+            }}
+          >
+            Log in
+          </button>
+          <button
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "signup" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+            onClick={() => {
+              setMode("signup");
+              setError(null);
+            }}
           >
             New player
           </button>
-          <button
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "recover" ? "bg-blue-600 text-white" : "text-blue-100"}`}
-            onClick={() => setMode("recover")}
-          >
-            I have a code
-          </button>
         </div>
 
-        {mode === "new" ? (
-          <>
-            <label className="text-sm font-medium">Pick a username</label>
-            <input
-              className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
-              value={username}
-              maxLength={20}
-              placeholder="e.g. GoalMachine"
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createAccount()}
-            />
-            <button
-              disabled={busy || username.trim().length < 2}
-              onClick={createAccount}
-              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
-            >
-              {busy ? "Creating…" : "Start playing (1,000 coins)"}
-            </button>
-          </>
-        ) : (
-          <>
-            <label className="text-sm font-medium">Your recovery code</label>
-            <input
-              className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
-              value={recovery}
-              placeholder="paste your code"
-              onChange={(e) => setRecovery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && recover()}
-            />
-            <button
-              disabled={busy || recovery.trim().length < 6}
-              onClick={recover}
-              className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
-            >
-              {busy ? "Checking…" : "Log back in"}
-            </button>
-          </>
-        )}
+        <label className="text-sm font-medium">Username</label>
+        <input
+          className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
+          value={username}
+          maxLength={20}
+          placeholder="e.g. GoalMachine"
+          autoCapitalize="none"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+
+        <label className="mt-3 block text-sm font-medium">Password</label>
+        <input
+          type="password"
+          className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
+          value={password}
+          maxLength={50}
+          placeholder={mode === "signup" ? "choose a password" : "your password"}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+        />
+
+        <button
+          disabled={busy || !canSubmit}
+          onClick={submit}
+          className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+        >
+          {busy
+            ? "…"
+            : mode === "signup"
+              ? "Start playing (1,000 coins)"
+              : "Log in"}
+        </button>
 
         {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+
+        <p className="mt-3 text-center text-xs text-blue-100/60">
+          {mode === "login"
+            ? "New here? Tap “New player” above to create an account."
+            : "Pick any username + password. Use the same ones to log in on your phone."}
+        </p>
       </div>
       <p className="mt-6 text-center text-xs text-blue-100/60">
         Free to play • Virtual coins only • No real money
@@ -247,7 +241,6 @@ function Game({
 }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
-  const [showCode, setShowCode] = useState(false);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
 
@@ -327,24 +320,10 @@ function Game({
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           🔗 Invite a friend
         </button>
-        <button
-          onClick={() => setShowCode((v) => !v)}
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
-        >
-          {showCode ? "Hide" : "Show"} recovery code
-        </button>
         <button onClick={onSignOut} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
           Sign out
         </button>
       </div>
-
-      {showCode && (
-        <div className="mt-2 break-all rounded-lg bg-white/10 p-3 text-xs text-blue-100">
-          Save this to log in on another device:
-          <br />
-          <span className="font-mono text-yellow-200">{token}</span>
-        </div>
-      )}
 
       {canBailout && (
         <div className="mt-4 rounded-xl bg-yellow-500/20 p-4">
