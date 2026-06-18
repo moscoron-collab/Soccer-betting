@@ -8,10 +8,14 @@ export type FdMatch = {
   competition: string;
   homeTeam: string;
   awayTeam: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
   kickoff: string; // ISO
   status: "SCHEDULED" | "TIMED" | "IN_PLAY" | "PAUSED" | "FINISHED" | string;
   homeScore: number | null;
   awayScore: number | null;
+  halfHome: number | null;
+  halfAway: number | null;
 };
 
 function getKey(): string {
@@ -63,10 +67,14 @@ async function fetchCompetitionMatches(
     competition: m.competition?.name ?? code,
     homeTeam: m.homeTeam?.shortName || m.homeTeam?.name || "Home",
     awayTeam: m.awayTeam?.shortName || m.awayTeam?.name || "Away",
+    homeCrest: m.homeTeam?.crest ?? null,
+    awayCrest: m.awayTeam?.crest ?? null,
     kickoff: m.utcDate,
     status: normalizeStatus(m.status),
     homeScore: m.score?.fullTime?.home ?? null,
     awayScore: m.score?.fullTime?.away ?? null,
+    halfHome: m.score?.halfTime?.home ?? null,
+    halfAway: m.score?.halfTime?.away ?? null,
   }));
 }
 

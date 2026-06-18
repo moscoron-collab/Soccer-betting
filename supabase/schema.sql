@@ -21,6 +21,10 @@ create table if not exists matches (
   status       text not null default 'SCHEDULED',   -- SCHEDULED | IN_PLAY | FINISHED
   home_score   integer,
   away_score   integer,
+  half_home    integer,                              -- half-time score (home)
+  half_away    integer,                              -- half-time score (away)
+  home_crest   text,                                 -- team flag / logo URL
+  away_crest   text,
   settled      boolean not null default false,
   updated_at   timestamptz not null default now()
 );
@@ -33,8 +37,8 @@ create table if not exists predictions (
   id          uuid primary key default gen_random_uuid(),
   player_id   uuid not null references players(id) on delete cascade,
   match_id    bigint not null references matches(id) on delete cascade,
-  type        text not null,                         -- WINNER | EXACT
-  pick        text,                                  -- HOME | DRAW | AWAY  (for WINNER)
+  type        text not null,                         -- WINNER | EXACT | HALFTIME | GOALS3
+  pick        text,                                  -- HOME|DRAW|AWAY (WINNER/HALFTIME) or YES|NO (GOALS3)
   exact_home  integer,                               -- (for EXACT)
   exact_away  integer,                               -- (for EXACT)
   stake       integer not null,

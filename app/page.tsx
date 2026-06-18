@@ -5,16 +5,19 @@ import { useCallback, useEffect, useState } from "react";
 const TOKEN_KEY = "spg_token";
 
 type Player = { id: string; username: string; coins: number };
+type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3";
 type Match = {
   id: number;
   competition: string;
   home_team: string;
   away_team: string;
+  home_crest: string | null;
+  away_crest: string | null;
   kickoff_at: string;
 };
 type Prediction = {
   id: string;
-  type: "WINNER" | "EXACT";
+  type: BetType;
   pick: string | null;
   exact_home: number | null;
   exact_away: number | null;
@@ -29,7 +32,18 @@ type Prediction = {
     status: string;
     home_score: number | null;
     away_score: number | null;
+    half_home: number | null;
+    half_away: number | null;
+    home_crest: string | null;
+    away_crest: string | null;
   } | null;
+};
+
+const BET_LABELS: Record<BetType, string> = {
+  WINNER: "Winner / Draw (2×)",
+  EXACT: "Exact score (5×)",
+  HALFTIME: "Half-time leader (2×)",
+  GOALS3: "3+ goals (2×)",
 };
 type LeaderRow = { username: string; coins: number };
 
@@ -347,7 +361,9 @@ function Game({
         {predictions.length === 0 ? (
           <Empty text="You haven't predicted anything yet. Pick a match above!" />
         ) : (
-          predictions.map((p) => <PredictionCard key={p.id} p={p} />)
+          predictions.map((p) => (
+            <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
+          ))
         )}
       </Section>
 
@@ -389,101 +405,150 @@ function Empty({ text }: { text: string }) {
   return <p className="rounded-xl bg-black/20 p-4 text-sm text-emerald-100/70">{text}</p>;
 }
 
-/* ------------------------------ Match card -------------------------------- */
+/* ------------------------------ Shared bits ------------------------------- */
 
-function MatchCard({
-  match,
-  token,
-  coins,
-  onPlaced,
+// Small team flag / crest image (countries show flags, clubs show logos).
+function Crest({ url }: { url: string | null }) {
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={url}
+      alt=""
+      className="inline-block h-5 w-5 object-contain align-middle"
+      onError={(e) => ((e.currentTarget.style.display = "none"))}
+    />
+  );
+}
+
+function TeamLine({
+  home,
+  away,
+  homeCrest,
+  awayCrest,
 }: {
-  match: Match;
-  token: string;
-  coins: number;
-  onPlaced: () => void;
+  home: string;
+  away: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
 }) {
-  const [type, setType] = useState<"WINNER" | "EXACT">("WINNER");
-  const [pick, setPick] = useState<"HOME" | "DRAW" | "AWAY" | null>(null);
-  const [eh, setEh] = useState("");
-  const [ea, setEa] = useState("");
-  const [stake, setStake] = useState(100);
+  return (
+    <div className="mt-1 flex items-center justify-center gap-2 text-base font-bold">
+      <Crest url={homeCrest} /> {home}
+      <span className="text-emerald-100/60">vs</span>
+      {away} <Crest url={awayCrest} />
+    </div>
+  );
+}
+
+// Human-readable summary of a bet, e.g. "Half-time leader: Brazil" or "3+ goals: Yes".
+function describeCall(
+  type: BetType,
+  pick: string | null,
+  exactHome: number | null,
+  exactAway: number | null,
+  home: string,
+  away: string
+): string {
+  const side = pick === "HOME" ? home : pick === "AWAY" ? away : "Draw";
+  if (type === "WINNER") return `Winner: ${side}`;
+  if (type === "HALFTIME") return `Half-time leader: ${side}`;
+  if (type === "GOALS3") return `3+ goals: ${pick === "YES" ? "Yes" : "No"}`;
+  return `Exact score: ${exactHome}–${exactAway}`;
+}
+
+type BetDraft = {
+  type: BetType;
+  pick: string | null;
+  exactHome: number | null;
+  exactAway: number | null;
+  stake: number;
+};
+
+/* ------------------------------- Bet form --------------------------------- */
+// Used both for placing a new bet (MatchCard) and editing one (PredictionCard).
+
+function BetForm({
+  home,
+  away,
+  coins,
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  home: string;
+  away: string;
+  coins: number; // max stake available
+  initial?: BetDraft;
+  submitLabel: string;
+  onSubmit: (body: any) => Promise<{ error?: string }>;
+  onCancel?: () => void;
+}) {
+  const [type, setTypeState] = useState<BetType>(initial?.type ?? "WINNER");
+  const [pick, setPick] = useState<string | null>(initial?.pick ?? null);
+  const [eh, setEh] = useState(initial?.exactHome != null ? String(initial.exactHome) : "");
+  const [ea, setEa] = useState(initial?.exactAway != null ? String(initial.exactAway) : "");
+  const [stake, setStake] = useState(initial?.stake ?? 100);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const kickoff = new Date(match.kickoff_at);
+  function setType(t: BetType) {
+    setTypeState(t);
+    setPick(null);
+    setEh("");
+    setEa("");
+  }
 
-  async function place() {
+  async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const body: any = { matchId: match.id, type, stake };
-      if (type === "WINNER") body.pick = pick;
+      const body: any = { type, stake };
+      if (type === "WINNER" || type === "HALFTIME" || type === "GOALS3") body.pick = pick;
       else {
         body.exactHome = Number(eh);
         body.exactAway = Number(ea);
       }
-      const res = await fetch("/api/predictions", {
-        method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Could not place prediction.");
-        return;
-      }
-      onPlaced();
+      const res = await onSubmit(body);
+      if (res?.error) setError(res.error);
     } finally {
       setBusy(false);
     }
   }
 
-  const canPlace =
+  const canSubmit =
     stake > 0 &&
     stake <= coins &&
-    (type === "WINNER" ? pick !== null : eh !== "" && ea !== "");
+    (type === "EXACT" ? eh !== "" && ea !== "" : pick !== null);
+
+  const sideButtons =
+    type === "GOALS3"
+      ? ([
+          ["YES", "Yes, 3+"],
+          ["NO", "Under 3"],
+        ] as const)
+      : ([
+          ["HOME", home],
+          ["DRAW", "Draw"],
+          ["AWAY", away],
+        ] as const);
 
   return (
-    <div className="rounded-xl bg-black/25 p-4">
-      <div className="flex items-center justify-between text-xs text-emerald-100/60">
-        <span>{match.competition}</span>
-        <span>
-          {kickoff.toLocaleDateString()}{" "}
-          {kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
-      </div>
-      <div className="mt-1 text-center text-base font-bold">
-        {match.home_team} <span className="text-emerald-100/60">vs</span> {match.away_team}
-      </div>
-
-      <div className="mt-3 flex gap-2 text-xs">
-        <button
-          onClick={() => setType("WINNER")}
-          className={`flex-1 rounded-lg px-2 py-1 font-semibold ${type === "WINNER" ? "bg-emerald-500" : "bg-black/30"}`}
-        >
-          Winner / Draw (2×)
-        </button>
-        <button
-          onClick={() => setType("EXACT")}
-          className={`flex-1 rounded-lg px-2 py-1 font-semibold ${type === "EXACT" ? "bg-emerald-500" : "bg-black/30"}`}
-        >
-          Exact score (5×)
-        </button>
+    <div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        {(Object.keys(BET_LABELS) as BetType[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setType(t)}
+            className={`rounded-lg px-2 py-1.5 font-semibold ${type === t ? "bg-emerald-500" : "bg-black/30"}`}
+          >
+            {BET_LABELS[t]}
+          </button>
+        ))}
       </div>
 
-      {type === "WINNER" ? (
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {(["HOME", "DRAW", "AWAY"] as const).map((opt) => (
-            <button
-              key={opt}
-              onClick={() => setPick(opt)}
-              className={`rounded-lg px-2 py-2 text-sm font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-black/30"}`}
-            >
-              {opt === "HOME" ? match.home_team : opt === "AWAY" ? match.away_team : "Draw"}
-            </button>
-          ))}
-        </div>
-      ) : (
+      {type === "EXACT" ? (
         <div className="mt-2 flex items-center justify-center gap-2">
           <input
             type="number"
@@ -501,6 +566,18 @@ function MatchCard({
             className="w-16 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
           />
         </div>
+      ) : (
+        <div className={`mt-2 grid gap-2 ${type === "GOALS3" ? "grid-cols-2" : "grid-cols-3"}`}>
+          {sideButtons.map(([opt, label]) => (
+            <button
+              key={opt}
+              onClick={() => setPick(opt)}
+              className={`rounded-lg px-2 py-2 text-sm font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-black/30"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className="mt-3 flex items-center gap-2">
@@ -513,12 +590,17 @@ function MatchCard({
           onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
           className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
         />
+        {onCancel && (
+          <button onClick={onCancel} className="rounded-lg bg-black/30 px-3 py-1.5 text-sm">
+            Close
+          </button>
+        )}
         <button
-          onClick={place}
-          disabled={busy || !canPlace}
+          onClick={submit}
+          disabled={busy || !canSubmit}
           className="ml-auto rounded-lg bg-emerald-500 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
         >
-          {busy ? "…" : "Predict"}
+          {busy ? "…" : submitLabel}
         </button>
       </div>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
@@ -526,26 +608,131 @@ function MatchCard({
   );
 }
 
+/* ------------------------------ Match card -------------------------------- */
+
+function MatchCard({
+  match,
+  token,
+  coins,
+  onPlaced,
+}: {
+  match: Match;
+  token: string;
+  coins: number;
+  onPlaced: () => void;
+}) {
+  const kickoff = new Date(match.kickoff_at);
+
+  async function place(body: any) {
+    const res = await fetch("/api/predictions", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ ...body, matchId: match.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error ?? "Could not place prediction." };
+    onPlaced();
+    return {};
+  }
+
+  return (
+    <div className="rounded-xl bg-black/25 p-4">
+      <div className="flex items-center justify-between text-xs text-emerald-100/60">
+        <span>{match.competition}</span>
+        <span>
+          {kickoff.toLocaleDateString()}{" "}
+          {kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      <TeamLine
+        home={match.home_team}
+        away={match.away_team}
+        homeCrest={match.home_crest}
+        awayCrest={match.away_crest}
+      />
+      <div className="mt-3">
+        <BetForm
+          home={match.home_team}
+          away={match.away_team}
+          coins={coins}
+          submitLabel="Predict"
+          onSubmit={place}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------- Prediction card ------------------------------ */
 
-function PredictionCard({ p }: { p: Prediction }) {
+function PredictionCard({
+  p,
+  token,
+  coins,
+  onChange,
+}: {
+  p: Prediction;
+  token: string;
+  coins: number;
+  onChange: () => void;
+}) {
   const m = p.matches;
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
   const statusColor =
     p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-emerald-100/70";
-  const yourCall =
-    p.type === "WINNER"
-      ? p.pick === "HOME"
-        ? m?.home_team
-        : p.pick === "AWAY"
-          ? m?.away_team
-          : "Draw"
-      : `${p.exact_home}–${p.exact_away}`;
+
+  const editable =
+    p.status === "PENDING" &&
+    !!m &&
+    m.status === "SCHEDULED" &&
+    new Date(m.kickoff_at) > new Date();
+
+  const yourCall = describeCall(
+    p.type,
+    p.pick,
+    p.exact_home,
+    p.exact_away,
+    m?.home_team ?? "Home",
+    m?.away_team ?? "Away"
+  );
+
+  async function saveEdit(body: any) {
+    const res = await fetch("/api/predictions", {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ ...body, predictionId: p.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error ?? "Could not update bet." };
+    setEditing(false);
+    onChange();
+    return {};
+  }
+
+  async function cancelBet() {
+    if (!confirm("Cancel this bet and get your coins back?")) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/predictions", {
+        method: "DELETE",
+        headers: authHeaders(token),
+        body: JSON.stringify({ predictionId: p.id }),
+      });
+      if (res.ok) onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="rounded-xl bg-black/20 p-3 text-sm">
       <div className="flex items-center justify-between">
-        <span className="font-semibold">
+        <span className="flex items-center gap-1 font-semibold">
+          <Crest url={m?.home_crest ?? null} />
           {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+          <Crest url={m?.away_crest ?? null} />
         </span>
         <span className={`font-bold ${statusColor}`}>
           {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `Won +${p.payout}` : "Lost"}
@@ -553,14 +740,53 @@ function PredictionCard({ p }: { p: Prediction }) {
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-emerald-100/70">
         <span>
-          Your call: <b>{yourCall}</b> · Stake {p.stake} · {p.type === "EXACT" ? "Exact" : "Winner"}
+          <b>{yourCall}</b> · Stake {p.stake}
         </span>
         {m && m.home_score != null && (
           <span>
             Final {m.home_score}–{m.away_score}
+            {m.half_home != null && ` (HT ${m.half_home}–${m.half_away})`}
           </span>
         )}
       </div>
+
+      {editable && !editing && (
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold"
+          >
+            ✏️ Edit
+          </button>
+          <button
+            onClick={cancelBet}
+            disabled={busy}
+            className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
+          >
+            🗑 Cancel
+          </button>
+        </div>
+      )}
+
+      {editable && editing && m && (
+        <div className="mt-3 rounded-lg bg-black/20 p-3">
+          <BetForm
+            home={m.home_team}
+            away={m.away_team}
+            coins={coins + p.stake}
+            submitLabel="Save"
+            onCancel={() => setEditing(false)}
+            initial={{
+              type: p.type,
+              pick: p.pick,
+              exactHome: p.exact_home,
+              exactAway: p.exact_away,
+              stake: p.stake,
+            }}
+            onSubmit={saveEdit}
+          />
+        </div>
+      )}
     </div>
   );
 }

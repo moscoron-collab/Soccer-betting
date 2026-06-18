@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { fetchMatches } from "@/lib/footballData";
-import { computePayout, PredictionType, WinnerPick } from "@/lib/payout";
+import { computePayout, PredictionType } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,10 +27,14 @@ async function runSync() {
       competition: m.competition,
       home_team: m.homeTeam,
       away_team: m.awayTeam,
+      home_crest: m.homeCrest,
+      away_crest: m.awayCrest,
       kickoff_at: m.kickoff,
       status: m.status,
       home_score: m.homeScore,
       away_score: m.awayScore,
+      half_home: m.halfHome,
+      half_away: m.halfAway,
       updated_at: new Date().toISOString(),
     }));
     const { error } = await supabase.from("matches").upsert(rows, { onConflict: "id" });
@@ -41,7 +45,7 @@ async function runSync() {
   // 2) Settle finished, unsettled matches that have scores.
   const { data: finished } = await supabase
     .from("matches")
-    .select("id, home_score, away_score")
+    .select("id, home_score, away_score, half_home, half_away")
     .eq("status", "FINISHED")
     .eq("settled", false)
     .not("home_score", "is", null)
@@ -53,6 +57,8 @@ async function runSync() {
   for (const match of finished ?? []) {
     const homeScore = match.home_score as number;
     const awayScore = match.away_score as number;
+    const halfHome = (match.half_home as number | null) ?? null;
+    const halfAway = (match.half_away as number | null) ?? null;
 
     const { data: preds } = await supabase
       .from("predictions")
@@ -63,12 +69,14 @@ async function runSync() {
     for (const p of preds ?? []) {
       const { won, payout } = computePayout(
         p.type as PredictionType,
-        (p.pick as WinnerPick) ?? null,
+        p.pick ?? null,
         p.exact_home,
         p.exact_away,
         p.stake,
         homeScore,
-        awayScore
+        awayScore,
+        halfHome,
+        halfAway
       );
 
       await supabase

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { data, error } = await supabase
     .from("matches")
-    .select("id, competition, home_team, away_team, kickoff_at, status")
+    .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status")
     .eq("status", "SCHEDULED")
     .gt("kickoff_at", new Date().toISOString())
     .order("kickoff_at", { ascending: true })
