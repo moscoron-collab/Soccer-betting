@@ -364,6 +364,17 @@ function Game({
         </div>
       </Section>
 
+      {/* My predictions */}
+      <Section title="My predictions">
+        {predictions.length === 0 ? (
+          <Empty text="You haven't predicted anything yet. Pick a match below!" />
+        ) : (
+          predictions.map((p) => (
+            <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
+          ))
+        )}
+      </Section>
+
       {/* Matches */}
       <Section title="Upcoming matches">
         {matches.length === 0 ? (
@@ -378,17 +389,6 @@ function Game({
               myPrediction={predByMatch.get(m.id)}
               onPlaced={onRefresh}
             />
-          ))
-        )}
-      </Section>
-
-      {/* My predictions */}
-      <Section title="My predictions">
-        {predictions.length === 0 ? (
-          <Empty text="You haven't predicted anything yet. Pick a match above!" />
-        ) : (
-          predictions.map((p) => (
-            <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
           ))
         )}
       </Section>
