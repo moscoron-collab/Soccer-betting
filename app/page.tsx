@@ -346,6 +346,24 @@ function Game({
         </div>
       )}
 
+      {/* Leaderboard */}
+      <Section title="🏆 Leaderboard">
+        <div className="overflow-hidden rounded-xl bg-black/20">
+          {leaderboard.map((row, i) => (
+            <div
+              key={row.username + i}
+              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-emerald-500/30" : ""}`}
+            >
+              <span>
+                <span className="inline-block w-6 text-emerald-100/60">{i + 1}.</span>
+                {row.username}
+              </span>
+              <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       {/* Matches */}
       <Section title="Upcoming matches">
         {matches.length === 0 ? (
@@ -373,24 +391,6 @@ function Game({
             <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
           ))
         )}
-      </Section>
-
-      {/* Leaderboard */}
-      <Section title="🏆 Leaderboard">
-        <div className="overflow-hidden rounded-xl bg-black/20">
-          {leaderboard.map((row, i) => (
-            <div
-              key={row.username + i}
-              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-emerald-500/30" : ""}`}
-            >
-              <span>
-                <span className="inline-block w-6 text-emerald-100/60">{i + 1}.</span>
-                {row.username}
-              </span>
-              <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
       </Section>
 
       <p className="mt-8 text-center text-xs text-emerald-100/50">
@@ -616,6 +616,97 @@ function BetForm({
   );
 }
 
+/* ------------------------------ Bet editor -------------------------------- */
+// Edit (change pick/stake) or cancel/undo a pending bet. Used on the match card
+// and in "My predictions".
+
+function BetEditor({
+  p,
+  home,
+  away,
+  token,
+  coins,
+  onChange,
+}: {
+  p: Prediction;
+  home: string;
+  away: string;
+  token: string;
+  coins: number;
+  onChange: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function saveEdit(body: any) {
+    const res = await fetch("/api/predictions", {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ ...body, predictionId: p.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error ?? "Could not update bet." };
+    setEditing(false);
+    onChange();
+    return {};
+  }
+
+  async function cancelBet() {
+    if (!confirm("Cancel this bet and get your coins back?")) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/predictions", {
+        method: "DELETE",
+        headers: authHeaders(token),
+        body: JSON.stringify({ predictionId: p.id }),
+      });
+      if (res.ok) onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="mt-3 rounded-lg bg-black/20 p-3">
+        <BetForm
+          home={home}
+          away={away}
+          coins={coins + p.stake}
+          submitLabel="Save"
+          onCancel={() => setEditing(false)}
+          initial={{
+            type: p.type,
+            pick: p.pick,
+            exactHome: p.exact_home,
+            exactAway: p.exact_away,
+            stake: p.stake,
+          }}
+          onSubmit={saveEdit}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex gap-2">
+      <button
+        onClick={() => setEditing(true)}
+        className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold"
+      >
+        ✏️ Edit
+      </button>
+      <button
+        onClick={cancelBet}
+        disabled={busy}
+        className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
+      >
+        🗑 Cancel / Undo
+      </button>
+    </div>
+  );
+}
+
 /* ------------------------------ Match card -------------------------------- */
 
 function MatchCard({
@@ -675,9 +766,16 @@ function MatchCard({
             )}
           </b>{" "}
           · 🪙{myPrediction.stake}
-          <span className="block text-xs text-emerald-100/70">
-            Edit or cancel it under “My predictions” below.
-          </span>
+          {myPrediction.status === "PENDING" && (
+            <BetEditor
+              p={myPrediction}
+              home={match.home_team}
+              away={match.away_team}
+              token={token}
+              coins={coins}
+              onChange={onPlaced}
+            />
+          )}
         </div>
       ) : (
         <div className="mt-3">
@@ -795,17 +893,12 @@ function PredictionCard({
   onChange: () => void;
 }) {
   const m = p.matches;
-  const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const statusColor =
     p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-emerald-100/70";
 
-  const editable =
-    p.status === "PENDING" &&
-    !!m &&
-    m.status === "SCHEDULED" &&
-    new Date(m.kickoff_at) > new Date();
+  // Editable while the bet is pending and the match hasn't kicked off yet.
+  const editable = p.status === "PENDING" && !!m && new Date(m.kickoff_at) > new Date();
 
   const yourCall = describeCall(
     p.type,
@@ -815,34 +908,6 @@ function PredictionCard({
     m?.home_team ?? "Home",
     m?.away_team ?? "Away"
   );
-
-  async function saveEdit(body: any) {
-    const res = await fetch("/api/predictions", {
-      method: "PUT",
-      headers: authHeaders(token),
-      body: JSON.stringify({ ...body, predictionId: p.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { error: data.error ?? "Could not update bet." };
-    setEditing(false);
-    onChange();
-    return {};
-  }
-
-  async function cancelBet() {
-    if (!confirm("Cancel this bet and get your coins back?")) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/predictions", {
-        method: "DELETE",
-        headers: authHeaders(token),
-        body: JSON.stringify({ predictionId: p.id }),
-      });
-      if (res.ok) onChange();
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="rounded-xl bg-black/20 p-3 text-sm">
@@ -868,42 +933,15 @@ function PredictionCard({
         )}
       </div>
 
-      {editable && !editing && (
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold"
-          >
-            ✏️ Edit
-          </button>
-          <button
-            onClick={cancelBet}
-            disabled={busy}
-            className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
-          >
-            🗑 Cancel
-          </button>
-        </div>
-      )}
-
-      {editable && editing && m && (
-        <div className="mt-3 rounded-lg bg-black/20 p-3">
-          <BetForm
-            home={m.home_team}
-            away={m.away_team}
-            coins={coins + p.stake}
-            submitLabel="Save"
-            onCancel={() => setEditing(false)}
-            initial={{
-              type: p.type,
-              pick: p.pick,
-              exactHome: p.exact_home,
-              exactAway: p.exact_away,
-              stake: p.stake,
-            }}
-            onSubmit={saveEdit}
-          />
-        </div>
+      {editable && m && (
+        <BetEditor
+          p={p}
+          home={m.home_team}
+          away={m.away_team}
+          token={token}
+          coins={coins}
+          onChange={onChange}
+        />
       )}
     </div>
   );
