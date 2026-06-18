@@ -289,10 +289,11 @@ function Game({
     onRefresh();
   }
 
-  const matchIdsPredicted = new Set(
-    predictions.map((p) => (p as any).match_id as number)
+  // Map of matchId -> the player's existing prediction (if any), so each match card
+  // can show "your pick" + the community panel without disappearing after you bet.
+  const predByMatch = new Map<number, Prediction>(
+    predictions.map((p) => [(p as any).match_id as number, p])
   );
-  const openMatches = matches.filter((m) => !matchIdsPredicted.has(m.id));
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
@@ -347,11 +348,18 @@ function Game({
 
       {/* Matches */}
       <Section title="Upcoming matches">
-        {openMatches.length === 0 ? (
+        {matches.length === 0 ? (
           <Empty text="No open matches right now. Check back soon — new fixtures load automatically." />
         ) : (
-          openMatches.map((m) => (
-            <MatchCard key={m.id} match={m} token={token} coins={player.coins} onPlaced={onRefresh} />
+          matches.map((m) => (
+            <MatchCard
+              key={m.id}
+              match={m}
+              token={token}
+              coins={player.coins}
+              myPrediction={predByMatch.get(m.id)}
+              onPlaced={onRefresh}
+            />
           ))
         )}
       </Section>
@@ -614,11 +622,13 @@ function MatchCard({
   match,
   token,
   coins,
+  myPrediction,
   onPlaced,
 }: {
   match: Match;
   token: string;
   coins: number;
+  myPrediction?: Prediction;
   onPlaced: () => void;
 }) {
   const kickoff = new Date(match.kickoff_at);
@@ -650,15 +660,36 @@ function MatchCard({
         homeCrest={match.home_crest}
         awayCrest={match.away_crest}
       />
-      <div className="mt-3">
-        <BetForm
-          home={match.home_team}
-          away={match.away_team}
-          coins={coins}
-          submitLabel="Predict"
-          onSubmit={place}
-        />
-      </div>
+
+      {myPrediction ? (
+        <div className="mt-3 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm">
+          ✅ Your pick:{" "}
+          <b>
+            {describeCall(
+              myPrediction.type,
+              myPrediction.pick,
+              myPrediction.exact_home,
+              myPrediction.exact_away,
+              match.home_team,
+              match.away_team
+            )}
+          </b>{" "}
+          · 🪙{myPrediction.stake}
+          <span className="block text-xs text-emerald-100/70">
+            Edit or cancel it under “My predictions” below.
+          </span>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <BetForm
+            home={match.home_team}
+            away={match.away_team}
+            coins={coins}
+            submitLabel="Predict"
+            onSubmit={place}
+          />
+        </div>
+      )}
 
       <CommunityBets match={match} />
     </div>
