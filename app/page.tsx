@@ -425,6 +425,17 @@ function Game({
   // Match of the Day = soonest upcoming match (list arrives sorted by kickoff).
   const motdId = matches[0]?.id;
 
+  // Pending bets grouped by match (one card per match) for "My predictions".
+  const pendingByMatch = new Map<number, Prediction[]>();
+  for (const p of predictions) {
+    if (p.status !== "PENDING") continue;
+    const mid = (p as any).match_id as number;
+    const arr = pendingByMatch.get(mid) ?? [];
+    arr.push(p);
+    pendingByMatch.set(mid, arr);
+  }
+  const pendingGroups = Array.from(pendingByMatch.values());
+
   function pickComp(c: string) {
     setComp(c);
     setVisible(10);
@@ -516,14 +527,20 @@ function Game({
         </div>
       </Section>
 
-      {/* My predictions */}
+      {/* My predictions (active bets only) */}
       <Section title="My predictions">
-        {predictions.length === 0 ? (
-          <Empty text="You haven't predicted anything yet. Pick a match below!" />
+        {pendingGroups.length === 0 ? (
+          <Empty text="No active bets right now. Pick a match below! (Finished bets are in 📊 My Log.)" />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {predictions.map((p) => (
-              <PredictionCard key={p.id} p={p} token={token} coins={player.coins} onChange={onRefresh} />
+            {pendingGroups.map((bets) => (
+              <MatchBetsCard
+                key={(bets[0] as any).match_id}
+                bets={bets}
+                token={token}
+                coins={player.coins}
+                onChange={onRefresh}
+              />
             ))}
           </div>
         )}
@@ -1621,35 +1638,22 @@ function CommunityBets({ match }: { match: Match }) {
   );
 }
 
-/* --------------------------- Prediction card ------------------------------ */
+/* --------------------------- Match bets card ------------------------------ */
+// All of a player's active bets on one match, grouped into a single card.
 
-function PredictionCard({
-  p,
+function MatchBetsCard({
+  bets,
   token,
   coins,
   onChange,
 }: {
-  p: Prediction;
+  bets: Prediction[];
   token: string;
   coins: number;
   onChange: () => void;
 }) {
-  const m = p.matches;
-
-  const statusColor =
-    p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-blue-100/70";
-
-  // Editable while the bet is pending and the match hasn't kicked off yet.
-  const editable = p.status === "PENDING" && !!m && new Date(m.kickoff_at) > new Date();
-
-  const yourCall = describeCall(
-    p.type,
-    p.pick,
-    p.exact_home,
-    p.exact_away,
-    m?.home_team ?? "Home",
-    m?.away_team ?? "Away"
-  );
+  const m = bets[0].matches;
+  const editable = !!m && new Date(m.kickoff_at) > new Date();
 
   return (
     <div className="rounded-xl bg-white/5 p-3 text-sm">
@@ -1659,39 +1663,32 @@ function PredictionCard({
           {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
           <Crest url={m?.away_crest ?? null} />
         </span>
-        <span className={`font-bold ${statusColor}`}>
-          {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `Won +${p.payout}` : "Lost"}
-        </span>
-      </div>
-      <div className="mt-1 flex items-center justify-between text-xs text-blue-100/70">
-        <span>
-          <b>{yourCall}</b> · Stake {p.stake}
-          {p.status === "PENDING" && (
-            <>
-              {" "}
-              · could win 🪙{potentialWin(p)}
-              {p.bonus_mult > 1 && ` (×${p.bonus_mult})`}
-            </>
-          )}
-        </span>
-        {m && m.home_score != null && (
-          <span>
-            Final {m.home_score}–{m.away_score}
-            {m.half_home != null && ` (HT ${m.half_home}–${m.half_away})`}
-          </span>
-        )}
+        <span className="text-xs text-blue-100/60">{editable ? "Open" : "Started"}</span>
       </div>
 
-      {editable && m && (
-        <BetEditor
-          p={p}
-          home={m.home_team}
-          away={m.away_team}
-          token={token}
-          coins={coins}
-          onChange={onChange}
-        />
-      )}
+      <div className="mt-2 space-y-2">
+        {bets.map((p) => (
+          <div key={p.id} className="rounded-lg bg-white/5 p-2">
+            <div className="text-xs text-blue-100/80">
+              <b>
+                {describeCall(p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? "Home", m?.away_team ?? "Away")}
+              </b>{" "}
+              · Stake {p.stake} · could win 🪙{potentialWin(p)}
+              {p.bonus_mult > 1 && ` (×${p.bonus_mult})`}
+            </div>
+            {editable && m && (
+              <BetEditor
+                p={p}
+                home={m.home_team}
+                away={m.away_team}
+                token={token}
+                coins={coins}
+                onChange={onChange}
+              />
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
