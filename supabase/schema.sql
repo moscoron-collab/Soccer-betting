@@ -9,8 +9,10 @@ create table if not exists players (
   password_hash   text,                            -- scrypt "salt:hash" (set on signup/first login)
   coins           integer not null default 1000,
   xp              integer not null default 0,        -- experience points -> level
+  win_streak      integer not null default 0,        -- current consecutive winning bets
   last_bailout_at timestamptz,                       -- for the "keep playing" top-up
   last_spin_at    timestamptz,                       -- for the daily spin
+  last_penalty_at timestamptz,                       -- for the daily penalty shootout
   created_at      timestamptz not null default now()
 );
 
@@ -99,6 +101,27 @@ create or replace function increment_xp(p_player uuid, p_amount integer)
 returns void language sql as $$
   update players set xp = xp + p_amount where id = p_player;
 $$;
+
+-- Win/lose a bet: bumps or resets the streak and returns the new value.
+create or replace function bump_streak(p_player uuid, p_won boolean)
+returns integer language plpgsql as $$
+declare s integer;
+begin
+  if p_won then
+    update players set win_streak = win_streak + 1 where id = p_player returning win_streak into s;
+  else
+    update players set win_streak = 0 where id = p_player returning win_streak into s;
+  end if;
+  return s;
+end $$;
+
+-- ---------- achievement_claims (one coin reward per achievement) ----------
+create table if not exists achievement_claims (
+  player_id  uuid not null references players(id) on delete cascade,
+  key        text not null,
+  created_at timestamptz not null default now(),
+  primary key (player_id, key)
+);
 
 -- Note: the app talks to the database only through server-side API routes using the
 -- service_role key, so Row Level Security is not required for V1. If you later expose

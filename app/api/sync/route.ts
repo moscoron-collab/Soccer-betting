@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic";
 // football-data calls are slow (rate-limited), so allow a long run on Vercel.
 export const maxDuration = 300;
 
+// Bonus coins when a winning bet reaches these streak lengths.
+const STREAK_BONUS: Record<number, number> = { 3: 50, 5: 150, 10: 500 };
+
 function authorized(req: Request): boolean {
   const secret = process.env.SYNC_SECRET;
   if (!secret) return false;
@@ -88,6 +91,18 @@ async function runSync() {
       if (payout > 0) {
         await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: payout });
         await supabase.rpc("increment_xp", { p_player: p.player_id, p_amount: 25 });
+      }
+
+      // Update the player's win streak and pay streak-milestone bonuses.
+      const { data: newStreak } = await supabase.rpc("bump_streak", {
+        p_player: p.player_id,
+        p_won: won,
+      });
+      if (won) {
+        const bonus = STREAK_BONUS[newStreak as number];
+        if (bonus) {
+          await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: bonus });
+        }
       }
       settledPredictions++;
     }

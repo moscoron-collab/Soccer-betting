@@ -8,3 +8,12 @@ body {
   min-height: 100vh;
   color: #e8eef9;
 }
+
+@keyframes pen-slide {
+  from {
+    left: 0;
+  }
+  to {
+    left: calc(100% - 8px);
+  }
+}

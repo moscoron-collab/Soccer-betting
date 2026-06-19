@@ -5,8 +5,10 @@ export type Player = {
   username: string;
   coins: number;
   xp: number;
+  win_streak: number;
   last_bailout_at: string | null;
   last_spin_at: string | null;
+  last_penalty_at: string | null;
   created_at: string;
 };
 
@@ -18,7 +20,9 @@ export async function getPlayerFromRequest(req: Request): Promise<Player | null>
 
   const { data, error } = await supabase
     .from("players")
-    .select("id, username, coins, xp, last_bailout_at, last_spin_at, created_at")
+    .select(
+      "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, created_at"
+    )
     .eq("secret_token", token)
     .maybeSingle();
 

@@ -6,7 +6,7 @@ import { VERSION, CHANGELOG } from "@/lib/changelog";
 
 const TOKEN_KEY = "spg_token";
 
-type Player = { id: string; username: string; coins: number; xp: number };
+type Player = { id: string; username: string; coins: number; xp: number; win_streak: number };
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 type Match = {
   id: number;
@@ -107,6 +107,7 @@ export default function Home() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [canBailout, setCanBailout] = useState(false);
   const [canSpin, setCanSpin] = useState(false);
+  const [canPenalty, setCanPenalty] = useState(false);
   const seenWon = useRef<Set<string> | null>(null);
 
   // Load token from storage on first render.
@@ -144,6 +145,7 @@ export default function Home() {
     setPredictions(preds);
     setCanBailout(!!data.canBailout);
     setCanSpin(!!data.canSpin);
+    setCanPenalty(!!data.canPenalty);
   }, []);
 
   useEffect(() => {
@@ -183,6 +185,7 @@ export default function Home() {
           predictions={predictions}
           canBailout={canBailout}
           canSpin={canSpin}
+          canPenalty={canPenalty}
           onRefresh={() => loadMe(token)}
           onSignOut={signOut}
         />
@@ -360,6 +363,7 @@ function Game({
   predictions,
   canBailout,
   canSpin,
+  canPenalty,
   onRefresh,
   onSignOut,
 }: {
@@ -368,6 +372,7 @@ function Game({
   predictions: Prediction[];
   canBailout: boolean;
   canSpin: boolean;
+  canPenalty: boolean;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -527,7 +532,9 @@ function Game({
         </button>
       </div>
 
-      {view === "log" && <MyLog predictions={predictions} player={player} />}
+      {view === "log" && (
+        <MyLog predictions={predictions} player={player} token={token} onChange={onRefresh} />
+      )}
 
       {view === "play" && (
         <>
@@ -575,16 +582,19 @@ function Game({
 
       {/* Mini-games */}
       <Section title="🎮 Mini-games">
-        <div className="rounded-xl bg-white/5 p-4">
-          <p className="font-bold">🎰 Daily Spin</p>
-          <p className="mt-1 text-xs text-blue-100/70">Spin once a day for free bonus coins.</p>
-          <button
-            onClick={spin}
-            disabled={!canSpin}
-            className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
-          >
-            {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
-          </button>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-white/5 p-4">
+            <p className="font-bold">🎰 Daily Spin</p>
+            <p className="mt-1 text-xs text-blue-100/70">Spin once a day for free bonus coins.</p>
+            <button
+              onClick={spin}
+              disabled={!canSpin}
+              className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+            >
+              {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
+            </button>
+          </div>
+          <PenaltyShootout token={token} canPlay={canPenalty} onDone={onRefresh} />
         </div>
       </Section>
 
@@ -697,7 +707,17 @@ function Changelog({ onClose }: { onClose: () => void }) {
 /* --------------------------------- My Log --------------------------------- */
 // Per-player history: record, net coins, and a line per settled bet.
 
-function MyLog({ predictions, player }: { predictions: Prediction[]; player: Player }) {
+function MyLog({
+  predictions,
+  player,
+  token,
+  onChange,
+}: {
+  predictions: Prediction[];
+  player: Player;
+  token: string;
+  onChange: () => void;
+}) {
   const settled = predictions.filter((p) => p.status !== "PENDING");
   const wins = settled.filter((p) => p.status === "WON").length;
   const losses = settled.filter((p) => p.status === "LOST").length;
@@ -709,28 +729,7 @@ function MyLog({ predictions, player }: { predictions: Prediction[]; player: Pla
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
   const lvl = levelInfo(player.xp);
-
-  // Current win streak: most recent settled bets (by kickoff) that are wins.
-  const byRecent = [...settled].sort(
-    (a, b) => new Date(b.matches?.kickoff_at ?? 0).getTime() - new Date(a.matches?.kickoff_at ?? 0).getTime()
-  );
-  let streak = 0;
-  for (const p of byRecent) {
-    if (p.status === "WON") streak++;
-    else break;
-  }
-
-  const exactWin = settled.some((p) => p.status === "WON" && p.type === "EXACT");
-  const achievements = [
-    { emoji: "🥇", label: "First Win", got: wins >= 1 },
-    { emoji: "🔟", label: "10 Wins", got: wins >= 10 },
-    { emoji: "🏆", label: "50 Wins", got: wins >= 50 },
-    { emoji: "🎯", label: "Exact Master", got: exactWin },
-    { emoji: "🔥", label: "5 Streak", got: streak >= 5 },
-    { emoji: "💰", label: "5,000 Coins", got: player.coins >= 5000 },
-    { emoji: "💎", label: "25,000 Coins", got: player.coins >= 25000 },
-    { emoji: "⭐", label: "Reach Level 10", got: lvl.level >= 10 },
-  ];
+  const streak = player.win_streak ?? 0;
 
   return (
     <div className="mt-4">
@@ -761,19 +760,9 @@ function MyLog({ predictions, player }: { predictions: Prediction[]; player: Pla
         />
       </div>
 
-      {/* Achievements */}
-      <h2 className="mb-2 mt-6 text-lg font-bold">Badges</h2>
-      <div className="grid grid-cols-4 gap-2">
-        {achievements.map((a) => (
-          <div
-            key={a.label}
-            className={`rounded-xl p-2 text-center text-xs ${a.got ? "bg-blue-600/30" : "bg-white/5 opacity-40"}`}
-          >
-            <div className="text-2xl">{a.emoji}</div>
-            <div className="mt-1">{a.label}</div>
-          </div>
-        ))}
-      </div>
+      {/* Achievements (claim coin rewards) */}
+      <h2 className="mb-2 mt-6 text-lg font-bold">🏅 Badges & rewards</h2>
+      <Achievements token={token} onClaimed={onChange} />
 
       <h2 className="mb-2 mt-6 text-lg font-bold">History</h2>
       {settled.length === 0 ? (
@@ -879,6 +868,178 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
   );
 }
 
+
+/* --------------------------- Penalty Shootout ----------------------------- */
+// Timing mini-game: tap Shoot when the ball lines up with the goal. Skill-based,
+// once a day, capped reward — so it's fair and un-cheatable on the leaderboard.
+
+function PenaltyShootout({
+  token,
+  canPlay,
+  onDone,
+}: {
+  token: string;
+  canPlay: boolean;
+  onDone: () => void;
+}) {
+  const [started, setStarted] = useState(false);
+  const [shots, setShots] = useState(0);
+  const [goals, setGoals] = useState(0);
+  const [result, setResult] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [reward, setReward] = useState<number | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const markRef = useRef<HTMLDivElement>(null);
+
+  function start() {
+    setStarted(true);
+    setShots(0);
+    setGoals(0);
+    setResult(null);
+    setDone(false);
+    setReward(null);
+  }
+
+  async function shoot() {
+    const bar = barRef.current;
+    const mark = markRef.current;
+    if (!bar || !mark || done) return;
+    const b = bar.getBoundingClientRect();
+    const m = mark.getBoundingClientRect();
+    const frac = (m.left + m.width / 2 - b.left) / b.width; // 0..1
+    const isGoal = frac >= 0.38 && frac <= 0.62;
+    const newGoals = goals + (isGoal ? 1 : 0);
+    const newShots = shots + 1;
+    setResult(isGoal ? "⚽ GOAL!" : "🧤 Saved!");
+    setGoals(newGoals);
+    setShots(newShots);
+
+    if (newShots >= 5) {
+      setDone(true);
+      const res = await fetch("/api/penalty", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ goals: newGoals }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReward(data.reward);
+        if (data.reward > 0) celebrate(`⚽ ${newGoals}/5 — +🪙${data.reward}!`);
+        onDone();
+      }
+    }
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-4">
+      <p className="font-bold">⚽ Penalty Shootout</p>
+      <p className="mt-1 text-xs text-blue-100/70">
+        Tap Shoot when the ball lines up with the goal. 5 shots, 🪙30 each.
+      </p>
+
+      {!canPlay ? (
+        <p className="mt-3 text-sm text-blue-100/60">Come back tomorrow ⚽</p>
+      ) : !started ? (
+        <button onClick={start} className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold">
+          Play
+        </button>
+      ) : (
+        <div className="mt-3">
+          <div ref={barRef} className="relative h-8 overflow-hidden rounded-lg bg-white/10">
+            <div className="absolute left-1/2 top-0 h-full w-[24%] -translate-x-1/2 bg-green-500/30" />
+            <div
+              ref={markRef}
+              className="absolute top-0 h-full w-2 bg-yellow-400"
+              style={{ animation: done ? "none" : "pen-slide 0.85s linear infinite alternate" }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span>
+              Shot {Math.min(shots + 1, 5)}/5 · Goals {goals}
+            </span>
+            <span className="font-bold">{result}</span>
+          </div>
+          {!done ? (
+            <button onClick={shoot} className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold">
+              Shoot ⚽
+            </button>
+          ) : (
+            <div className="mt-2 text-center text-sm font-bold text-yellow-200">
+              {reward !== null ? `${goals}/5 goals · +🪙${reward}` : "…"}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ----------------------------- Achievements ------------------------------- */
+
+type Achievement = {
+  key: string;
+  emoji: string;
+  label: string;
+  reward: number;
+  got: boolean;
+  claimed: boolean;
+  claimable: boolean;
+};
+
+function Achievements({ token, onClaimed }: { token: string; onClaimed: () => void }) {
+  const [list, setList] = useState<Achievement[]>([]);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/achievements", { headers: authHeaders(token) });
+    if (res.ok) setList((await res.json()).achievements ?? []);
+  }, [token]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function claim(key: string) {
+    const res = await fetch("/api/achievements", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      celebrate(`🏅 Badge reward: +🪙${data.reward}!`);
+      load();
+      onClaimed();
+    } else {
+      toast(data.error ?? "Try again.");
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {list.map((a) => (
+        <div
+          key={a.key}
+          className={`rounded-xl p-2 text-center text-xs ${a.got ? "bg-blue-600/30" : "bg-white/5 opacity-50"}`}
+        >
+          <div className="text-2xl">{a.emoji}</div>
+          <div className="mt-1 font-semibold">{a.label}</div>
+          <div className="text-yellow-300">🪙{a.reward}</div>
+          {a.claimable ? (
+            <button
+              onClick={() => claim(a.key)}
+              className="mt-1 w-full rounded bg-blue-600 px-2 py-1 text-xs font-bold"
+            >
+              Claim
+            </button>
+          ) : a.claimed ? (
+            <div className="mt-1 text-green-300">✓ Claimed</div>
+          ) : (
+            <div className="mt-1 text-blue-100/50">Locked</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (

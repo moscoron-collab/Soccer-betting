@@ -31,7 +31,11 @@ export async function GET(req: Request) {
     !player.last_spin_at ||
     Date.now() - new Date(player.last_spin_at).getTime() > 86400000;
 
-  return NextResponse.json({ player, predictions: predictions ?? [], canBailout, canSpin });
+  const canPenalty =
+    !player.last_penalty_at ||
+    Date.now() - new Date(player.last_penalty_at).getTime() > 86400000;
+
+  return NextResponse.json({ player, predictions: predictions ?? [], canBailout, canSpin, canPenalty });
 }
 
 // POST /api/me/bailout-style top-up: if broke, top up to the floor once per day.

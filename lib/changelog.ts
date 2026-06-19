@@ -1,10 +1,19 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "1.10";
+export const VERSION = "2.0";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "2.0",
+    date: "2026-06-19",
+    changes: [
+      "🏅 Achievement rewards — unlock badges and claim coin prizes",
+      "🔥 Win-streak bonuses — extra coins for 3, 5 and 10 wins in a row",
+      "⚽ Penalty Shootout mini-game for daily bonus coins",
+    ],
+  },
   {
     version: "1.10",
     date: "2026-06-19",
