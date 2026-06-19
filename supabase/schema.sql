@@ -48,7 +48,7 @@ create table if not exists predictions (
   bonus_mult  numeric not null default 1,            -- underdog + Match of the Day bonus, locked at bet time
   status      text not null default 'PENDING',       -- PENDING | WON | LOST
   created_at  timestamptz not null default now(),
-  unique (player_id, match_id)                       -- one prediction per match per player (V1)
+  unique (player_id, match_id, type)                 -- one bet of each type per match per player
 );
 
 create index if not exists predictions_player_idx on predictions (player_id);

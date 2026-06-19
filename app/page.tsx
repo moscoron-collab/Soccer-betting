@@ -297,11 +297,14 @@ function Game({
     onRefresh();
   }
 
-  // Map of matchId -> the player's existing prediction (if any), so each match card
-  // can show "your pick" + the community panel without disappearing after you bet.
-  const predByMatch = new Map<number, Prediction>(
-    predictions.map((p) => [(p as any).match_id as number, p])
-  );
+  // Map of matchId -> the player's bets on that match (up to one of each type).
+  const predByMatch = new Map<number, Prediction[]>();
+  for (const p of predictions) {
+    const mid = (p as any).match_id as number;
+    const arr = predByMatch.get(mid) ?? [];
+    arr.push(p);
+    predByMatch.set(mid, arr);
+  }
 
   // Competition filter + "show more" to keep the match list short.
   const competitions = Array.from(new Set(matches.map((m) => m.competition)));
@@ -442,7 +445,7 @@ function Game({
                   match={m}
                   token={token}
                   coins={player.coins}
-                  myPrediction={predByMatch.get(m.id)}
+                  myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
                   onPlaced={onRefresh}
                 />
@@ -542,9 +545,10 @@ type BetDraft = {
 };
 
 /* ------------------------------- Bet form --------------------------------- */
-// Used both for placing a new bet (MatchCard) and editing one (PredictionCard).
+// Places (or edits) a single bet of a FIXED type. Type tabs live in MatchCard.
 
 function BetForm({
+  type,
   home,
   away,
   coins,
@@ -553,6 +557,7 @@ function BetForm({
   onSubmit,
   onCancel,
 }: {
+  type: BetType;
   home: string;
   away: string;
   coins: number; // max stake available
@@ -561,7 +566,6 @@ function BetForm({
   onSubmit: (body: any) => Promise<{ error?: string }>;
   onCancel?: () => void;
 }) {
-  const [type, setTypeState] = useState<BetType>(initial?.type ?? "WINNER");
   const [pick, setPick] = useState<string | null>(initial?.pick ?? null);
   const [eh, setEh] = useState(initial?.exactHome != null ? String(initial.exactHome) : "");
   const [ea, setEa] = useState(initial?.exactAway != null ? String(initial.exactAway) : "");
@@ -569,22 +573,16 @@ function BetForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function setType(t: BetType) {
-    setTypeState(t);
-    setPick(null);
-    setEh("");
-    setEa("");
-  }
-
   async function submit() {
     setBusy(true);
     setError(null);
     try {
       const body: any = { type, stake };
-      if (type === "WINNER" || type === "HALFTIME" || type === "GOALS3") body.pick = pick;
-      else {
+      if (type === "EXACT") {
         body.exactHome = Number(eh);
         body.exactAway = Number(ea);
+      } else {
+        body.pick = pick;
       }
       const res = await onSubmit(body);
       if (res?.error) setError(res.error);
@@ -612,20 +610,8 @@ function BetForm({
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        {(Object.keys(BET_LABELS) as BetType[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setType(t)}
-            className={`rounded-lg px-2 py-1.5 font-semibold ${type === t ? "bg-blue-600" : "bg-white/10"}`}
-          >
-            {BET_LABELS[t]}
-          </button>
-        ))}
-      </div>
-
       {type === "EXACT" ? (
-        <div className="mt-2 flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <input
             type="number"
             min={0}
@@ -643,7 +629,7 @@ function BetForm({
           />
         </div>
       ) : (
-        <div className={`mt-2 grid gap-2 ${type === "GOALS3" ? "grid-cols-2" : "grid-cols-3"}`}>
+        <div className={`grid gap-2 ${type === "GOALS3" ? "grid-cols-2" : "grid-cols-3"}`}>
           {sideButtons.map(([opt, label]) => (
             <button
               key={opt}
@@ -738,6 +724,7 @@ function BetEditor({
     return (
       <div className="mt-3 rounded-lg bg-white/5 p-3">
         <BetForm
+          type={p.type}
           home={home}
           away={away}
           coins={coins + p.stake}
@@ -781,18 +768,23 @@ function MatchCard({
   match,
   token,
   coins,
-  myPrediction,
+  myBets,
   isMotd,
   onPlaced,
 }: {
   match: Match;
   token: string;
   coins: number;
-  myPrediction?: Prediction;
+  myBets: Prediction[];
   isMotd?: boolean;
   onPlaced: () => void;
 }) {
   const kickoff = new Date(match.kickoff_at);
+  const [tab, setTab] = useState<BetType>("WINNER");
+
+  // The player's bet of the currently selected type, if any.
+  const betByType = new Map(myBets.map((b) => [b.type, b]));
+  const current = betByType.get(tab);
 
   async function place(body: any) {
     const res = await fetch("/api/predictions", {
@@ -827,29 +819,47 @@ function MatchCard({
         awayCrest={match.away_crest}
       />
 
-      {myPrediction ? (
+      <p className="mt-2 text-center text-xs text-blue-100/60">
+        💡 Place a bet on each option — backing the unpopular pick pays an underdog bonus.
+      </p>
+
+      {/* Bet-type tabs: ✓ marks ones you've already bet. */}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+        {(Object.keys(BET_LABELS) as BetType[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-lg px-2 py-1.5 font-semibold ${tab === t ? "bg-blue-600" : "bg-white/10"}`}
+          >
+            {betByType.has(t) ? "✓ " : ""}
+            {BET_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      {current ? (
         <div className="mt-3 rounded-lg bg-blue-600/20 px-3 py-2 text-sm">
-          ✅ Your pick:{" "}
+          ✅ Your bet:{" "}
           <b>
             {describeCall(
-              myPrediction.type,
-              myPrediction.pick,
-              myPrediction.exact_home,
-              myPrediction.exact_away,
+              current.type,
+              current.pick,
+              current.exact_home,
+              current.exact_away,
               match.home_team,
               match.away_team
             )}
           </b>{" "}
-          · 🪙{myPrediction.stake}
-          {myPrediction.status === "PENDING" && (
+          · 🪙{current.stake}
+          {current.status === "PENDING" && (
             <span className="block text-xs text-blue-100/70">
-              Could win 🪙{potentialWin(myPrediction)}
-              {myPrediction.bonus_mult > 1 && ` (bonus ×${myPrediction.bonus_mult})`}
+              Could win 🪙{potentialWin(current)}
+              {current.bonus_mult > 1 && ` (bonus ×${current.bonus_mult})`}
             </span>
           )}
-          {myPrediction.status === "PENDING" && (
+          {current.status === "PENDING" && (
             <BetEditor
-              p={myPrediction}
+              p={current}
               home={match.home_team}
               away={match.away_team}
               token={token}
@@ -860,10 +870,8 @@ function MatchCard({
         </div>
       ) : (
         <div className="mt-3">
-          <p className="mb-2 text-center text-xs text-blue-100/60">
-            💡 Win more by backing the unpopular pick — underdog bets pay a bonus.
-          </p>
           <BetForm
+            type={tab}
             home={match.home_team}
             away={match.away_team}
             coins={coins}

@@ -102,15 +102,19 @@ export async function POST(req: Request) {
   const open = await getOpenMatch(matchId);
   if ("error" in open) return NextResponse.json({ error: open.error }, { status: open.status });
 
-  // One prediction per match per player.
+  // One bet of each type per match per player.
   const { data: existing } = await supabase
     .from("predictions")
     .select("id")
     .eq("player_id", player.id)
     .eq("match_id", matchId)
+    .eq("type", p.type)
     .maybeSingle();
   if (existing) {
-    return NextResponse.json({ error: "You already predicted this match. Edit it instead." }, { status: 409 });
+    return NextResponse.json(
+      { error: "You already have this type of bet on this match. Edit it instead." },
+      { status: 409 }
+    );
   }
 
   // Deduct the stake now (escrow), guarding against a race on balance.
