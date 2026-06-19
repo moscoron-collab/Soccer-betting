@@ -492,6 +492,17 @@ function Game({
           <p className="text-2xl font-extrabold text-yellow-300">
             🪙 <CountUp value={player.coins} />
           </p>
+          <button
+            onClick={openChanges}
+            className="mt-1 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-blue-100"
+          >
+            v{VERSION} · What&apos;s new
+            {hasUpdate && (
+              <span className="ml-1 rounded-full bg-yellow-400 px-1 text-[10px] font-bold text-gray-900">
+                !
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
