@@ -515,6 +515,11 @@ function Game({
         )}
       </Section>
 
+      {/* Daily challenges */}
+      <Section title="🎯 Daily challenges">
+        <ChallengesSection token={token} onClaimed={onRefresh} />
+      </Section>
+
       {/* Combo bets */}
       <Section title="🎟️ Combo bet">
         <CombosSection token={token} matches={matches} coins={player.coins} onPlaced={onRefresh} />
@@ -706,6 +711,76 @@ function MyLog({ predictions, player }: { predictions: Prediction[]; player: Pla
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* --------------------------- Daily challenges ----------------------------- */
+
+type Challenge = {
+  key: string;
+  label: string;
+  target: number;
+  reward: number;
+  progress: number;
+  claimed: boolean;
+  claimable: boolean;
+};
+
+function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () => void }) {
+  const [list, setList] = useState<Challenge[]>([]);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/challenges", { headers: authHeaders(token) });
+    if (res.ok) setList((await res.json()).challenges ?? []);
+  }, [token]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function claim(key: string) {
+    const res = await fetch("/api/challenges", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      celebrate(`🎯 Challenge done: +🪙${data.reward}!`);
+      load();
+      onClaimed();
+    } else {
+      toast(data.error ?? "Try again.");
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {list.map((c) => (
+        <div key={c.key} className="rounded-xl bg-white/5 p-4">
+          <div className="flex items-center justify-between">
+            <span className="font-bold">{c.label}</span>
+            <span className="text-xs text-yellow-300">🪙{c.reward}</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full bg-blue-500" style={{ width: `${(c.progress / c.target) * 100}%` }} />
+          </div>
+          <div className="mt-1 text-xs text-blue-100/60">
+            {c.progress}/{c.target}
+          </div>
+          {c.claimed ? (
+            <p className="mt-2 text-sm font-semibold text-green-300">✓ Claimed</p>
+          ) : (
+            <button
+              onClick={() => claim(c.key)}
+              disabled={!c.claimable}
+              className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold disabled:opacity-40"
+            >
+              {c.claimable ? "Claim reward" : "In progress"}
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

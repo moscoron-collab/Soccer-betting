@@ -80,6 +80,15 @@ create table if not exists parlays (
 );
 create index if not exists parlays_player_idx on parlays (player_id);
 
+-- ---------- challenge_claims (daily challenges) ----------
+create table if not exists challenge_claims (
+  player_id   uuid not null references players(id) on delete cascade,
+  day         date not null,
+  key         text not null,
+  created_at  timestamptz not null default now(),
+  primary key (player_id, day, key)
+);
+
 -- ---------- helper: atomic coin increment (used when settling winnings) ----------
 create or replace function increment_coins(p_player uuid, p_amount integer)
 returns void language sql as $$
