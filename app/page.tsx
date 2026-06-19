@@ -79,6 +79,13 @@ function potentialWin(p: Prediction): number {
   return Math.round(p.stake * BASE_MULT[p.type] * (p.bonus_mult ?? 1));
 }
 
+// The effective multiplier shown to players (base × bonus), so stake × this = could-win.
+function effMult(p: Prediction): string {
+  const m = BASE_MULT[p.type] * (p.bonus_mult ?? 1);
+  const s = Number.isInteger(m) ? `${m}` : m.toFixed(1);
+  return (p.bonus_mult ?? 1) > 1 ? `×${s} 🔥` : `×${s}`;
+}
+
 // Level/tier from XP (100 XP per level, tiers match the original concept).
 function levelInfo(xp: number) {
   const level = Math.min(100, Math.floor((xp || 0) / 100) + 1);
@@ -1531,8 +1538,7 @@ function MatchCard({
           · 🪙{current.stake}
           {current.status === "PENDING" && (
             <span className="block text-xs text-blue-100/70">
-              Could win 🪙{potentialWin(current)}
-              {current.bonus_mult > 1 && ` (bonus ×${current.bonus_mult})`}
+              Could win 🪙{potentialWin(current)} ({effMult(current)})
             </span>
           )}
           {current.status === "PENDING" && (
@@ -1635,8 +1641,7 @@ function MatchBetsCard({
               <b>
                 {describeCall(p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? "Home", m?.away_team ?? "Away")}
               </b>{" "}
-              · Stake {p.stake} · could win 🪙{potentialWin(p)}
-              {p.bonus_mult > 1 && ` (×${p.bonus_mult})`}
+              · Stake {p.stake} · could win 🪙{potentialWin(p)} ({effMult(p)})
             </div>
             {editable && m && (
               <BetEditor
