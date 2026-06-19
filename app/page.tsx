@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, toast } from "@/lib/celebrate";
+import { VERSION, CHANGELOG } from "@/lib/changelog";
 
 const TOKEN_KEY = "spg_token";
 
@@ -353,6 +354,7 @@ function Game({
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
+  const [showChanges, setShowChanges] = useState(false);
 
   const loadMatches = useCallback(async () => {
     const res = await fetch("/api/matches");
@@ -596,7 +598,53 @@ function Game({
       <p className="mt-8 text-center text-xs text-blue-100/50">
         Free to play • Virtual coins only • No real money gambling
       </p>
+      <p className="mt-1 text-center text-xs text-blue-100/40">
+        v{VERSION} ·{" "}
+        <button onClick={() => setShowChanges(true)} className="underline">
+          What&apos;s new
+        </button>
+      </p>
+
+      {showChanges && <Changelog onClose={() => setShowChanges(false)} />}
     </main>
+  );
+}
+
+/* ------------------------------ Changelog --------------------------------- */
+
+function Changelog({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">🆕 What&apos;s new</h2>
+          <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
+            Close
+          </button>
+        </div>
+        <div className="mt-3 space-y-4">
+          {CHANGELOG.map((r) => (
+            <div key={r.version}>
+              <div className="flex items-baseline gap-2">
+                <span className="font-bold text-blue-300">v{r.version}</span>
+                <span className="text-xs text-blue-100/50">{r.date}</span>
+              </div>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-blue-100/80">
+                {r.changes.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
