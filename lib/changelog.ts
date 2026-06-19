@@ -1,10 +1,19 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "1.9";
+export const VERSION = "1.10";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "1.10",
+    date: "2026-06-19",
+    changes: [
+      "Removed Combo bets",
+      "Clearer payouts: each bet shows the full multiplier (e.g. ×4.5) so stake × it = winnings",
+      "Every bet market now shows a plain-English question",
+    ],
+  },
   {
     version: "1.9",
     date: "2026-06-19",
