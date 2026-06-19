@@ -256,6 +256,7 @@ function Game({
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
+  const [view, setView] = useState<"play" | "log">("play");
 
   const loadMatches = useCallback(async () => {
     const res = await fetch("/api/matches");
@@ -367,6 +368,26 @@ function Game({
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="mt-4 flex gap-2 rounded-xl bg-white/5 p-1">
+        <button
+          onClick={() => setView("play")}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "play" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+        >
+          🎮 Play
+        </button>
+        <button
+          onClick={() => setView("log")}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "log" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+        >
+          📊 My Log
+        </button>
+      </div>
+
+      {view === "log" && <MyLog predictions={predictions} />}
+
+      {view === "play" && (
+        <>
       {/* Leaderboard */}
       <Section title="🏆 Leaderboard">
         <div className="overflow-hidden rounded-xl bg-white/5">
@@ -463,11 +484,83 @@ function Game({
           </>
         )}
       </Section>
+        </>
+      )}
 
       <p className="mt-8 text-center text-xs text-blue-100/50">
         Free to play • Virtual coins only • No real money gambling
       </p>
     </main>
+  );
+}
+
+/* --------------------------------- My Log --------------------------------- */
+// Per-player history: record, net coins, and a line per settled bet.
+
+function MyLog({ predictions }: { predictions: Prediction[] }) {
+  const settled = predictions.filter((p) => p.status !== "PENDING");
+  const wins = settled.filter((p) => p.status === "WON").length;
+  const losses = settled.filter((p) => p.status === "LOST").length;
+  const pending = predictions.length - settled.length;
+  const net = settled.reduce(
+    (sum, p) => sum + (p.status === "WON" ? p.payout - p.stake : -p.stake),
+    0
+  );
+  const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+
+  return (
+    <div className="mt-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Wins" value={`${wins}`} color="text-green-300" />
+        <Stat label="Losses" value={`${losses}`} color="text-red-300" />
+        <Stat label="Win rate" value={`${winRate}%`} />
+        <Stat
+          label="Net coins"
+          value={`${net >= 0 ? "+" : ""}${net.toLocaleString()}`}
+          color={net >= 0 ? "text-green-300" : "text-red-300"}
+        />
+      </div>
+
+      <h2 className="mb-2 mt-6 text-lg font-bold">History</h2>
+      {settled.length === 0 ? (
+        <Empty text={pending > 0 ? "Your bets are still pending — results show here once matches finish." : "No finished bets yet. Place some predictions!"} />
+      ) : (
+        <div className="space-y-2">
+          {settled.map((p) => {
+            const m = p.matches;
+            const delta = p.status === "WON" ? p.payout - p.stake : -p.stake;
+            return (
+              <div key={p.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-sm">
+                <div>
+                  <div className="font-semibold">
+                    {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+                    {m && m.home_score != null && (
+                      <span className="text-blue-100/60"> · {m.home_score}–{m.away_score}</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-blue-100/70">
+                    {describeCall(p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? "Home", m?.away_team ?? "Away")} · staked {p.stake}
+                  </div>
+                </div>
+                <div className={`text-right font-bold ${delta >= 0 ? "text-green-300" : "text-red-300"}`}>
+                  {delta >= 0 ? `+${delta}` : delta} 🪙
+                  <div className="text-xs font-normal text-blue-100/60">{p.status}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-xl bg-white/5 p-3 text-center">
+      <div className={`text-xl font-extrabold ${color ?? ""}`}>{value}</div>
+      <div className="text-xs text-blue-100/60">{label}</div>
+    </div>
   );
 }
 
