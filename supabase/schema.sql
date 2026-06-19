@@ -8,6 +8,7 @@ create table if not exists players (
   secret_token    text unique not null,            -- session token stored in the browser
   password_hash   text,                            -- scrypt "salt:hash" (set on signup/first login)
   coins           integer not null default 1000,
+  xp              integer not null default 0,        -- experience points -> level
   last_bailout_at timestamptz,                       -- for the "keep playing" top-up
   last_spin_at    timestamptz,                       -- for the daily spin
   created_at      timestamptz not null default now()
@@ -83,6 +84,11 @@ create index if not exists parlays_player_idx on parlays (player_id);
 create or replace function increment_coins(p_player uuid, p_amount integer)
 returns void language sql as $$
   update players set coins = coins + p_amount where id = p_player;
+$$;
+
+create or replace function increment_xp(p_player uuid, p_amount integer)
+returns void language sql as $$
+  update players set xp = xp + p_amount where id = p_player;
 $$;
 
 -- Note: the app talks to the database only through server-side API routes using the

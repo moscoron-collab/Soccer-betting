@@ -87,6 +87,7 @@ async function runSync() {
 
       if (payout > 0) {
         await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: payout });
+        await supabase.rpc("increment_xp", { p_player: p.player_id, p_amount: 25 });
       }
       settledPredictions++;
     }
@@ -178,6 +179,7 @@ async function runSync() {
       .eq("id", par.id);
     if (payout > 0) {
       await supabase.rpc("increment_coins", { p_player: par.player_id, p_amount: payout });
+      await supabase.rpc("increment_xp", { p_player: par.player_id, p_amount: 50 });
     }
     settledParlays++;
   }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { celebrate, toast } from "@/lib/celebrate";
 
 const TOKEN_KEY = "spg_token";
 
-type Player = { id: string; username: string; coins: number };
+type Player = { id: string; username: string; coins: number; xp: number };
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 type Match = {
   id: number;
@@ -62,6 +63,14 @@ function potentialWin(p: Prediction): number {
   return Math.round(p.stake * BASE_MULT[p.type] * (p.bonus_mult ?? 1));
 }
 
+// Level/tier from XP (100 XP per level, tiers match the original concept).
+function levelInfo(xp: number) {
+  const level = Math.min(100, Math.floor((xp || 0) / 100) + 1);
+  const tier =
+    level >= 100 ? "Legend" : level >= 50 ? "Expert" : level >= 25 ? "Scout" : level >= 10 ? "Analyst" : "Rookie";
+  return { level, tier, intoLevel: (xp || 0) % 100 };
+}
+
 type LeaderRow = { username: string; coins: number };
 
 function authHeaders(token: string): HeadersInit {
@@ -75,6 +84,7 @@ export default function Home() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [canBailout, setCanBailout] = useState(false);
   const [canSpin, setCanSpin] = useState(false);
+  const seenWon = useRef<Set<string> | null>(null);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -92,14 +102,36 @@ export default function Home() {
       return;
     }
     const data = await res.json();
+    const preds: Prediction[] = data.predictions ?? [];
+
+    // Celebrate bets that have just been won since the last check.
+    const wonIds = new Set(preds.filter((p) => p.status === "WON").map((p) => p.id));
+    if (seenWon.current === null) {
+      seenWon.current = wonIds; // first load — don't celebrate past wins
+    } else {
+      const fresh = preds.filter((p) => p.status === "WON" && !seenWon.current!.has(p.id));
+      if (fresh.length > 0) {
+        const gained = fresh.reduce((s, p) => s + p.payout, 0);
+        celebrate(`🎉 You won 🪙${gained.toLocaleString()}!`);
+      }
+      seenWon.current = wonIds;
+    }
+
     setPlayer(data.player);
-    setPredictions(data.predictions ?? []);
+    setPredictions(preds);
     setCanBailout(!!data.canBailout);
     setCanSpin(!!data.canSpin);
   }, []);
 
   useEffect(() => {
     if (token) loadMe(token);
+  }, [token, loadMe]);
+
+  // Poll every 60s so wins pop while you're watching.
+  useEffect(() => {
+    if (!token) return;
+    const id = setInterval(() => loadMe(token), 60000);
+    return () => clearInterval(id);
   }, [token, loadMe]);
 
   function onSignedIn(t: string) {
@@ -116,21 +148,76 @@ export default function Home() {
 
   if (!ready) return null;
 
-  if (!token || !player) {
-    return <AuthScreen onSignedIn={onSignedIn} />;
-  }
+  return (
+    <>
+      <Toaster />
+      {!token || !player ? (
+        <AuthScreen onSignedIn={onSignedIn} />
+      ) : (
+        <Game
+          token={token}
+          player={player}
+          predictions={predictions}
+          canBailout={canBailout}
+          canSpin={canSpin}
+          onRefresh={() => loadMe(token)}
+          onSignOut={signOut}
+        />
+      )}
+    </>
+  );
+}
+
+/* ------------------------------- Toaster ---------------------------------- */
+
+function Toaster() {
+  const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
+  useEffect(() => {
+    function onToast(e: Event) {
+      const msg = (e as CustomEvent).detail as string;
+      const id = Date.now() + Math.random();
+      setToasts((t) => [...t, { id, msg }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+    }
+    window.addEventListener("spg-toast", onToast);
+    return () => window.removeEventListener("spg-toast", onToast);
+  }, []);
 
   return (
-    <Game
-      token={token}
-      player={player}
-      predictions={predictions}
-      canBailout={canBailout}
-      canSpin={canSpin}
-      onRefresh={() => loadMe(token)}
-      onSignOut={signOut}
-    />
+    <div className="fixed left-1/2 top-4 z-[10000] flex -translate-x-1/2 flex-col items-center gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg"
+        >
+          {t.msg}
+        </div>
+      ))}
+    </div>
   );
+}
+
+// Animated number that counts up/down when its value changes.
+function CountUp({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current;
+    const to = value;
+    prev.current = value;
+    if (from === to) return;
+    const start = performance.now();
+    const dur = 700;
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / dur);
+      setDisplay(Math.round(from + (to - from) * p));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{display.toLocaleString()}</>;
 }
 
 /* ------------------------------- Auth screen ------------------------------- */
@@ -333,10 +420,10 @@ function Game({
     const res = await fetch("/api/spin", { method: "POST", headers: authHeaders(token) });
     const data = await res.json();
     if (res.ok) {
-      alert(`🎰 You won ${data.reward} coins!`);
+      celebrate(`🎰 Daily Spin: +🪙${data.reward}!`);
       onRefresh();
     } else {
-      alert(data.error ?? "Try again.");
+      toast(data.error ?? "Try again.");
     }
   }
 
@@ -351,7 +438,7 @@ function Game({
         <div className="text-right">
           <p className="text-sm text-blue-100/70">Coins</p>
           <p className="text-2xl font-extrabold text-yellow-300">
-            🪙 {player.coins.toLocaleString()}
+            🪙 <CountUp value={player.coins} />
           </p>
         </div>
       </div>
@@ -393,7 +480,7 @@ function Game({
         </button>
       </div>
 
-      {view === "log" && <MyLog predictions={predictions} />}
+      {view === "log" && <MyLog predictions={predictions} player={player} />}
 
       {view === "play" && (
         <>
@@ -511,7 +598,7 @@ function Game({
 /* --------------------------------- My Log --------------------------------- */
 // Per-player history: record, net coins, and a line per settled bet.
 
-function MyLog({ predictions }: { predictions: Prediction[] }) {
+function MyLog({ predictions, player }: { predictions: Prediction[]; player: Player }) {
   const settled = predictions.filter((p) => p.status !== "PENDING");
   const wins = settled.filter((p) => p.status === "WON").length;
   const losses = settled.filter((p) => p.status === "LOST").length;
@@ -522,9 +609,49 @@ function MyLog({ predictions }: { predictions: Prediction[] }) {
   );
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
+  const lvl = levelInfo(player.xp);
+
+  // Current win streak: most recent settled bets (by kickoff) that are wins.
+  const byRecent = [...settled].sort(
+    (a, b) => new Date(b.matches?.kickoff_at ?? 0).getTime() - new Date(a.matches?.kickoff_at ?? 0).getTime()
+  );
+  let streak = 0;
+  for (const p of byRecent) {
+    if (p.status === "WON") streak++;
+    else break;
+  }
+
+  const exactWin = settled.some((p) => p.status === "WON" && p.type === "EXACT");
+  const achievements = [
+    { emoji: "🥇", label: "First Win", got: wins >= 1 },
+    { emoji: "🔟", label: "10 Wins", got: wins >= 10 },
+    { emoji: "🏆", label: "50 Wins", got: wins >= 50 },
+    { emoji: "🎯", label: "Exact Master", got: exactWin },
+    { emoji: "🔥", label: "5 Streak", got: streak >= 5 },
+    { emoji: "💰", label: "5,000 Coins", got: player.coins >= 5000 },
+    { emoji: "💎", label: "25,000 Coins", got: player.coins >= 25000 },
+    { emoji: "⭐", label: "Reach Level 10", got: lvl.level >= 10 },
+  ];
+
   return (
     <div className="mt-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Level */}
+      <div className="rounded-xl bg-white/5 p-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-bold">
+            Level {lvl.level} · <span className="text-blue-300">{lvl.tier}</span>
+          </span>
+          <span className="text-blue-100/60">
+            {streak > 0 ? `🔥 ${streak} win streak` : "XP"}
+          </span>
+        </div>
+        <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full bg-blue-500" style={{ width: `${lvl.intoLevel}%` }} />
+        </div>
+        <div className="mt-1 text-right text-xs text-blue-100/60">{lvl.intoLevel}/100 XP to next level</div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Wins" value={`${wins}`} color="text-green-300" />
         <Stat label="Losses" value={`${losses}`} color="text-red-300" />
         <Stat label="Win rate" value={`${winRate}%`} />
@@ -533,6 +660,20 @@ function MyLog({ predictions }: { predictions: Prediction[] }) {
           value={`${net >= 0 ? "+" : ""}${net.toLocaleString()}`}
           color={net >= 0 ? "text-green-300" : "text-red-300"}
         />
+      </div>
+
+      {/* Achievements */}
+      <h2 className="mb-2 mt-6 text-lg font-bold">Badges</h2>
+      <div className="grid grid-cols-4 gap-2">
+        {achievements.map((a) => (
+          <div
+            key={a.label}
+            className={`rounded-xl p-2 text-center text-xs ${a.got ? "bg-blue-600/30" : "bg-white/5 opacity-40"}`}
+          >
+            <div className="text-2xl">{a.emoji}</div>
+            <div className="mt-1">{a.label}</div>
+          </div>
+        ))}
       </div>
 
       <h2 className="mb-2 mt-6 text-lg font-bold">History</h2>
@@ -679,6 +820,7 @@ function CombosSection({
     setLegs([]);
     loadParlays();
     onPlaced();
+    toast("Combo placed 🎟️");
   }
 
   return (
@@ -1161,6 +1303,7 @@ function MatchCard({
     });
     const data = await res.json();
     if (!res.ok) return { error: data.error ?? "Could not place prediction." };
+    toast("Bet placed ✅");
     onPlaced();
     return {};
   }

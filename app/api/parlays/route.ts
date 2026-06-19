@@ -130,5 +130,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not place combo." }, { status: 500 });
   }
 
+  await supabase.rpc("increment_xp", { p_player: player.id, p_amount: 10 });
   return NextResponse.json({ id: created.id, coins: newBalance, mult });
 }
