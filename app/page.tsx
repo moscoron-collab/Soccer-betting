@@ -41,10 +41,10 @@ type Prediction = {
 };
 
 const BET_LABELS: Record<BetType, string> = {
-  WINNER: "Winner / Draw (2×)",
-  EXACT: "Exact score (5×)",
-  HALFTIME: "Half-time leader (2×)",
-  GOALS3: "3+ goals (2×)",
+  WINNER: "Winner / Draw",
+  EXACT: "Exact score",
+  HALFTIME: "Half-time leader",
+  GOALS3: "3+ goals",
 };
 const BASE_MULT: Record<BetType, number> = { WINNER: 2, EXACT: 5, HALFTIME: 2, GOALS3: 2 };
 
@@ -736,7 +736,7 @@ function BetForm({
       )}
 
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-xs text-blue-100/70">Stake</span>
+        <span className="text-xs text-blue-100/70">Bet</span>
         <input
           type="number"
           min={1}
@@ -745,6 +745,7 @@ function BetForm({
           onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
           className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
         />
+        <span className="text-xs text-blue-100/70">coins</span>
         {onCancel && (
           <button onClick={onCancel} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
             Close
@@ -758,6 +759,15 @@ function BetForm({
           {busy ? "…" : submitLabel}
         </button>
       </div>
+
+      {stake > 0 && (
+        <p className="mt-2 text-center text-sm font-semibold text-yellow-200">
+          → If correct, you win 🪙{(stake * BASE_MULT[type]).toLocaleString()}
+          <span className="block text-xs font-normal text-blue-100/60">
+            (unpopular picks win even more)
+          </span>
+        </p>
+      )}
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
     </div>
   );
