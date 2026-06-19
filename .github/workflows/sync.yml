@@ -5,7 +5,7 @@ name: Sync matches & settle predictions
 # database awake so it never sleeps. Everything here is free.
 on:
   schedule:
-    - cron: "0 * * * *" # every hour, on the hour (UTC)
+    - cron: "*/15 * * * *" # every 15 minutes
   workflow_dispatch: {} # lets you run it manually from the Actions tab
 
 jobs:
