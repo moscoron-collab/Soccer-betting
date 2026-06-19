@@ -461,7 +461,11 @@ function Game({
     arr.push(p);
     pendingByMatch.set(mid, arr);
   }
-  const pendingGroups = Array.from(pendingByMatch.values());
+  const pendingGroups = Array.from(pendingByMatch.values()).sort(
+    (a, b) =>
+      new Date(a[0].matches?.kickoff_at ?? 0).getTime() -
+      new Date(b[0].matches?.kickoff_at ?? 0).getTime()
+  );
 
   function pickComp(c: string) {
     setComp(c);
