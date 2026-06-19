@@ -355,6 +355,18 @@ function Game({
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
   const [showChanges, setShowChanges] = useState(false);
+  const [seenVersion, setSeenVersion] = useState<string>(VERSION);
+
+  useEffect(() => {
+    setSeenVersion(localStorage.getItem("spg_seen_version") ?? "");
+  }, []);
+  const hasUpdate = seenVersion !== VERSION;
+
+  function openChanges() {
+    setShowChanges(true);
+    localStorage.setItem("spg_seen_version", VERSION);
+    setSeenVersion(VERSION);
+  }
 
   const loadMatches = useCallback(async () => {
     const res = await fetch("/api/matches");
@@ -600,9 +612,14 @@ function Game({
       </p>
       <p className="mt-1 text-center text-xs text-blue-100/40">
         v{VERSION} ·{" "}
-        <button onClick={() => setShowChanges(true)} className="underline">
+        <button onClick={openChanges} className="underline">
           What&apos;s new
         </button>
+        {hasUpdate && (
+          <span className="ml-1 rounded-full bg-yellow-400 px-1.5 py-0.5 text-[10px] font-bold text-gray-900">
+            Updated!
+          </span>
+        )}
       </p>
 
       {showChanges && <Changelog onClose={() => setShowChanges(false)} />}
