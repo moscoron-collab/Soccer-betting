@@ -1,10 +1,18 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "1.7";
+export const VERSION = "1.8";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "1.8",
+    date: "2026-06-19",
+    changes: [
+      "Removed the Beat the Crowd mini-game",
+      "My predictions now shows only your active bets, grouped one card per match",
+    ],
+  },
   {
     version: "1.7",
     date: "2026-06-19",

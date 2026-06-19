@@ -558,21 +558,16 @@ function Game({
 
       {/* Mini-games */}
       <Section title="🎮 Mini-games">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-white/5 p-4">
-            <p className="font-bold">🎰 Daily Spin</p>
-            <p className="mt-1 text-xs text-blue-100/70">
-              Spin once a day for free bonus coins.
-            </p>
-            <button
-              onClick={spin}
-              disabled={!canSpin}
-              className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
-            >
-              {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
-            </button>
-          </div>
-          <CrowdGame token={token} matches={matches} />
+        <div className="rounded-xl bg-white/5 p-4">
+          <p className="font-bold">🎰 Daily Spin</p>
+          <p className="mt-1 text-xs text-blue-100/70">Spin once a day for free bonus coins.</p>
+          <button
+            onClick={spin}
+            disabled={!canSpin}
+            className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+          >
+            {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
+          </button>
         </div>
       </Section>
 
@@ -1689,118 +1684,6 @@ function MatchBetsCard({
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-/* --------------------------- Beat the Crowd ------------------------------- */
-// Guess what % of players will back the favourite; closest guess wins coins.
-// Resolves at kickoff (via the sync job), so no AI can know the answer ahead.
-
-type CrowdGuess = {
-  id: string;
-  match_id: number;
-  guess_pct: number;
-  reward: number;
-  status: "PENDING" | "SETTLED";
-  matches: { home_team: string; away_team: string; kickoff_at: string } | null;
-};
-
-function CrowdGame({ token, matches }: { token: string; matches: Match[] }) {
-  const [guesses, setGuesses] = useState<CrowdGuess[]>([]);
-  const [sel, setSel] = useState<number | "">("");
-  const [pct, setPct] = useState(50);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/crowd", { headers: authHeaders(token) });
-    if (res.ok) setGuesses((await res.json()).guesses ?? []);
-  }, [token]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const guessedIds = new Set(guesses.map((g) => g.match_id));
-  const available = matches.filter((m) => !guessedIds.has(m.id)).slice(0, 20);
-
-  async function submit() {
-    if (sel === "") return;
-    setMsg(null);
-    const res = await fetch("/api/crowd", {
-      method: "POST",
-      headers: authHeaders(token),
-      body: JSON.stringify({ matchId: sel, guessPct: pct }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setMsg(data.error ?? "Try again.");
-      return;
-    }
-    setSel("");
-    setPct(50);
-    load();
-  }
-
-  return (
-    <div className="rounded-xl bg-white/5 p-4">
-      <p className="font-bold">🎯 Beat the Crowd</p>
-      <p className="mt-1 text-xs text-blue-100/70">
-        Guess what % of players will back the favourite. Closest guess wins coins (settled at
-        kickoff).
-      </p>
-
-      <select
-        value={sel}
-        onChange={(e) => setSel(e.target.value ? Number(e.target.value) : "")}
-        className="mt-3 w-full rounded-lg bg-white/95 px-2 py-1.5 text-sm text-gray-900"
-      >
-        <option value="">Pick a match…</option>
-        {available.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.home_team} vs {m.away_team}
-          </option>
-        ))}
-      </select>
-
-      {sel !== "" && (
-        <div className="mt-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span>Favourite backed by</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={pct}
-              onChange={(e) => setPct(Number(e.target.value))}
-              className="flex-1"
-            />
-            <b className="w-10 text-right">{pct}%</b>
-          </div>
-          <button
-            onClick={submit}
-            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold"
-          >
-            Submit guess
-          </button>
-        </div>
-      )}
-      {msg && <p className="mt-2 text-xs text-red-300">{msg}</p>}
-
-      {guesses.length > 0 && (
-        <div className="mt-3 space-y-1 text-xs">
-          {guesses.slice(0, 5).map((g) => (
-            <div key={g.id} className="flex justify-between rounded bg-white/5 px-2 py-1">
-              <span>
-                {g.matches ? `${g.matches.home_team} v ${g.matches.away_team}` : "Match"} · {g.guess_pct}%
-              </span>
-              <span className={g.status === "SETTLED" ? (g.reward > 0 ? "text-green-300" : "text-blue-100/60") : "text-blue-100/60"}>
-                {g.status === "PENDING" ? "Pending" : g.reward > 0 ? `Won +${g.reward}` : "No win"}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
