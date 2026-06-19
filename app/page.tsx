@@ -64,6 +64,15 @@ const BASE_MULT: Record<BetType, number> = {
   BTTS: 2,
   TOTALS: 3,
 };
+// A plain-English question shown above each market's options.
+const BET_PROMPTS: Record<BetType, string> = {
+  WINNER: "Who wins the match?",
+  EXACT: "Guess the exact final score",
+  HALFTIME: "Who's leading at half-time?",
+  GOALS3: "Will there be 3 or more goals?",
+  BTTS: "Will both teams score?",
+  TOTALS: "How many goals in total (both teams)?",
+};
 
 // Coins a pending bet would return if it wins (base × locked-in bonus).
 function potentialWin(p: Prediction): number {
@@ -1267,6 +1276,7 @@ function BetForm({
 
   return (
     <div>
+      <p className="mb-2 text-center text-xs font-semibold text-blue-100/80">{BET_PROMPTS[type]}</p>
       {type === "EXACT" ? (
         <div className="flex items-center justify-center gap-2">
           <input
