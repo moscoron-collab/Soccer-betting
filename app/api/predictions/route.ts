@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
 import { computeBonusMult } from "@/lib/bonus";
+import { PredictionType, validateSelection } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type ParsedPrediction = {
-  type: "WINNER" | "EXACT" | "HALFTIME" | "GOALS3";
+  type: PredictionType;
   pick: string | null;
   exactHome: number | null;
   exactAway: number | null;
@@ -17,47 +18,18 @@ type ParsedPrediction = {
 // Validates the prediction fields shared by placing (POST) and editing (PUT).
 // Returns either the parsed prediction or an error message.
 function parsePrediction(body: any): { ok: true; value: ParsedPrediction } | { ok: false; error: string } {
-  const type = body?.type;
   const stake = Math.floor(Number(body?.stake));
-
-  if (!["WINNER", "EXACT", "HALFTIME", "GOALS3"].includes(type)) {
-    return { ok: false, error: "Invalid prediction type" };
-  }
   if (!Number.isFinite(stake) || stake <= 0) {
     return { ok: false, error: "Stake must be a positive number" };
   }
 
-  let pick: string | null = null;
-  let exactHome: number | null = null;
-  let exactAway: number | null = null;
+  const sel = validateSelection(body?.type, body?.pick, body?.exactHome, body?.exactAway);
+  if (!sel.ok) return { ok: false, error: sel.error };
 
-  if (type === "WINNER" || type === "HALFTIME") {
-    pick = body?.pick;
-    if (!["HOME", "DRAW", "AWAY"].includes(pick ?? "")) {
-      return { ok: false, error: "Pick HOME, DRAW or AWAY" };
-    }
-  } else if (type === "GOALS3") {
-    pick = body?.pick;
-    if (!["YES", "NO"].includes(pick ?? "")) {
-      return { ok: false, error: "Pick YES or NO" };
-    }
-  } else {
-    // EXACT
-    exactHome = Math.floor(Number(body?.exactHome));
-    exactAway = Math.floor(Number(body?.exactAway));
-    if (
-      !Number.isFinite(exactHome) ||
-      !Number.isFinite(exactAway) ||
-      exactHome < 0 ||
-      exactAway < 0 ||
-      exactHome > 30 ||
-      exactAway > 30
-    ) {
-      return { ok: false, error: "Enter a valid score" };
-    }
-  }
-
-  return { ok: true, value: { type, pick, exactHome, exactAway, stake } };
+  return {
+    ok: true,
+    value: { type: sel.type, pick: sel.pick, exactHome: sel.exactHome, exactAway: sel.exactAway, stake },
+  };
 }
 
 // Confirms a match exists and is still open for predictions (not kicked off).

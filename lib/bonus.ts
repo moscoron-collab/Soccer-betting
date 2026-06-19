@@ -11,23 +11,13 @@ export async function computeBonusMult(
 ): Promise<number> {
   let bonus = 1;
 
-  if ((type === "WINNER" || type === "HALFTIME") && pick) {
+  // Underdog bonus for any pick-based market (everything except EXACT).
+  if (type !== "EXACT" && pick) {
     const { data } = await supabase
       .from("predictions")
       .select("pick")
       .eq("match_id", matchId)
-      .in("type", ["WINNER", "HALFTIME"]);
-    const rows = data ?? [];
-    if (rows.length >= 3) {
-      const same = rows.filter((r) => r.pick === pick).length;
-      bonus = underdogBonus(same / rows.length);
-    }
-  } else if (type === "GOALS3" && pick) {
-    const { data } = await supabase
-      .from("predictions")
-      .select("pick")
-      .eq("match_id", matchId)
-      .eq("type", "GOALS3");
+      .eq("type", type);
     const rows = data ?? [];
     if (rows.length >= 3) {
       const same = rows.filter((r) => r.pick === pick).length;

@@ -66,6 +66,19 @@ create table if not exists crowd_guesses (
   unique (player_id, match_id)
 );
 
+-- ---------- parlays (combo bets) ----------
+create table if not exists parlays (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  stake       integer not null,
+  mult        numeric not null default 1,            -- combined multiplier of all legs
+  payout      integer not null default 0,
+  legs        jsonb not null,                        -- [{match_id,type,pick,exact_home,exact_away,home_team,away_team}]
+  status      text not null default 'PENDING',       -- PENDING | WON | LOST
+  created_at  timestamptz not null default now()
+);
+create index if not exists parlays_player_idx on parlays (player_id);
+
 -- ---------- helper: atomic coin increment (used when settling winnings) ----------
 create or replace function increment_coins(p_player uuid, p_amount integer)
 returns void language sql as $$

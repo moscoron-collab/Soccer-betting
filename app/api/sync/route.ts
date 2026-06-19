@@ -133,7 +133,56 @@ async function runSync() {
     settledGuesses++;
   }
 
-  return { upserted, settledMatches, settledPredictions, settledGuesses };
+  // 4) Settle combo bets (parlays) once all their legs' matches are finished.
+  let settledParlays = 0;
+  const { data: parlays } = await supabase
+    .from("parlays")
+    .select("id, player_id, stake, mult, legs")
+    .eq("status", "PENDING");
+
+  for (const par of parlays ?? []) {
+    const legs = (par.legs as any[]) ?? [];
+    const ids = legs.map((l) => l.match_id);
+    const { data: legMatches } = await supabase
+      .from("matches")
+      .select("id, status, home_score, away_score, half_home, half_away")
+      .in("id", ids);
+    const mById = new Map((legMatches ?? []).map((m) => [m.id, m]));
+
+    // Wait until every leg's match has a final score.
+    const allFinished = legs.every((l) => {
+      const m = mById.get(l.match_id);
+      return m && m.status === "FINISHED" && m.home_score != null && m.away_score != null;
+    });
+    if (!allFinished) continue;
+
+    const allWon = legs.every((l) => {
+      const m = mById.get(l.match_id)!;
+      return computePayout(
+        l.type as PredictionType,
+        l.pick ?? null,
+        l.exact_home,
+        l.exact_away,
+        1,
+        m.home_score as number,
+        m.away_score as number,
+        m.half_home,
+        m.half_away
+      ).won;
+    });
+
+    const payout = allWon ? Math.round(par.stake * Number(par.mult)) : 0;
+    await supabase
+      .from("parlays")
+      .update({ status: allWon ? "WON" : "LOST", payout })
+      .eq("id", par.id);
+    if (payout > 0) {
+      await supabase.rpc("increment_coins", { p_player: par.player_id, p_amount: payout });
+    }
+    settledParlays++;
+  }
+
+  return { upserted, settledMatches, settledPredictions, settledGuesses, settledParlays };
 }
 
 export async function POST(req: Request) {

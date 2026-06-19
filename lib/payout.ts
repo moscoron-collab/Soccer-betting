@@ -4,6 +4,8 @@ export const WINNER_MULTIPLIER = 2; // correct winner/draw returns 2x the stake
 export const EXACT_MULTIPLIER = 5; // correct exact score returns 5x the stake
 export const HALFTIME_MULTIPLIER = 2; // correct half-time leader returns 2x the stake
 export const GOALS3_MULTIPLIER = 2; // correct "3+ goals" returns 2x the stake
+export const BTTS_MULTIPLIER = 2; // correct "both teams to score" returns 2x
+export const TOTALS_MULTIPLIER = 3; // correct total-goals band returns 3x
 
 export const STARTING_COINS = 1000;
 export const BAILOUT_FLOOR = 100; // if you drop below this you can top up once a day
@@ -12,12 +14,76 @@ export const BAILOUT_AMOUNT = 100;
 export const MOTD_BONUS = 0.5; // extra multiplier added for the Match of the Day
 export const MAX_BONUS = 3; // cap on the total bonus multiplier
 
-export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3";
+export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 export type WinnerPick = "HOME" | "DRAW" | "AWAY";
 
 export function baseMultiplier(type: PredictionType): number {
   if (type === "EXACT") return EXACT_MULTIPLIER;
-  return WINNER_MULTIPLIER; // WINNER / HALFTIME / GOALS3 all 2x
+  if (type === "TOTALS") return TOTALS_MULTIPLIER;
+  return WINNER_MULTIPLIER; // WINNER / HALFTIME / GOALS3 / BTTS all 2x
+}
+
+// Total-goals band for the TOTALS market.
+export function goalsBand(total: number): "0-1" | "2-3" | "4+" {
+  if (total <= 1) return "0-1";
+  if (total <= 3) return "2-3";
+  return "4+";
+}
+
+export const BET_TYPES: PredictionType[] = [
+  "WINNER",
+  "EXACT",
+  "HALFTIME",
+  "GOALS3",
+  "BTTS",
+  "TOTALS",
+];
+
+// Validates a single selection (used by single bets and parlay legs).
+export function validateSelection(
+  type: any,
+  rawPick: any,
+  rawExactHome: any,
+  rawExactAway: any
+):
+  | { ok: true; type: PredictionType; pick: string | null; exactHome: number | null; exactAway: number | null }
+  | { ok: false; error: string } {
+  if (!BET_TYPES.includes(type)) return { ok: false, error: "Invalid prediction type" };
+
+  let pick: string | null = null;
+  let exactHome: number | null = null;
+  let exactAway: number | null = null;
+
+  if (type === "WINNER" || type === "HALFTIME") {
+    pick = rawPick;
+    if (!["HOME", "DRAW", "AWAY"].includes(pick ?? "")) {
+      return { ok: false, error: "Pick HOME, DRAW or AWAY" };
+    }
+  } else if (type === "GOALS3" || type === "BTTS") {
+    pick = rawPick;
+    if (!["YES", "NO"].includes(pick ?? "")) return { ok: false, error: "Pick YES or NO" };
+  } else if (type === "TOTALS") {
+    pick = rawPick;
+    if (!["0-1", "2-3", "4+"].includes(pick ?? "")) {
+      return { ok: false, error: "Pick a goals range" };
+    }
+  } else {
+    // EXACT
+    exactHome = Math.floor(Number(rawExactHome));
+    exactAway = Math.floor(Number(rawExactAway));
+    if (
+      !Number.isFinite(exactHome) ||
+      !Number.isFinite(exactAway) ||
+      exactHome < 0 ||
+      exactAway < 0 ||
+      exactHome > 30 ||
+      exactAway > 30
+    ) {
+      return { ok: false, error: "Enter a valid score" };
+    }
+  }
+
+  return { ok: true, type, pick, exactHome, exactAway };
 }
 
 // Underdog bonus: the fewer players who backed your pick, the bigger the bonus.
@@ -57,6 +123,10 @@ export function computePayout(
     won = pick === resultFromScore(halfHome ?? 0, halfAway ?? 0);
   } else if (type === "GOALS3") {
     won = pick === (homeScore + awayScore >= 3 ? "YES" : "NO");
+  } else if (type === "BTTS") {
+    won = pick === (homeScore > 0 && awayScore > 0 ? "YES" : "NO");
+  } else if (type === "TOTALS") {
+    won = pick === goalsBand(homeScore + awayScore);
   } else {
     won = exactHome === homeScore && exactAway === awayScore;
   }

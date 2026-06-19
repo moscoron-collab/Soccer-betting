@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 const TOKEN_KEY = "spg_token";
 
 type Player = { id: string; username: string; coins: number };
-type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3";
+type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 type Match = {
   id: number;
   competition: string;
@@ -45,8 +45,17 @@ const BET_LABELS: Record<BetType, string> = {
   EXACT: "Exact score",
   HALFTIME: "Half-time leader",
   GOALS3: "3+ goals",
+  BTTS: "Both teams score",
+  TOTALS: "Total goals",
 };
-const BASE_MULT: Record<BetType, number> = { WINNER: 2, EXACT: 5, HALFTIME: 2, GOALS3: 2 };
+const BASE_MULT: Record<BetType, number> = {
+  WINNER: 2,
+  EXACT: 5,
+  HALFTIME: 2,
+  GOALS3: 2,
+  BTTS: 2,
+  TOTALS: 3,
+};
 
 // Coins a pending bet would return if it wins (base × locked-in bonus).
 function potentialWin(p: Prediction): number {
@@ -419,6 +428,11 @@ function Game({
         )}
       </Section>
 
+      {/* Combo bets */}
+      <Section title="🎟️ Combo bet">
+        <CombosSection token={token} matches={matches} coins={player.coins} onPlaced={onRefresh} />
+      </Section>
+
       {/* Mini-games */}
       <Section title="🎮 Mini-games">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -555,6 +569,242 @@ function MyLog({ predictions }: { predictions: Prediction[] }) {
   );
 }
 
+/* ------------------------------ Combo bets -------------------------------- */
+// Build a parlay: 2+ picks on different matches; all must win; payout multiplies.
+
+type ComboLeg = {
+  matchId: number;
+  type: BetType;
+  pick: string | null;
+  exactHome: number | null;
+  exactAway: number | null;
+  home_team: string;
+  away_team: string;
+};
+
+function pickOptions(type: BetType, home: string, away: string): [string, string][] {
+  if (type === "GOALS3") return [["YES", "Yes, 3+"], ["NO", "Under 3"]];
+  if (type === "BTTS") return [["YES", "Yes"], ["NO", "No"]];
+  if (type === "TOTALS") return [["0-1", "0–1"], ["2-3", "2–3"], ["4+", "4+"]];
+  return [["HOME", home], ["DRAW", "Draw"], ["AWAY", away]];
+}
+
+function CombosSection({
+  token,
+  matches,
+  coins,
+  onPlaced,
+}: {
+  token: string;
+  matches: Match[];
+  coins: number;
+  onPlaced: () => void;
+}) {
+  const [legs, setLegs] = useState<ComboLeg[]>([]);
+  const [parlays, setParlays] = useState<any[]>([]);
+  const [stake, setStake] = useState(100);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const [mId, setMId] = useState<number | "">("");
+  const [type, setTypeState] = useState<BetType>("WINNER");
+  const [pick, setPick] = useState<string | null>(null);
+  const [eh, setEh] = useState("");
+  const [ea, setEa] = useState("");
+
+  const loadParlays = useCallback(async () => {
+    const res = await fetch("/api/parlays", { headers: authHeaders(token) });
+    if (res.ok) setParlays((await res.json()).parlays ?? []);
+  }, [token]);
+  useEffect(() => {
+    loadParlays();
+  }, [loadParlays]);
+
+  function setType(t: BetType) {
+    setTypeState(t);
+    setPick(null);
+    setEh("");
+    setEa("");
+  }
+
+  const usedIds = new Set(legs.map((l) => l.matchId));
+  const avail = matches.filter((m) => !usedIds.has(m.id));
+  const selMatch = matches.find((m) => m.id === mId);
+
+  function addLeg() {
+    if (!selMatch) return;
+    if (type === "EXACT" ? eh === "" || ea === "" : pick === null) return;
+    setLegs([
+      ...legs,
+      {
+        matchId: selMatch.id,
+        type,
+        pick,
+        exactHome: eh ? Number(eh) : null,
+        exactAway: ea ? Number(ea) : null,
+        home_team: selMatch.home_team,
+        away_team: selMatch.away_team,
+      },
+    ]);
+    setMId("");
+    setPick(null);
+    setEh("");
+    setEa("");
+  }
+
+  const mult = Math.min(50, legs.reduce((p, l) => p * BASE_MULT[l.type], 1));
+  const potential = Math.round(stake * mult);
+  const canPlace = legs.length >= 2 && stake > 0 && stake <= coins;
+
+  async function place() {
+    setMsg(null);
+    const res = await fetch("/api/parlays", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        stake,
+        legs: legs.map((l) => ({
+          matchId: l.matchId,
+          type: l.type,
+          pick: l.pick,
+          exactHome: l.exactHome,
+          exactAway: l.exactAway,
+        })),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setMsg(data.error ?? "Try again.");
+      return;
+    }
+    setLegs([]);
+    loadParlays();
+    onPlaced();
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-4">
+      <p className="text-xs text-blue-100/70">
+        Pick 2 or more (different matches). <b>All must win</b> — but the payout multiplies! 🔥
+      </p>
+
+      {/* Current legs */}
+      {legs.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {legs.map((l, i) => (
+            <div key={i} className="flex items-center justify-between rounded bg-white/5 px-2 py-1 text-xs">
+              <span>
+                {l.home_team} v {l.away_team} ·{" "}
+                {describeCall(l.type, l.pick, l.exactHome, l.exactAway, l.home_team, l.away_team)}
+              </span>
+              <button onClick={() => setLegs(legs.filter((_, x) => x !== i))} className="text-red-300">
+                ✕
+              </button>
+            </div>
+          ))}
+          <p className="pt-1 text-center text-sm font-bold text-yellow-200">
+            Combo ×{mult} → win 🪙{potential.toLocaleString()} if all hit
+          </p>
+        </div>
+      )}
+
+      {/* Add a leg */}
+      <div className="mt-3 rounded-lg bg-white/5 p-2">
+        <select
+          value={mId}
+          onChange={(e) => setMId(e.target.value ? Number(e.target.value) : "")}
+          className="w-full rounded-lg bg-white/95 px-2 py-1.5 text-sm text-gray-900"
+        >
+          <option value="">Add a match…</option>
+          {avail.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.home_team} vs {m.away_team}
+            </option>
+          ))}
+        </select>
+
+        {selMatch && (
+          <>
+            <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
+              {(Object.keys(BET_LABELS) as BetType[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setType(t)}
+                  className={`rounded px-1 py-1 font-semibold ${type === t ? "bg-blue-600" : "bg-white/10"}`}
+                >
+                  {BET_LABELS[t]}
+                </button>
+              ))}
+            </div>
+
+            {type === "EXACT" ? (
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <input type="number" min={0} value={eh} onChange={(e) => setEh(e.target.value)} className="w-14 rounded bg-white/95 px-2 py-1 text-center text-gray-900" />
+                <span>:</span>
+                <input type="number" min={0} value={ea} onChange={(e) => setEa(e.target.value)} className="w-14 rounded bg-white/95 px-2 py-1 text-center text-gray-900" />
+              </div>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {pickOptions(type, selMatch.home_team, selMatch.away_team).map(([opt, label]) => (
+                  <button
+                    key={opt}
+                    onClick={() => setPick(opt)}
+                    className={`rounded px-2 py-1 text-xs font-semibold ${pick === opt ? "bg-yellow-400 text-gray-900" : "bg-white/10"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button onClick={addLeg} className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold">
+              ➕ Add to combo
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Stake + place */}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs text-blue-100/70">Bet</span>
+        <input
+          type="number"
+          min={1}
+          max={coins}
+          value={stake}
+          onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
+          className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
+        />
+        <button
+          onClick={place}
+          disabled={!canPlace}
+          className="ml-auto rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+        >
+          Place combo
+        </button>
+      </div>
+      {legs.length < 2 && <p className="mt-1 text-xs text-blue-100/50">Add at least 2 picks.</p>}
+      {msg && <p className="mt-2 text-xs text-red-300">{msg}</p>}
+
+      {/* Existing combos */}
+      {parlays.length > 0 && (
+        <div className="mt-4 space-y-1 text-xs">
+          <p className="font-semibold text-blue-100/80">Your combos:</p>
+          {parlays.slice(0, 6).map((p) => (
+            <div key={p.id} className="flex justify-between rounded bg-white/5 px-2 py-1">
+              <span>
+                {p.legs.length} picks · ×{p.mult} · bet {p.stake}
+              </span>
+              <span className={p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-blue-100/60"}>
+                {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `Won +${p.payout}` : "Lost"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="rounded-xl bg-white/5 p-3 text-center">
@@ -626,6 +876,8 @@ function describeCall(
   if (type === "WINNER") return `Winner: ${side}`;
   if (type === "HALFTIME") return `Half-time leader: ${side}`;
   if (type === "GOALS3") return `3+ goals: ${pick === "YES" ? "Yes" : "No"}`;
+  if (type === "BTTS") return `Both teams score: ${pick === "YES" ? "Yes" : "No"}`;
+  if (type === "TOTALS") return `Total goals: ${pick}`;
   return `Exact score: ${exactHome}–${exactAway}`;
 }
 
@@ -689,17 +941,29 @@ function BetForm({
     stake <= coins &&
     (type === "EXACT" ? eh !== "" && ea !== "" : pick !== null);
 
-  const sideButtons =
+  const sideButtons: ReadonlyArray<readonly [string, string]> =
     type === "GOALS3"
-      ? ([
+      ? [
           ["YES", "Yes, 3+"],
           ["NO", "Under 3"],
-        ] as const)
-      : ([
-          ["HOME", home],
-          ["DRAW", "Draw"],
-          ["AWAY", away],
-        ] as const);
+        ]
+      : type === "BTTS"
+        ? [
+            ["YES", "Yes"],
+            ["NO", "No"],
+          ]
+        : type === "TOTALS"
+          ? [
+              ["0-1", "0–1"],
+              ["2-3", "2–3"],
+              ["4+", "4+"],
+            ]
+          : [
+              ["HOME", home],
+              ["DRAW", "Draw"],
+              ["AWAY", away],
+            ];
+  const twoCols = type === "GOALS3" || type === "BTTS";
 
   return (
     <div>
@@ -722,7 +986,7 @@ function BetForm({
           />
         </div>
       ) : (
-        <div className={`grid gap-2 ${type === "GOALS3" ? "grid-cols-2" : "grid-cols-3"}`}>
+        <div className={`grid gap-2 ${twoCols ? "grid-cols-2" : "grid-cols-3"}`}>
           {sideButtons.map(([opt, label]) => (
             <button
               key={opt}
