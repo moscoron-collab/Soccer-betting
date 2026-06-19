@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { celebrate, toast } from "@/lib/celebrate";
+import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 
 const TOKEN_KEY = "spg_token";
@@ -108,7 +108,8 @@ export default function Home() {
   const [canBailout, setCanBailout] = useState(false);
   const [canSpin, setCanSpin] = useState(false);
   const [canPenalty, setCanPenalty] = useState(false);
-  const seenWon = useRef<Set<string> | null>(null);
+  const firstLoad = useRef(true);
+  const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -128,18 +129,34 @@ export default function Home() {
     const data = await res.json();
     const preds: Prediction[] = data.predictions ?? [];
 
-    // Celebrate bets that have just been won since the last check.
-    const wonIds = new Set(preds.filter((p) => p.status === "WON").map((p) => p.id));
-    if (seenWon.current === null) {
-      seenWon.current = wonIds; // first load — don't celebrate past wins
-    } else {
-      const fresh = preds.filter((p) => p.status === "WON" && !seenWon.current!.has(p.id));
-      if (fresh.length > 0) {
-        const gained = fresh.reduce((s, p) => s + p.payout, 0);
+    // Results the player hasn't seen yet (settled while they were away or watching).
+    const settled = preds.filter((p) => p.status !== "PENDING");
+    const raw = localStorage.getItem("spg_seen_settled");
+    const seen = new Set<string>(raw ? JSON.parse(raw) : []);
+    const fresh = settled.filter((p) => !seen.has(p.id));
+
+    if (raw === null) {
+      // First time on this device — set a baseline, don't recap old history.
+    } else if (fresh.length > 0) {
+      const won = fresh.filter((p) => p.status === "WON");
+      const lost = fresh.filter((p) => p.status === "LOST");
+      const gained = won.reduce((s, p) => s + p.payout, 0);
+      const net = fresh.reduce((s, p) => s + (p.status === "WON" ? p.payout - p.stake : -p.stake), 0);
+
+      if (firstLoad.current) {
+        // Opened the app and found new results — show a welcome-back recap.
+        setRecap({ won: won.length, lost: lost.length, net, gained });
+        if (won.length > 0) {
+          confettiBurst();
+          playCheer();
+        }
+      } else if (won.length > 0) {
+        // A win landed while watching live.
         celebrate(`🎉 You won 🪙${gained.toLocaleString()}!`);
       }
-      seenWon.current = wonIds;
     }
+    localStorage.setItem("spg_seen_settled", JSON.stringify(settled.map((p) => p.id)));
+    firstLoad.current = false;
 
     setPlayer(data.player);
     setPredictions(preds);
@@ -176,6 +193,7 @@ export default function Home() {
   return (
     <>
       <Toaster />
+      {recap && <WelcomeBack data={recap} onClose={() => setRecap(null)} />}
       {!token || !player ? (
         <AuthScreen onSignedIn={onSignedIn} />
       ) : (
@@ -191,6 +209,55 @@ export default function Home() {
         />
       )}
     </>
+  );
+}
+
+/* ----------------------------- Welcome back ------------------------------- */
+// Recap of bets that settled while the player was away, shown on app open.
+
+function WelcomeBack({
+  data,
+  onClose,
+}: {
+  data: { won: number; lost: number; net: number; gained: number };
+  onClose: () => void;
+}) {
+  const positive = data.net >= 0;
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[#0f2143] p-6 text-center shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-4xl">{data.won > 0 ? "🎉" : "👋"}</div>
+        <h2 className="mt-2 text-xl font-extrabold">Welcome back!</h2>
+        <p className="mt-1 text-sm text-blue-100/70">While you were away, your bets settled:</p>
+
+        <div className="mt-4 space-y-1 text-sm">
+          {data.won > 0 && (
+            <p className="text-green-300">
+              ✅ Won {data.won} bet{data.won > 1 ? "s" : ""} (+🪙{data.gained.toLocaleString()})
+            </p>
+          )}
+          {data.lost > 0 && (
+            <p className="text-red-300">
+              ❌ Lost {data.lost} bet{data.lost > 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
+        <p className={`mt-4 text-2xl font-extrabold ${positive ? "text-green-300" : "text-red-300"}`}>
+          Net {positive ? "+" : ""}🪙{data.net.toLocaleString()}
+        </p>
+
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
+        >
+          {positive ? "Let's go! 🚀" : "OK"}
+        </button>
+      </div>
+    </div>
   );
 }
 
