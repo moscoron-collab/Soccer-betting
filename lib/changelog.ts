@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.6";
+export const VERSION = "3.7";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.7",
+    date: "2026-06-20",
+    changes: [
+      "Tap any player to see their stats: a Wins / Losses / Win-rate panel now sits at the top of their profile, above their bet log.",
+    ],
+  },
   {
     version: "3.6",
     date: "2026-06-20",

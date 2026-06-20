@@ -182,6 +182,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Player log modal
   "playerLog.title": { en: "Player log", he: "יומן שחקן" },
   "playerLog.errLoad": { en: "Could not load player.", he: "לא הצלחנו לטעון את השחקן." },
+  "playerLog.coins": { en: "🪙 {coins}", he: "🪙 {coins}" },
   "playerLog.record": {
     en: "🪙 {coins} · ✅ {w} W · ❌ {l} L",
     he: "🪙 {coins} · ✅ {w} נצ' · ❌ {l} הפ'",

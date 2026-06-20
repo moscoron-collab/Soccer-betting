@@ -1176,11 +1176,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
                   )}
                 </p>
                 <p className="text-xs text-blue-100/70">
-                  {t("playerLog.record", {
-                    coins: data.player.coins.toLocaleString(),
-                    w: data.wins,
-                    l: data.losses,
-                  })}
+                  {t("playerLog.coins", { coins: data.player.coins.toLocaleString() })}
                   {data.player.win_streak > 0 && <> · 🔥 {data.player.win_streak}</>}
                 </p>
                 {data.player.created_at && (
@@ -1189,6 +1185,16 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Stats grid (same style as your own My Log) */}
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <Stat label={t("mylog.wins")} value={`${data.wins}`} color="text-green-300" />
+              <Stat label={t("mylog.losses")} value={`${data.losses}`} color="text-red-300" />
+              <Stat
+                label={t("mylog.winRate")}
+                value={`${data.wins + data.losses > 0 ? Math.round((data.wins / (data.wins + data.losses)) * 100) : 0}%`}
+              />
             </div>
 
             {data.player.hide_picks && (
