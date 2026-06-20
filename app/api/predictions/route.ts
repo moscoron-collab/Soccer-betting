@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     boostSpent = true;
   }
 
-  const bonusMult = await computeBonusMult(matchId, p.type, p.pick);
+  const bonusMult = await computeBonusMult(matchId, p.type, p.pick, body?.tz);
 
   const { data: created, error: insertErr } = await supabase
     .from("predictions")
@@ -209,7 +209,7 @@ export async function PUT(req: Request) {
     .eq("id", player.id);
   if (coinErr) return NextResponse.json({ error: "Could not update bet." }, { status: 500 });
 
-  const bonusMult = await computeBonusMult(old.match_id, p.type, p.pick);
+  const bonusMult = await computeBonusMult(old.match_id, p.type, p.pick, body?.tz);
 
   const { error: updErr } = await supabase
     .from("predictions")

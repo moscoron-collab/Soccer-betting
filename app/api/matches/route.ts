@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getMotdId } from "@/lib/motd";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/matches -> upcoming matches still open for prediction, each with the
-// current Winner-bet split (who-wins vote) and who picked what.
-export async function GET() {
+// GET /api/matches?tz=... -> upcoming matches still open for prediction, each
+// with the current Winner-bet split (who-wins vote) and who picked what, plus
+// the Match of the Day id (one fixed match per the player's local day).
+export async function GET(req: Request) {
+  const tz = new URL(req.url).searchParams.get("tz");
+
   const { data: matches, error } = await supabase
     .from("matches")
     .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status")
@@ -61,8 +65,10 @@ export async function GET() {
     bet_stats: statsByMatch.get(m.id) ?? { home: 0, draw: 0, away: 0, voters: [] },
   }));
 
+  const motdId = await getMotdId(tz);
+
   return NextResponse.json(
-    { matches: withStats },
+    { matches: withStats, motdId },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );
 }

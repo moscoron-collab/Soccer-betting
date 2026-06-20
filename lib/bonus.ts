@@ -1,13 +1,16 @@
 import { supabase } from "./supabase";
 import { PredictionType, underdogBonus, MOTD_BONUS, MAX_BONUS } from "./payout";
+import { getMotdId } from "./motd";
 
 // Computes the bonus multiplier locked in when a bet is placed:
 //   underdog bonus (based on the current crowd split) + Match of the Day bonus.
 // Returns 1 when there isn't enough of a crowd yet to judge (avoids gaming).
+// `tz` is the player's timezone, used to pick their Match of the Day.
 export async function computeBonusMult(
   matchId: number,
   type: PredictionType,
-  pick: string | null
+  pick: string | null,
+  tz: string | null | undefined
 ): Promise<number> {
   let bonus = 1;
 
@@ -25,16 +28,9 @@ export async function computeBonusMult(
     }
   }
 
-  // Match of the Day = the soonest upcoming match.
-  const { data: motd } = await supabase
-    .from("matches")
-    .select("id")
-    .eq("status", "SCHEDULED")
-    .gt("kickoff_at", new Date().toISOString())
-    .order("kickoff_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (motd && motd.id === matchId) bonus += MOTD_BONUS;
+  // Match of the Day bonus (one fixed match per the player's local day).
+  const motdId = await getMotdId(tz);
+  if (motdId === matchId) bonus += MOTD_BONUS;
 
   return Math.min(MAX_BONUS, Math.round(bonus * 100) / 100);
 }

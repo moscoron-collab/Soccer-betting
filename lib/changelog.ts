@@ -1,10 +1,18 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.4";
+export const VERSION = "3.5";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.5",
+    date: "2026-06-20",
+    changes: [
+      "Cheaper spins! Extra wheel spins now cost 🪙75 (down from 🪙150).",
+      "Match of the Day is now ONE fixed match per day — the biggest game of your day — instead of always jumping to the next match. It's based on your own local day (works for any timezone), and the bonus matches the ⭐ exactly.",
+    ],
+  },
   {
     version: "3.4",
     date: "2026-06-20",

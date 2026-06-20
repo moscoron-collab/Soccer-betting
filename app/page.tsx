@@ -587,6 +587,7 @@ function Game({
 }) {
   const { t } = useLang();
   const [matches, setMatches] = useState<Match[]>([]);
+  const [motdId, setMotdId] = useState<number | null>(null);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
@@ -607,9 +608,12 @@ function Game({
   }
 
   const loadMatches = useCallback(async () => {
-    const res = await fetch(`/api/matches?_=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(`/api/matches?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
+      cache: "no-store",
+    });
     const data = await res.json();
     setMatches(data.matches ?? []);
+    setMotdId(data.motdId ?? null);
   }, []);
 
   useEffect(() => {
@@ -668,8 +672,7 @@ function Game({
   const filtered = comp === "All" ? matches : matches.filter((m) => m.competition === comp);
   const shown = filtered.slice(0, visible);
 
-  // Match of the Day = soonest upcoming match (list arrives sorted by kickoff).
-  const motdId = matches[0]?.id;
+  // Match of the Day comes from the server (one fixed match per local day).
 
   // Pending bets grouped by match (one card per match) for "My predictions".
   const pendingByMatch = new Map<number, Prediction[]>();
@@ -2246,7 +2249,7 @@ function BetEditor({
     const res = await fetch("/api/predictions", {
       method: "PUT",
       headers: authHeaders(token),
-      body: JSON.stringify({ ...body, predictionId: p.id }),
+      body: JSON.stringify({ ...body, predictionId: p.id, tz: clientTz() }),
     });
     const data = await res.json();
     if (!res.ok) return { error: data.error ?? t("editor.errUpdate") };
@@ -2345,7 +2348,7 @@ function MatchCard({
     const res = await fetch("/api/predictions", {
       method: "POST",
       headers: authHeaders(token),
-      body: JSON.stringify({ ...body, matchId: match.id }),
+      body: JSON.stringify({ ...body, matchId: match.id, tz: clientTz() }),
     });
     const data = await res.json();
     if (!res.ok) return { error: data.error ?? t("card.errPlace") };
