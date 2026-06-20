@@ -657,6 +657,14 @@ function Game({
         <>
       {/* Leaderboard */}
       <Section title="🏆 Leaderboard">
+        <div className="mb-2 flex justify-end">
+          <button
+            onClick={loadLeaderboard}
+            className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100"
+          >
+            ↻ Refresh
+          </button>
+        </div>
         <div className="overflow-hidden rounded-xl bg-white/5">
           {leaderboard.map((row, i) => (
             <button
