@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
-import {
-  WHEEL,
-  EXTRA_SPIN_COST,
-  MAX_SPINS_PER_DAY,
-  pickSliceIndex,
-  spinsUsedToday,
-  todayUTC,
-} from "@/lib/wheel";
+import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, pickSliceIndex, spinsUsedToday } from "@/lib/wheel";
+import { localDate } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST /api/spin -> spin the wheel.
 // First spin each day is free; the rest cost EXTRA_SPIN_COST, up to MAX_SPINS_PER_DAY.
+// Resets at the player's local midnight (their timezone is sent as { tz }).
 export async function POST(req: Request) {
   const player = await getPlayerFromRequest(req);
   if (!player) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const used = spinsUsedToday(player.spin_day, player.spins_today);
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* tz is optional; default to UTC */
+  }
+  const today = localDate(body?.tz);
+
+  const used = spinsUsedToday(player.spin_day, player.spins_today, today);
   if (used >= MAX_SPINS_PER_DAY) {
     return NextResponse.json(
       { error: "No spins left today. Come back tomorrow!" },
@@ -52,7 +55,7 @@ export async function POST(req: Request) {
     update.streak_shield = player.streak_shield + slice.amount;
   }
   update.coins = coins;
-  update.spin_day = todayUTC();
+  update.spin_day = today;
   update.spins_today = used + 1;
   update.last_spin_at = new Date().toISOString();
 

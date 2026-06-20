@@ -32,14 +32,10 @@ export const EXTRA_SPIN_COST = 150;
 // Maximum spins allowed per day (1 free + the rest paid).
 export const MAX_SPINS_PER_DAY = 4;
 
-// Today's date (UTC) as YYYY-MM-DD, used to reset the daily spin counter.
-export function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// How many spins the player has already used today (0 if it's a new day).
-export function spinsUsedToday(spinDay: string | null, spinsToday: number): number {
-  return spinDay === todayUTC() ? spinsToday : 0;
+// How many spins the player has already used "today" (0 if it's a new day).
+// `today` is the player's local date (YYYY-MM-DD) computed from their timezone.
+export function spinsUsedToday(spinDay: string | null, spinsToday: number, today: string): number {
+  return spinDay === today ? spinsToday : 0;
 }
 
 // Picks a winning slice index, weighted by each slice's `weight`.

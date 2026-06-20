@@ -1,31 +1,28 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
+import { isNewLocalDay } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const COINS_PER_GOAL = 30; // 5 goals = 150 coins max per day
 
-function canPlay(last: string | null): boolean {
-  if (!last) return true;
-  return Date.now() - new Date(last).getTime() > 24 * 60 * 60 * 1000;
-}
-
-// POST /api/penalty { goals } -> award coins for the daily shootout (once per day)
+// POST /api/penalty { goals, tz } -> award coins for the daily shootout
+// (once per local day; the player's timezone is sent as { tz }).
 export async function POST(req: Request) {
   const player = await getPlayerFromRequest(req);
   if (!player) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-
-  if (!canPlay(player.last_penalty_at)) {
-    return NextResponse.json({ error: "You already played today. Come back tomorrow!" }, { status: 429 });
-  }
 
   let body: any;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (!isNewLocalDay(player.last_penalty_at, body?.tz)) {
+    return NextResponse.json({ error: "You already played today. Come back tomorrow!" }, { status: 429 });
   }
 
   // Clamp to 0–5 so a bad client can't over-claim; the daily cap bounds it anyway.

@@ -117,6 +117,16 @@ function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
 }
 
+// The player's local timezone, so daily features (spin/penalty/top-up) reset at
+// their local midnight. Auto-detected from the browser.
+function clientTz(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -138,7 +148,10 @@ export default function Home() {
   }, []);
 
   const loadMe = useCallback(async (t: string) => {
-    const res = await fetch("/api/me", { headers: authHeaders(t) });
+    const res = await fetch(`/api/me?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
+      headers: authHeaders(t),
+      cache: "no-store",
+    });
     if (res.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       setToken(null);
@@ -530,7 +543,11 @@ function Game({
   }
 
   async function bailout() {
-    await fetch("/api/me", { method: "POST", headers: authHeaders(token) });
+    await fetch("/api/me", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ tz: clientTz() }),
+    });
     onRefresh();
   }
 
@@ -1333,7 +1350,11 @@ function SpinWheel({
     if (!canSpin) return;
     setSpinning(true);
     setResult(null);
-    const res = await fetch("/api/spin", { method: "POST", headers: authHeaders(token) });
+    const res = await fetch("/api/spin", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ tz: clientTz() }),
+    });
     const data = await res.json();
     if (!res.ok) {
       toast(data.error ?? "Try again.");
@@ -1480,7 +1501,7 @@ function PenaltyShootout({
       const res = await fetch("/api/penalty", {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ goals: newGoals }),
+        body: JSON.stringify({ goals: newGoals, tz: clientTz() }),
       });
       const data = await res.json();
       if (res.ok) {

@@ -4,16 +4,21 @@ import { getPlayerFromRequest } from "@/lib/auth";
 import { BAILOUT_AMOUNT, BAILOUT_FLOOR } from "@/lib/payout";
 import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
 import { quickRefresh } from "@/lib/settle";
+import { localDate, isNewLocalDay } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/me -> current player + their predictions (header: x-player-token)
+// GET /api/me?tz=America/New_York -> current player + their predictions.
+// `tz` is the player's timezone so daily features reset at their local midnight.
 export async function GET(req: Request) {
   let player = await getPlayerFromRequest(req);
   if (!player) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+
+  const tz = new URL(req.url).searchParams.get("tz");
+  const today = localDate(tz);
 
   // Settle freshly-finished games while players are online (throttled globally to
   // one feed call per minute), so winnings appear within ~a minute. Best-effort.
@@ -31,17 +36,13 @@ export async function GET(req: Request) {
     .limit(50);
 
   const canBailout =
-    player.coins < BAILOUT_FLOOR &&
-    (!player.last_bailout_at ||
-      Date.now() - new Date(player.last_bailout_at).getTime() > 86400000);
+    player.coins < BAILOUT_FLOOR && isNewLocalDay(player.last_bailout_at, tz);
 
-  const used = spinsUsedToday(player.spin_day, player.spins_today);
+  const used = spinsUsedToday(player.spin_day, player.spins_today, today);
   const spinsLeft = Math.max(0, MAX_SPINS_PER_DAY - used);
   const nextSpinFree = used === 0;
 
-  const canPenalty =
-    !player.last_penalty_at ||
-    Date.now() - new Date(player.last_penalty_at).getTime() > 86400000;
+  const canPenalty = isNewLocalDay(player.last_penalty_at, tz);
 
   // Serve the leaderboard from here too: /api/me is always dynamic (it reads the
   // player token), so it can't be edge-cached the way the public /api/leaderboard
@@ -66,11 +67,18 @@ export async function GET(req: Request) {
   );
 }
 
-// POST /api/me/bailout-style top-up: if broke, top up to the floor once per day.
+// POST /api/me  { tz } -> low-coins top-up to the floor, once per local day.
 export async function POST(req: Request) {
   const player = await getPlayerFromRequest(req);
   if (!player) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* tz optional */
   }
 
   if (player.coins >= BAILOUT_FLOOR) {
@@ -79,10 +87,7 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (
-    player.last_bailout_at &&
-    Date.now() - new Date(player.last_bailout_at).getTime() < 86400000
-  ) {
+  if (!isNewLocalDay(player.last_bailout_at, body?.tz)) {
     return NextResponse.json(
       { error: "You already topped up today. Come back tomorrow!" },
       { status: 429 }
