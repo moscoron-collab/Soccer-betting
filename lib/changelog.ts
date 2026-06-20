@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "2.8";
+export const VERSION = "2.9";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "2.9",
+    date: "2026-06-20",
+    changes: [
+      "Hebrew! 🇮🇱 Tap the language button (top of the screen) to switch between English and עברית. The whole app flips to right-to-left in Hebrew, and your choice is remembered. New Hebrew-speaking players start in Hebrew automatically.",
+    ],
+  },
   {
     version: "2.8",
     date: "2026-06-20",

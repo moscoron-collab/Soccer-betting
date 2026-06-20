@@ -3,7 +3,50 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
-import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, describePrize, type WheelSlice } from "@/lib/wheel";
+import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, type WheelSlice } from "@/lib/wheel";
+import { LangProvider, useLang } from "@/lib/i18n";
+
+// Translator type, so helpers can take `t` without importing React context.
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+// Friendly one-line summary of a wheel prize, in the player's language.
+function prizeText(t: T, slice: WheelSlice): string {
+  switch (slice.kind) {
+    case "BOOST":
+      return t("prize.boost", { n: slice.amount });
+    case "SHIELD":
+      return t("prize.shield", { n: slice.amount });
+    case "JACKPOT":
+      return t("prize.jackpot", { n: slice.amount.toLocaleString() });
+    default:
+      return slice.amount === 0
+        ? t("prize.noWin")
+        : t("prize.coins", { n: slice.amount.toLocaleString() });
+  }
+}
+
+// The short label drawn on a wheel slice (numbers stay as-is, words translate).
+function sliceLabel(t: T, slice: WheelSlice): string {
+  if (slice.kind === "JACKPOT") return t("wheel.jackpot");
+  if (slice.kind === "BOOST") return t("wheel.boost");
+  if (slice.kind === "SHIELD") return t("wheel.shield");
+  if (slice.amount === 0) return t("wheel.noWin");
+  return slice.label;
+}
+
+// A small button that toggles between English and Hebrew.
+function LangToggle() {
+  const { lang, setLang, t } = useLang();
+  return (
+    <button
+      onClick={() => setLang(lang === "en" ? "he" : "en")}
+      className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
+      title="Language / שפה"
+    >
+      {t("lang.switch")}
+    </button>
+  );
+}
 
 // Preset avatars players can choose without uploading a photo.
 const AVATAR_PRESETS = ["⚽", "🥅", "🧤", "👟", "🏆", "🦁", "🐯", "🐉", "🦅", "🦊", "🔥", "⭐", "👑", "😎", "🤖", "👻"];
@@ -63,14 +106,9 @@ type Prediction = {
   } | null;
 };
 
-const BET_LABELS: Record<BetType, string> = {
-  WINNER: "Winner / Draw",
-  EXACT: "Exact score",
-  HALFTIME: "Half-time leader",
-  GOALS3: "3+ goals",
-  BTTS: "Both teams score",
-  TOTALS: "Total goals",
-};
+// All bet markets, in display order. Labels/prompts are translated via i18n keys
+// `bet.<TYPE>` and `prompt.<TYPE>`.
+const BET_TYPES: BetType[] = ["WINNER", "EXACT", "HALFTIME", "GOALS3", "BTTS", "TOTALS"];
 const BASE_MULT: Record<BetType, number> = {
   WINNER: 2,
   EXACT: 5,
@@ -78,15 +116,6 @@ const BASE_MULT: Record<BetType, number> = {
   GOALS3: 2,
   BTTS: 2,
   TOTALS: 3,
-};
-// A plain-English question shown above each market's options.
-const BET_PROMPTS: Record<BetType, string> = {
-  WINNER: "Who wins the match?",
-  EXACT: "Guess the exact final score",
-  HALFTIME: "Who's leading at half-time?",
-  GOALS3: "Will there be 3 or more goals?",
-  BTTS: "Will both teams score?",
-  TOTALS: "How many goals in total (both teams)?",
 };
 
 // Coins a pending bet would return if it wins (base × locked-in bonus × 2× boost).
@@ -103,12 +132,12 @@ function effMult(p: Prediction): string {
   return `×${s}${flames}${bolt}`;
 }
 
-// Level/tier from XP (100 XP per level, tiers match the original concept).
+// Level/tier from XP (100 XP per level). `tierKey` maps to an i18n `tier.*` key.
 function levelInfo(xp: number) {
   const level = Math.min(100, Math.floor((xp || 0) / 100) + 1);
-  const tier =
-    level >= 100 ? "Legend" : level >= 50 ? "Expert" : level >= 25 ? "Scout" : level >= 10 ? "Analyst" : "Rookie";
-  return { level, tier, intoLevel: (xp || 0) % 100 };
+  const tierKey =
+    level >= 100 ? "legend" : level >= 50 ? "expert" : level >= 25 ? "scout" : level >= 10 ? "analyst" : "rookie";
+  return { level, tierKey, intoLevel: (xp || 0) % 100 };
 }
 
 type LeaderRow = { username: string; coins: number; avatar?: string | null };
@@ -127,7 +156,16 @@ function clientTz(): string {
   }
 }
 
-export default function Home() {
+export default function Page() {
+  return (
+    <LangProvider>
+      <Home />
+    </LangProvider>
+  );
+}
+
+function Home() {
+  const { t } = useLang();
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
@@ -147,9 +185,9 @@ export default function Home() {
     setReady(true);
   }, []);
 
-  const loadMe = useCallback(async (t: string) => {
+  const loadMe = useCallback(async (tok: string) => {
     const res = await fetch(`/api/me?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
-      headers: authHeaders(t),
+      headers: authHeaders(tok),
       cache: "no-store",
     });
     if (res.status === 401) {
@@ -184,7 +222,7 @@ export default function Home() {
         }
       } else if (won.length > 0) {
         // A win landed while watching live.
-        celebrate(`🎉 You won 🪙${gained.toLocaleString()}!`);
+        celebrate(t("welcome.liveWin", { g: gained.toLocaleString() }));
       }
     }
     localStorage.setItem("spg_seen_settled", JSON.stringify(settled.map((p) => p.id)));
@@ -197,7 +235,7 @@ export default function Home() {
     setNextSpinFree(!!data.nextSpinFree);
     setCanPenalty(!!data.canPenalty);
     setLeaderboard(data.leaderboard ?? []);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (token) loadMe(token);
@@ -210,9 +248,9 @@ export default function Home() {
     return () => clearInterval(id);
   }, [token, loadMe]);
 
-  function onSignedIn(t: string) {
-    localStorage.setItem(TOKEN_KEY, t);
-    setToken(t);
+  function onSignedIn(tok: string) {
+    localStorage.setItem(TOKEN_KEY, tok);
+    setToken(tok);
   }
 
   function signOut() {
@@ -258,6 +296,7 @@ function WelcomeBack({
   data: { won: number; lost: number; net: number; gained: number };
   onClose: () => void;
 }) {
+  const { t } = useLang();
   const positive = data.net >= 0;
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -266,31 +305,34 @@ function WelcomeBack({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-4xl">{data.won > 0 ? "🎉" : "👋"}</div>
-        <h2 className="mt-2 text-xl font-extrabold">Welcome back!</h2>
-        <p className="mt-1 text-sm text-blue-100/70">While you were away, your bets settled:</p>
+        <h2 className="mt-2 text-xl font-extrabold">{t("welcome.title")}</h2>
+        <p className="mt-1 text-sm text-blue-100/70">{t("welcome.subtitle")}</p>
 
         <div className="mt-4 space-y-1 text-sm">
           {data.won > 0 && (
             <p className="text-green-300">
-              ✅ Won {data.won} bet{data.won > 1 ? "s" : ""} (+🪙{data.gained.toLocaleString()})
+              {t(data.won > 1 ? "welcome.wonMany" : "welcome.wonOne", {
+                n: data.won,
+                g: data.gained.toLocaleString(),
+              })}
             </p>
           )}
           {data.lost > 0 && (
             <p className="text-red-300">
-              ❌ Lost {data.lost} bet{data.lost > 1 ? "s" : ""}
+              {t(data.lost > 1 ? "welcome.lostMany" : "welcome.lostOne", { n: data.lost })}
             </p>
           )}
         </div>
 
         <p className={`mt-4 text-2xl font-extrabold ${positive ? "text-green-300" : "text-red-300"}`}>
-          Net {positive ? "+" : ""}🪙{data.net.toLocaleString()}
+          {t("welcome.net")} {positive ? "+" : ""}🪙{data.net.toLocaleString()}
         </p>
 
         <button
           onClick={onClose}
           className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
         >
-          {positive ? "Let's go! 🚀" : "OK"}
+          {positive ? t("welcome.go") : t("common.ok")}
         </button>
       </div>
     </div>
@@ -351,7 +393,8 @@ function CountUp({ value }: { value: number }) {
 
 /* ------------------------------- Auth screen ------------------------------- */
 
-function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
+function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
+  const { t } = useLang();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -370,7 +413,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong.");
+        setError(data.error ?? t("auth.somethingWrong"));
         return;
       }
       onSignedIn(data.token);
@@ -383,10 +426,11 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
 
   return (
     <main className="mx-auto max-w-md px-5 py-10">
-      <h1 className="text-3xl font-extrabold text-center">⚽ Soccer Predictor</h1>
-      <p className="mt-2 text-center text-blue-100/80">
-        Predict real matches. Win coins. Top the leaderboard.
-      </p>
+      <div className="flex justify-end">
+        <LangToggle />
+      </div>
+      <h1 className="text-3xl font-extrabold text-center">{t("app.title")}</h1>
+      <p className="mt-2 text-center text-blue-100/80">{t("app.tagline")}</p>
 
       <div className="mt-8 rounded-2xl bg-white/5 p-5 shadow-lg backdrop-blur">
         <div className="mb-4 flex gap-2 rounded-xl bg-white/5 p-1">
@@ -397,7 +441,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
               setError(null);
             }}
           >
-            Log in
+            {t("auth.login")}
           </button>
           <button
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${mode === "signup" ? "bg-blue-600 text-white" : "text-blue-100"}`}
@@ -406,27 +450,27 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
               setError(null);
             }}
           >
-            New player
+            {t("auth.newPlayer")}
           </button>
         </div>
 
-        <label className="text-sm font-medium">Username</label>
+        <label className="text-sm font-medium">{t("auth.username")}</label>
         <input
           className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
           value={username}
           maxLength={20}
-          placeholder="e.g. GoalMachine"
+          placeholder={t("auth.usernamePlaceholder")}
           autoCapitalize="none"
           onChange={(e) => setUsername(e.target.value)}
         />
 
-        <label className="mt-3 block text-sm font-medium">Password</label>
+        <label className="mt-3 block text-sm font-medium">{t("auth.password")}</label>
         <input
           type="password"
           className="mt-1 w-full rounded-lg bg-white/95 px-3 py-2 text-gray-900 outline-none"
           value={password}
           maxLength={50}
-          placeholder={mode === "signup" ? "choose a password" : "your password"}
+          placeholder={mode === "signup" ? t("auth.passwordChoose") : t("auth.passwordYour")}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
         />
@@ -436,24 +480,16 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (t: string) => void }) {
           onClick={submit}
           className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
         >
-          {busy
-            ? "…"
-            : mode === "signup"
-              ? "Start playing (1,000 coins)"
-              : "Log in"}
+          {busy ? "…" : mode === "signup" ? t("auth.start") : t("auth.login")}
         </button>
 
         {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
 
         <p className="mt-3 text-center text-xs text-blue-100/60">
-          {mode === "login"
-            ? "New here? Tap “New player” above to create an account."
-            : "Pick any username + password. Use the same ones to log in on your phone."}
+          {mode === "login" ? t("auth.loginHint") : t("auth.signupHint")}
         </p>
       </div>
-      <p className="mt-6 text-center text-xs text-blue-100/60">
-        Free to play • Virtual coins only • No real money
-      </p>
+      <p className="mt-6 text-center text-xs text-blue-100/60">{t("auth.footer")}</p>
     </main>
   );
 }
@@ -483,6 +519,7 @@ function Game({
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
+  const { t } = useLang();
   const [matches, setMatches] = useState<Match[]>([]);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
@@ -529,17 +566,17 @@ function Game({
       process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_SITE_URL !== "http://localhost:3000"
         ? process.env.NEXT_PUBLIC_SITE_URL
         : window.location.origin;
-    const text = "Play the Soccer Prediction Game with me! ⚽";
+    const text = t("share.text");
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Soccer Predictor", text, url });
+        await navigator.share({ title: t("app.title"), text, url });
         return;
       } catch {
         /* user cancelled */
       }
     }
     await navigator.clipboard.writeText(url);
-    alert("Link copied! Send it to your friends.");
+    alert(t("share.copied"));
   }
 
   async function bailout() {
@@ -593,16 +630,16 @@ function Game({
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowSettings(true)} title="Edit profile" className="shrink-0">
+          <button onClick={() => setShowSettings(true)} title={t("game.settings")} className="shrink-0">
             <Avatar avatar={player.avatar} size={44} />
           </button>
           <div>
-            <p className="text-sm text-blue-100/70">Playing as</p>
+            <p className="text-sm text-blue-100/70">{t("game.playingAs")}</p>
             <h1 className="text-xl font-bold">{player.username}</h1>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm text-blue-100/70">Coins</p>
+          <p className="text-sm text-blue-100/70">{t("game.coins")}</p>
           <p className="text-2xl font-extrabold text-yellow-300">
             🪙 <CountUp value={player.coins} />
           </p>
@@ -610,7 +647,7 @@ function Game({
             onClick={openChanges}
             className="mt-1 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-blue-100"
           >
-            v{VERSION} · What&apos;s new
+            v{VERSION} · {t("game.whatsNew")}
             {hasUpdate && (
               <span className="ml-1 rounded-full bg-yellow-400 px-1 text-[10px] font-bold text-gray-900">
                 !
@@ -621,25 +658,26 @@ function Game({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
+        <LangToggle />
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
-          🔗 Invite a friend
+          {t("game.invite")}
         </button>
         <button onClick={() => setShowSettings(true)} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
-          ⚙️ Profile &amp; settings
+          {t("game.settings")}
         </button>
         <button onClick={onSignOut} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
-          Sign out
+          {t("game.signOut")}
         </button>
       </div>
 
       {canBailout && (
         <div className="mt-4 rounded-xl bg-yellow-500/20 p-4">
-          <p className="text-sm">You're low on coins! Grab a free daily top-up.</p>
+          <p className="text-sm">{t("game.lowCoins")}</p>
           <button
             onClick={bailout}
             className="mt-2 rounded-lg bg-yellow-400 px-3 py-1.5 text-sm font-bold text-gray-900"
           >
-            Get 100 coins
+            {t("game.getCoins")}
           </button>
         </div>
       )}
@@ -650,13 +688,13 @@ function Game({
           onClick={() => setView("play")}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "play" ? "bg-blue-600 text-white" : "text-blue-100"}`}
         >
-          🎮 Play
+          {t("game.tabPlay")}
         </button>
         <button
           onClick={() => setView("log")}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "log" ? "bg-blue-600 text-white" : "text-blue-100"}`}
         >
-          📊 My Log
+          {t("game.tabLog")}
         </button>
       </div>
 
@@ -667,13 +705,13 @@ function Game({
       {view === "play" && (
         <>
       {/* Leaderboard */}
-      <Section title="🏆 Leaderboard">
+      <Section title={t("game.leaderboard")}>
         <div className="mb-2 flex justify-end">
           <button
             onClick={refreshAll}
             className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100"
           >
-            ↻ Refresh
+            {t("game.refresh")}
           </button>
         </div>
         <div className="overflow-hidden rounded-xl bg-white/5">
@@ -681,7 +719,7 @@ function Game({
             <button
               key={row.username + i}
               onClick={() => setViewPlayer(row.username)}
-              title={`View ${row.username}'s log`}
+              title={t("game.viewLog", { name: row.username })}
               className={`flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm hover:bg-white/5 ${row.username === player.username ? "bg-blue-600/30" : ""}`}
             >
               <span className="flex min-w-0 items-center gap-2">
@@ -698,9 +736,9 @@ function Game({
       </Section>
 
       {/* My predictions (active bets only) */}
-      <Section title="My predictions">
+      <Section title={t("game.myPredictions")}>
         {pendingGroups.length === 0 ? (
-          <Empty text="No active bets right now. Pick a match below! (Finished bets are in 📊 My Log.)" />
+          <Empty text={t("game.noActiveBets")} />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {pendingGroups.map((bets) => (
@@ -717,12 +755,12 @@ function Game({
       </Section>
 
       {/* Daily challenges */}
-      <Section title="🎯 Daily challenges">
+      <Section title={t("game.dailyChallenges")}>
         <ChallengesSection token={token} onClaimed={refreshAll} />
       </Section>
 
       {/* Mini-games */}
-      <Section title="🎮 Mini-games">
+      <Section title={t("game.miniGames")}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SpinWheel
             token={token}
@@ -738,9 +776,9 @@ function Game({
       </Section>
 
       {/* Matches */}
-      <Section title="Upcoming matches">
+      <Section title={t("game.upcoming")}>
         {matches.length === 0 ? (
-          <Empty text="No open matches right now. Check back soon — new fixtures load automatically." />
+          <Empty text={t("game.noMatches")} />
         ) : (
           <>
             {competitions.length > 1 && (
@@ -751,7 +789,7 @@ function Game({
                     onClick={() => pickComp(c)}
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${comp === c ? "bg-blue-600 text-white" : "bg-white/10 text-blue-100"}`}
                   >
-                    {c}
+                    {c === "All" ? t("game.all") : c}
                   </button>
                 ))}
               </div>
@@ -778,7 +816,7 @@ function Game({
                 onClick={() => setVisible((v) => v + 10)}
                 className="w-full rounded-xl bg-white/10 py-2.5 text-sm font-semibold text-blue-100"
               >
-                Show more ({filtered.length - visible} more)
+                {t("game.showMore", { n: filtered.length - visible })}
               </button>
             )}
           </>
@@ -787,17 +825,15 @@ function Game({
         </>
       )}
 
-      <p className="mt-8 text-center text-xs text-blue-100/50">
-        Free to play • Virtual coins only • No real money gambling
-      </p>
+      <p className="mt-8 text-center text-xs text-blue-100/50">{t("game.footer")}</p>
       <p className="mt-1 text-center text-xs text-blue-100/40">
         v{VERSION} ·{" "}
         <button onClick={openChanges} className="underline">
-          What&apos;s new
+          {t("game.whatsNew")}
         </button>
         {hasUpdate && (
           <span className="ml-1 rounded-full bg-yellow-400 px-1.5 py-0.5 text-[10px] font-bold text-gray-900">
-            Updated!
+            {t("game.updated")}
           </span>
         )}
       </p>
@@ -833,6 +869,7 @@ function SettingsModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useLang();
   const [avatar, setAvatar] = useState<string | null | undefined>(player.avatar);
   const [hidePicks, setHidePicks] = useState<boolean>(!!player.hide_picks);
   const [busy, setBusy] = useState(false);
@@ -843,7 +880,7 @@ function SettingsModal({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
+      setError(t("settings.errImage"));
       return;
     }
     setError(null);
@@ -851,7 +888,7 @@ function SettingsModal({
       const dataUrl = await resizeImage(file, 160);
       setAvatar(dataUrl);
     } catch {
-      setError("Could not read that image.");
+      setError(t("settings.errRead"));
     }
   }
 
@@ -866,7 +903,7 @@ function SettingsModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Could not save.");
+        setError(data.error ?? t("settings.errSave"));
         return;
       }
       onSaved();
@@ -883,7 +920,7 @@ function SettingsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-extrabold">⚙️ Profile &amp; settings</h2>
+          <h2 className="text-xl font-extrabold">{t("game.settings")}</h2>
           <button onClick={onClose} className="rounded-lg bg-white/10 px-2 py-1 text-sm">
             ✕
           </button>
@@ -894,14 +931,14 @@ function SettingsModal({
           <Avatar avatar={avatar} size={56} />
           <div>
             <p className="font-bold">{player.username}</p>
-            <p className="text-xs text-blue-100/60">Profile picture</p>
+            <p className="text-xs text-blue-100/60">{t("settings.profilePic")}</p>
           </div>
         </div>
 
         {/* Upload your own */}
         <div className="mt-4">
           <label className="block">
-            <span className="text-sm font-semibold">Upload your own photo</span>
+            <span className="text-sm font-semibold">{t("settings.upload")}</span>
             <input
               type="file"
               accept="image/*"
@@ -913,7 +950,7 @@ function SettingsModal({
 
         {/* Or pick a preset */}
         <div className="mt-4">
-          <p className="text-sm font-semibold">Or pick an emoji</p>
+          <p className="text-sm font-semibold">{t("settings.pickEmoji")}</p>
           <div className="mt-2 grid grid-cols-8 gap-2">
             {AVATAR_PRESETS.map((emoji) => (
               <button
@@ -930,7 +967,7 @@ function SettingsModal({
               onClick={() => setAvatar(null)}
               className="mt-2 text-xs font-semibold text-blue-200 underline"
             >
-              Remove picture
+              {t("settings.removePic")}
             </button>
           )}
         </div>
@@ -938,10 +975,8 @@ function SettingsModal({
         {/* Privacy toggle */}
         <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
           <div>
-            <p className="text-sm font-semibold">Hide my picks from others</p>
-            <p className="text-xs text-blue-100/60">
-              When on, other players can&apos;t see your picks until a match kicks off.
-            </p>
+            <p className="text-sm font-semibold">{t("settings.hideTitle")}</p>
+            <p className="text-xs text-blue-100/60">{t("settings.hideDesc")}</p>
           </div>
           <button
             onClick={() => setHidePicks((v) => !v)}
@@ -961,7 +996,7 @@ function SettingsModal({
           disabled={busy}
           className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white disabled:opacity-50"
         >
-          {busy ? "Saving…" : "Save"}
+          {busy ? t("settings.saving") : t("settings.save")}
         </button>
       </div>
     </div>
@@ -999,6 +1034,7 @@ function resizeImage(file: File, size: number): Promise<string> {
 // Opens when you tap another player's avatar — shows their profile + bet log.
 
 function PlayerLogModal({ username, onClose }: { username: string; onClose: () => void }) {
+  const { t } = useLang();
   const [data, setData] = useState<{
     player: { username: string; avatar: string | null; coins: number; win_streak: number; hide_picks?: boolean };
     predictions: Prediction[];
@@ -1017,10 +1053,10 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
         });
         const d = await res.json();
         if (!live) return;
-        if (!res.ok) setError(d.error ?? "Could not load player.");
+        if (!res.ok) setError(d.error ?? t("playerLog.errLoad"));
         else setData(d);
       } catch {
-        if (live) setError("Could not load player.");
+        if (live) setError(t("playerLog.errLoad"));
       } finally {
         if (live) setLoading(false);
       }
@@ -1028,7 +1064,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
     return () => {
       live = false;
     };
-  }, [username]);
+  }, [username, t]);
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -1037,13 +1073,13 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Player log</h2>
+          <h2 className="text-lg font-bold">{t("playerLog.title")}</h2>
           <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
-            Close
+            {t("common.close")}
           </button>
         </div>
 
-        {loading && <p className="mt-4 text-sm text-blue-100/70">Loading…</p>}
+        {loading && <p className="mt-4 text-sm text-blue-100/70">{t("common.loading")}</p>}
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
         {data && (
@@ -1053,7 +1089,11 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
               <div>
                 <p className="text-lg font-bold">{data.player.username}</p>
                 <p className="text-xs text-blue-100/70">
-                  🪙 {data.player.coins.toLocaleString()} · ✅ {data.wins} W · ❌ {data.losses} L
+                  {t("playerLog.record", {
+                    coins: data.player.coins.toLocaleString(),
+                    w: data.wins,
+                    l: data.losses,
+                  })}
                   {data.player.win_streak > 0 && <> · 🔥 {data.player.win_streak}</>}
                 </p>
               </div>
@@ -1061,13 +1101,13 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
 
             {data.player.hide_picks && (
               <p className="mt-3 rounded-lg bg-white/5 p-2 text-xs text-blue-100/60">
-                🙈 This player hides their upcoming picks until kickoff.
+                {t("playerLog.hides")}
               </p>
             )}
 
             <div className="mt-4 space-y-2">
               {data.predictions.length === 0 ? (
-                <p className="text-sm text-blue-100/70">No bets to show.</p>
+                <p className="text-sm text-blue-100/70">{t("playerLog.noBets")}</p>
               ) : (
                 data.predictions.map((p) => {
                   const m = p.matches;
@@ -1077,20 +1117,25 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
                     <div key={p.id} className="rounded-lg bg-white/5 p-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">
-                          {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+                          {m ? `${m.home_team} ${t("common.vs")} ${m.away_team}` : t("common.match")}
                         </span>
                         <span className={`font-bold ${color}`}>
-                          {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `+🪙${p.payout}` : "Lost"}
+                          {p.status === "PENDING"
+                            ? t("common.pending")
+                            : p.status === "WON"
+                              ? `+🪙${p.payout}`
+                              : t("common.lost")}
                         </span>
                       </div>
                       <div className="mt-0.5 text-blue-100/70">
                         {describeCall(
+                          t,
                           p.type,
                           p.pick,
                           p.exact_home,
                           p.exact_away,
-                          m?.home_team ?? "Home",
-                          m?.away_team ?? "Away"
+                          m?.home_team ?? t("common.home"),
+                          m?.away_team ?? t("common.away")
                         )}{" "}
                         · 🪙{p.stake}
                         {p.boosted && <span className="text-amber-300"> ⚡2×</span>}
@@ -1110,6 +1155,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
 /* ------------------------------ Changelog --------------------------------- */
 
 function Changelog({ onClose }: { onClose: () => void }) {
+  const { t } = useLang();
   return (
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4"
@@ -1120,9 +1166,9 @@ function Changelog({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">🆕 What&apos;s new</h2>
+          <h2 className="text-lg font-bold">{t("changelog.title")}</h2>
           <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
-            Close
+            {t("common.close")}
           </button>
         </div>
         <div className="mt-3 space-y-4">
@@ -1159,6 +1205,7 @@ function MyLog({
   token: string;
   onChange: () => void;
 }) {
+  const { t } = useLang();
   const settled = predictions.filter((p) => p.status !== "PENDING");
   const wins = settled.filter((p) => p.status === "WON").length;
   const losses = settled.filter((p) => p.status === "LOST").length;
@@ -1178,36 +1225,39 @@ function MyLog({
       <div className="rounded-xl bg-white/5 p-4">
         <div className="flex items-center justify-between text-sm">
           <span className="font-bold">
-            Level {lvl.level} · <span className="text-blue-300">{lvl.tier}</span>
+            {t("mylog.level", { n: lvl.level })} ·{" "}
+            <span className="text-blue-300">{t(`tier.${lvl.tierKey}`)}</span>
           </span>
           <span className="text-blue-100/60">
-            {streak > 0 ? `🔥 ${streak} win streak` : "XP"}
+            {streak > 0 ? t("mylog.winStreak", { n: streak }) : t("mylog.xp")}
           </span>
         </div>
         <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
           <div className="h-full bg-blue-500" style={{ width: `${lvl.intoLevel}%` }} />
         </div>
-        <div className="mt-1 text-right text-xs text-blue-100/60">{lvl.intoLevel}/100 XP to next level</div>
+        <div className="mt-1 text-right text-xs text-blue-100/60">
+          {t("mylog.xpToNext", { n: lvl.intoLevel })}
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Wins" value={`${wins}`} color="text-green-300" />
-        <Stat label="Losses" value={`${losses}`} color="text-red-300" />
-        <Stat label="Win rate" value={`${winRate}%`} />
+        <Stat label={t("mylog.wins")} value={`${wins}`} color="text-green-300" />
+        <Stat label={t("mylog.losses")} value={`${losses}`} color="text-red-300" />
+        <Stat label={t("mylog.winRate")} value={`${winRate}%`} />
         <Stat
-          label="Net coins"
+          label={t("mylog.netCoins")}
           value={`${net >= 0 ? "+" : ""}${net.toLocaleString()}`}
           color={net >= 0 ? "text-green-300" : "text-red-300"}
         />
       </div>
 
       {/* Achievements (claim coin rewards) */}
-      <h2 className="mb-2 mt-6 text-lg font-bold">🏅 Badges & rewards</h2>
+      <h2 className="mb-2 mt-6 text-lg font-bold">{t("mylog.badges")}</h2>
       <Achievements token={token} onClaimed={onChange} />
 
-      <h2 className="mb-2 mt-6 text-lg font-bold">History</h2>
+      <h2 className="mb-2 mt-6 text-lg font-bold">{t("mylog.history")}</h2>
       {settled.length === 0 ? (
-        <Empty text={pending > 0 ? "Your bets are still pending — results show here once matches finish." : "No finished bets yet. Place some predictions!"} />
+        <Empty text={pending > 0 ? t("mylog.pendingEmpty") : t("mylog.noFinished")} />
       ) : (
         <div className="space-y-2">
           {settled.map((p) => {
@@ -1217,18 +1267,20 @@ function MyLog({
               <div key={p.id} className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-sm">
                 <div>
                   <div className="font-semibold">
-                    {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+                    {m ? `${m.home_team} ${t("common.vs")} ${m.away_team}` : t("common.match")}
                     {m && m.home_score != null && (
                       <span className="text-blue-100/60"> · {m.home_score}–{m.away_score}</span>
                     )}
                   </div>
                   <div className="text-xs text-blue-100/70">
-                    {describeCall(p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? "Home", m?.away_team ?? "Away")} · staked {p.stake}
+                    {describeCall(t, p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? t("common.home"), m?.away_team ?? t("common.away"))} · {t("mylog.staked", { n: p.stake })}
                   </div>
                 </div>
                 <div className={`text-right font-bold ${delta >= 0 ? "text-green-300" : "text-red-300"}`}>
                   {delta >= 0 ? `+${delta}` : delta} 🪙
-                  <div className="text-xs font-normal text-blue-100/60">{p.status}</div>
+                  <div className="text-xs font-normal text-blue-100/60">
+                    {p.status === "WON" ? t("common.won") : t("common.lost")}
+                  </div>
                 </div>
               </div>
             );
@@ -1252,6 +1304,7 @@ type Challenge = {
 };
 
 function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () => void }) {
+  const { t } = useLang();
   const [list, setList] = useState<Challenge[]>([]);
 
   const load = useCallback(async () => {
@@ -1270,11 +1323,11 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
     });
     const data = await res.json();
     if (res.ok) {
-      celebrate(`🎯 Challenge done: +🪙${data.reward}!`);
+      celebrate(t("challenge.done", { r: data.reward }));
       load();
       onClaimed();
     } else {
-      toast(data.error ?? "Try again.");
+      toast(data.error ?? t("common.tryAgain"));
     }
   }
 
@@ -1283,7 +1336,7 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
       {list.map((c) => (
         <div key={c.key} className="rounded-xl bg-white/5 p-4">
           <div className="flex items-center justify-between">
-            <span className="font-bold">{c.label}</span>
+            <span className="font-bold">{t(`challenge.${c.key}`)}</span>
             <span className="text-xs text-yellow-300">🪙{c.reward}</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
@@ -1293,14 +1346,14 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
             {c.progress}/{c.target}
           </div>
           {c.claimed ? (
-            <p className="mt-2 text-sm font-semibold text-green-300">✓ Claimed</p>
+            <p className="mt-2 text-sm font-semibold text-green-300">{t("challenge.claimed")}</p>
           ) : (
             <button
               onClick={() => claim(c.key)}
               disabled={!c.claimable}
               className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold disabled:opacity-40"
             >
-              {c.claimable ? "Claim reward" : "In progress"}
+              {c.claimable ? t("challenge.claim") : t("challenge.inProgress")}
             </button>
           )}
         </div>
@@ -1334,6 +1387,7 @@ function SpinWheel({
   shields: number;
   onDone: () => void;
 }) {
+  const { t } = useLang();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<WheelSlice | null>(null);
@@ -1357,7 +1411,7 @@ function SpinWheel({
     });
     const data = await res.json();
     if (!res.ok) {
-      toast(data.error ?? "Try again.");
+      toast(data.error ?? t("common.tryAgain"));
       setSpinning(false);
       return;
     }
@@ -1373,7 +1427,7 @@ function SpinWheel({
     setTimeout(() => {
       const slice = data.slice as WheelSlice;
       setResult(slice);
-      celebrate(describePrize(slice));
+      celebrate(prizeText(t, slice));
       setSpinning(false);
       onDone();
     }, SPIN_MS);
@@ -1381,10 +1435,9 @@ function SpinWheel({
 
   return (
     <div className="rounded-xl bg-white/5 p-4">
-      <p className="font-bold">🎡 Spin the Wheel</p>
+      <p className="font-bold">{t("spin.title")}</p>
       <p className="mt-1 text-xs text-blue-100/70">
-        First spin free daily, then 🪙{EXTRA_SPIN_COST} each (up to {MAX_SPINS_PER_DAY}/day). Win coins,
-        a jackpot, or power-ups!
+        {t("spin.desc", { cost: EXTRA_SPIN_COST, max: MAX_SPINS_PER_DAY })}
       </p>
 
       {/* The wheel + pointer */}
@@ -1409,7 +1462,7 @@ function SpinWheel({
             >
               <div className="absolute left-1/2 top-[10px] -translate-x-1/2 text-center text-[10px] font-bold leading-tight text-white drop-shadow">
                 <div className="text-sm">{w.emoji}</div>
-                {w.label}
+                {sliceLabel(t, w)}
               </div>
             </div>
           ))}
@@ -1419,7 +1472,7 @@ function SpinWheel({
       </div>
 
       {result && !spinning && (
-        <p className="mt-3 text-center text-sm font-bold text-yellow-200">{describePrize(result)}</p>
+        <p className="mt-3 text-center text-sm font-bold text-yellow-200">{prizeText(t, result)}</p>
       )}
 
       <button
@@ -1428,24 +1481,26 @@ function SpinWheel({
         className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
       >
         {spinning
-          ? "Spinning…"
+          ? t("spin.spinning")
           : spinsLeft <= 0
-            ? "No spins left today"
+            ? t("spin.noSpins")
             : nextSpinFree
-              ? "Spin now 🎡 (free)"
+              ? t("spin.free")
               : coins >= EXTRA_SPIN_COST
-                ? `Spin again 🎡 (🪙${EXTRA_SPIN_COST})`
-                : `Need 🪙${EXTRA_SPIN_COST} to spin`}
+                ? t("spin.again", { cost: EXTRA_SPIN_COST })
+                : t("spin.need", { cost: EXTRA_SPIN_COST })}
       </button>
 
       <p className="mt-2 text-center text-[11px] text-blue-100/60">
-        {spinsLeft > 0 ? `${spinsLeft} spin${spinsLeft > 1 ? "s" : ""} left today` : "Come back tomorrow"}
+        {spinsLeft > 0
+          ? t(spinsLeft > 1 ? "spin.leftMany" : "spin.leftOne", { n: spinsLeft })
+          : t("spin.comeback")}
       </p>
 
       {/* Power-up inventory */}
       <div className="mt-2 flex justify-center gap-3 text-xs text-blue-100/80">
-        <span title="2× payout power-ups">⚡ 2× boosts: <b>{boost}</b></span>
-        <span title="Streak shields">🛡️ shields: <b>{shields}</b></span>
+        <span>{t("spin.boosts")} <b>{boost}</b></span>
+        <span>{t("spin.shields")} <b>{shields}</b></span>
       </div>
     </div>
   );
@@ -1464,6 +1519,7 @@ function PenaltyShootout({
   canPlay: boolean;
   onDone: () => void;
 }) {
+  const { t } = useLang();
   const [started, setStarted] = useState(false);
   const [shots, setShots] = useState(0);
   const [goals, setGoals] = useState(0);
@@ -1492,7 +1548,7 @@ function PenaltyShootout({
     const isGoal = frac >= 0.38 && frac <= 0.62;
     const newGoals = goals + (isGoal ? 1 : 0);
     const newShots = shots + 1;
-    setResult(isGoal ? "⚽ GOAL!" : "🧤 Saved!");
+    setResult(isGoal ? t("penalty.goal") : t("penalty.saved"));
     setGoals(newGoals);
     setShots(newShots);
 
@@ -1506,7 +1562,7 @@ function PenaltyShootout({
       const data = await res.json();
       if (res.ok) {
         setReward(data.reward);
-        if (data.reward > 0) celebrate(`⚽ ${newGoals}/5 — +🪙${data.reward}!`);
+        if (data.reward > 0) celebrate(t("penalty.celebrate", { g: newGoals, r: data.reward }));
         onDone();
       }
     }
@@ -1514,16 +1570,14 @@ function PenaltyShootout({
 
   return (
     <div className="rounded-xl bg-white/5 p-4">
-      <p className="font-bold">⚽ Penalty Shootout</p>
-      <p className="mt-1 text-xs text-blue-100/70">
-        Tap Shoot when the ball lines up with the goal. 5 shots, 🪙30 each.
-      </p>
+      <p className="font-bold">{t("penalty.title")}</p>
+      <p className="mt-1 text-xs text-blue-100/70">{t("penalty.desc")}</p>
 
       {!canPlay ? (
-        <p className="mt-3 text-sm text-blue-100/60">Come back tomorrow ⚽</p>
+        <p className="mt-3 text-sm text-blue-100/60">{t("penalty.comeback")}</p>
       ) : !started ? (
         <button onClick={start} className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold">
-          Play
+          {t("penalty.play")}
         </button>
       ) : (
         <div className="mt-3">
@@ -1536,18 +1590,16 @@ function PenaltyShootout({
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-xs">
-            <span>
-              Shot {Math.min(shots + 1, 5)}/5 · Goals {goals}
-            </span>
+            <span>{t("penalty.shotLine", { n: Math.min(shots + 1, 5), g: goals })}</span>
             <span className="font-bold">{result}</span>
           </div>
           {!done ? (
             <button onClick={shoot} className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold">
-              Shoot ⚽
+              {t("penalty.shoot")}
             </button>
           ) : (
             <div className="mt-2 text-center text-sm font-bold text-yellow-200">
-              {reward !== null ? `${goals}/5 goals · +🪙${reward}` : "…"}
+              {reward !== null ? t("penalty.result", { g: goals, r: reward }) : "…"}
             </div>
           )}
         </div>
@@ -1569,6 +1621,7 @@ type Achievement = {
 };
 
 function Achievements({ token, onClaimed }: { token: string; onClaimed: () => void }) {
+  const { t } = useLang();
   const [list, setList] = useState<Achievement[]>([]);
 
   const load = useCallback(async () => {
@@ -1587,11 +1640,11 @@ function Achievements({ token, onClaimed }: { token: string; onClaimed: () => vo
     });
     const data = await res.json();
     if (res.ok) {
-      celebrate(`🏅 Badge reward: +🪙${data.reward}!`);
+      celebrate(t("ach.reward", { r: data.reward }));
       load();
       onClaimed();
     } else {
-      toast(data.error ?? "Try again.");
+      toast(data.error ?? t("common.tryAgain"));
     }
   }
 
@@ -1603,19 +1656,19 @@ function Achievements({ token, onClaimed }: { token: string; onClaimed: () => vo
           className={`rounded-xl p-2 text-center text-xs ${a.got ? "bg-blue-600/30" : "bg-white/5 opacity-50"}`}
         >
           <div className="text-2xl">{a.emoji}</div>
-          <div className="mt-1 font-semibold">{a.label}</div>
+          <div className="mt-1 font-semibold">{t(`ach.${a.key}`)}</div>
           <div className="text-yellow-300">🪙{a.reward}</div>
           {a.claimable ? (
             <button
               onClick={() => claim(a.key)}
               className="mt-1 w-full rounded bg-blue-600 px-2 py-1 text-xs font-bold"
             >
-              Claim
+              {t("ach.claim")}
             </button>
           ) : a.claimed ? (
-            <div className="mt-1 text-green-300">✓ Claimed</div>
+            <div className="mt-1 text-green-300">{t("ach.claimed")}</div>
           ) : (
-            <div className="mt-1 text-blue-100/50">Locked</div>
+            <div className="mt-1 text-blue-100/50">{t("ach.locked")}</div>
           )}
         </div>
       ))}
@@ -1699,10 +1752,11 @@ function TeamLine({
   homeCrest: string | null;
   awayCrest: string | null;
 }) {
+  const { t } = useLang();
   return (
     <div className="mt-1 flex items-center justify-center gap-2 text-base font-bold">
       <Crest url={homeCrest} /> {home}
-      <span className="text-blue-100/60">vs</span>
+      <span className="text-blue-100/60">{t("common.vs")}</span>
       {away} <Crest url={awayCrest} />
     </div>
   );
@@ -1710,6 +1764,7 @@ function TeamLine({
 
 // Human-readable summary of a bet, e.g. "Half-time leader: Brazil" or "3+ goals: Yes".
 function describeCall(
+  t: T,
   type: BetType,
   pick: string | null,
   exactHome: number | null,
@@ -1717,13 +1772,14 @@ function describeCall(
   home: string,
   away: string
 ): string {
-  const side = pick === "HOME" ? home : pick === "AWAY" ? away : "Draw";
-  if (type === "WINNER") return `Winner: ${side}`;
-  if (type === "HALFTIME") return `Half-time leader: ${side}`;
-  if (type === "GOALS3") return `3+ goals: ${pick === "YES" ? "Yes" : "No"}`;
-  if (type === "BTTS") return `Both teams score: ${pick === "YES" ? "Yes" : "No"}`;
-  if (type === "TOTALS") return `Total goals: ${pick}`;
-  return `Exact score: ${exactHome}–${exactAway}`;
+  const side = pick === "HOME" ? home : pick === "AWAY" ? away : t("common.draw");
+  const yn = pick === "YES" ? t("common.yes") : t("common.no");
+  if (type === "WINNER") return t("call.winner", { side });
+  if (type === "HALFTIME") return t("call.halftime", { side });
+  if (type === "GOALS3") return t("call.goals3", { yn });
+  if (type === "BTTS") return t("call.btts", { yn });
+  if (type === "TOTALS") return t("call.totals", { pick: pick ?? "" });
+  return t("call.exact", { h: exactHome ?? 0, a: exactAway ?? 0 });
 }
 
 type BetDraft = {
@@ -1758,6 +1814,7 @@ function BetForm({
   onSubmit: (body: any) => Promise<{ error?: string }>;
   onCancel?: () => void;
 }) {
+  const { t } = useLang();
   const [pick, setPick] = useState<string | null>(initial?.pick ?? null);
   const [eh, setEh] = useState(initial?.exactHome != null ? String(initial.exactHome) : "");
   const [ea, setEa] = useState(initial?.exactAway != null ? String(initial.exactAway) : "");
@@ -1793,13 +1850,13 @@ function BetForm({
   const sideButtons: ReadonlyArray<readonly [string, string]> =
     type === "GOALS3"
       ? [
-          ["YES", "Yes, 3+"],
-          ["NO", "Under 3"],
+          ["YES", t("form.yes3")],
+          ["NO", t("form.under3")],
         ]
       : type === "BTTS"
         ? [
-            ["YES", "Yes"],
-            ["NO", "No"],
+            ["YES", t("common.yes")],
+            ["NO", t("common.no")],
           ]
         : type === "TOTALS"
           ? [
@@ -1809,14 +1866,14 @@ function BetForm({
             ]
           : [
               ["HOME", home],
-              ["DRAW", "Draw"],
+              ["DRAW", t("common.draw")],
               ["AWAY", away],
             ];
   const twoCols = type === "GOALS3" || type === "BTTS";
 
   return (
     <div>
-      <p className="mb-2 text-center text-xs font-semibold text-blue-100/80">{BET_PROMPTS[type]}</p>
+      <p className="mb-2 text-center text-xs font-semibold text-blue-100/80">{t(`prompt.${type}`)}</p>
       {type === "EXACT" ? (
         <div className="flex items-center justify-center gap-2">
           <input
@@ -1850,7 +1907,7 @@ function BetForm({
       )}
 
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-xs text-blue-100/70">Bet</span>
+        <span className="text-xs text-blue-100/70">{t("form.bet")}</span>
         <input
           type="number"
           min={1}
@@ -1859,10 +1916,10 @@ function BetForm({
           onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
           className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
         />
-        <span className="text-xs text-blue-100/70">coins</span>
+        <span className="text-xs text-blue-100/70">{t("form.coins")}</span>
         {onCancel && (
           <button onClick={onCancel} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
-            Close
+            {t("common.close")}
           </button>
         )}
         <button
@@ -1883,19 +1940,19 @@ function BetForm({
             className="h-4 w-4 accent-amber-400"
           />
           <span className="font-semibold text-amber-200">
-            ⚡ Use a 2× payout power-up <span className="text-amber-200/70">({boost} left)</span>
+            {t("form.useBoost")}{" "}
+            <span className="text-amber-200/70">{t("form.boostLeft", { n: boost })}</span>
           </span>
         </label>
       )}
 
       {stake > 0 && (
         <p className="mt-2 text-center text-sm font-semibold text-yellow-200">
-          → If correct, you win 🪙
-          {(stake * BASE_MULT[type] * (useBoost && boost > 0 ? 2 : 1)).toLocaleString()}
+          {t("form.ifCorrect", {
+            n: (stake * BASE_MULT[type] * (useBoost && boost > 0 ? 2 : 1)).toLocaleString(),
+          })}
           {useBoost && boost > 0 && <span className="text-amber-300"> ⚡2×</span>}
-          <span className="block text-xs font-normal text-blue-100/60">
-            (unpopular picks win even more)
-          </span>
+          <span className="block text-xs font-normal text-blue-100/60">{t("form.unpopular")}</span>
         </p>
       )}
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
@@ -1922,6 +1979,7 @@ function BetEditor({
   coins: number;
   onChange: () => void;
 }) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -1932,14 +1990,14 @@ function BetEditor({
       body: JSON.stringify({ ...body, predictionId: p.id }),
     });
     const data = await res.json();
-    if (!res.ok) return { error: data.error ?? "Could not update bet." };
+    if (!res.ok) return { error: data.error ?? t("editor.errUpdate") };
     setEditing(false);
     onChange();
     return {};
   }
 
   async function cancelBet() {
-    if (!confirm("Cancel this bet and get your coins back?")) return;
+    if (!confirm(t("editor.confirm"))) return;
     setBusy(true);
     try {
       const res = await fetch("/api/predictions", {
@@ -1961,7 +2019,7 @@ function BetEditor({
           home={home}
           away={away}
           coins={coins + p.stake}
-          submitLabel="Save"
+          submitLabel={t("form.save")}
           onCancel={() => setEditing(false)}
           initial={{
             type: p.type,
@@ -1982,14 +2040,14 @@ function BetEditor({
         onClick={() => setEditing(true)}
         className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold"
       >
-        ✏️ Edit
+        {t("editor.edit")}
       </button>
       <button
         onClick={cancelBet}
         disabled={busy}
         className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-red-300 disabled:opacity-50"
       >
-        🗑 Cancel / Undo
+        {t("editor.cancel")}
       </button>
     </div>
   );
@@ -2016,6 +2074,7 @@ function MatchCard({
   onOpenPlayer?: (username: string) => void;
   onPlaced: () => void;
 }) {
+  const { t } = useLang();
   const kickoff = new Date(match.kickoff_at);
   const [tab, setTab] = useState<BetType>("WINNER");
 
@@ -2030,8 +2089,8 @@ function MatchCard({
       body: JSON.stringify({ ...body, matchId: match.id }),
     });
     const data = await res.json();
-    if (!res.ok) return { error: data.error ?? "Could not place prediction." };
-    toast("Bet placed ✅");
+    if (!res.ok) return { error: data.error ?? t("card.errPlace") };
+    toast(t("card.placed"));
     onPlaced();
     return {};
   }
@@ -2046,9 +2105,7 @@ function MatchCard({
         </span>
       </div>
       {isMotd && (
-        <div className="mt-1 text-center text-xs font-bold text-yellow-300">
-          ⭐ Match of the Day — winning bets get a bonus!
-        </div>
+        <div className="mt-1 text-center text-xs font-bold text-yellow-300">{t("card.motd")}</div>
       )}
       <TeamLine
         home={match.home_team}
@@ -2057,29 +2114,28 @@ function MatchCard({
         awayCrest={match.away_crest}
       />
 
-      <p className="mt-2 text-center text-xs text-blue-100/60">
-        💡 Place a bet on each option — backing the unpopular pick pays an underdog bonus.
-      </p>
+      <p className="mt-2 text-center text-xs text-blue-100/60">{t("card.tip")}</p>
 
       {/* Bet-type tabs: ✓ marks ones you've already bet. */}
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-        {(Object.keys(BET_LABELS) as BetType[]).map((t) => (
+        {BET_TYPES.map((bt) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-lg px-2 py-1.5 font-semibold ${tab === t ? "bg-blue-600" : "bg-white/10"}`}
+            key={bt}
+            onClick={() => setTab(bt)}
+            className={`rounded-lg px-2 py-1.5 font-semibold ${tab === bt ? "bg-blue-600" : "bg-white/10"}`}
           >
-            {betByType.has(t) ? "✓ " : ""}
-            {BET_LABELS[t]}
+            {betByType.has(bt) ? "✓ " : ""}
+            {t(`bet.${bt}`)}
           </button>
         ))}
       </div>
 
       {current ? (
         <div className="mt-3 rounded-lg bg-blue-600/20 px-3 py-2 text-sm">
-          ✅ Your bet:{" "}
+          {t("card.yourBet")}{" "}
           <b>
             {describeCall(
+              t,
               current.type,
               current.pick,
               current.exact_home,
@@ -2091,7 +2147,7 @@ function MatchCard({
           · 🪙{current.stake}
           {current.status === "PENDING" && (
             <span className="block text-xs text-blue-100/70">
-              Could win 🪙{potentialWin(current)} ({effMult(current)})
+              {t("card.couldWin", { n: potentialWin(current), mult: effMult(current) })}
             </span>
           )}
           {current.status === "PENDING" && (
@@ -2113,7 +2169,7 @@ function MatchCard({
             away={match.away_team}
             coins={coins}
             boost={boost}
-            submitLabel="Predict"
+            submitLabel={t("form.predict")}
             onSubmit={place}
           />
         </div>
@@ -2134,6 +2190,7 @@ function WhoWins({
   match: Match;
   onOpenPlayer?: (username: string) => void;
 }) {
+  const { t } = useLang();
   const s = match.bet_stats;
   if (!s) return null;
   const total = s.home + s.draw + s.away;
@@ -2141,12 +2198,14 @@ function WhoWins({
   const pct = (n: number) => Math.round((n / total) * 100);
 
   function label(pick: string) {
-    return pick === "HOME" ? match.home_team : pick === "AWAY" ? match.away_team : "Draw";
+    return pick === "HOME" ? match.home_team : pick === "AWAY" ? match.away_team : t("common.draw");
   }
 
   return (
     <div className="mt-3 border-t border-white/10 pt-2 text-xs">
-      <p className="mb-1 font-semibold text-blue-100/70">Who wins? ({total} bet{total > 1 ? "s" : ""})</p>
+      <p className="mb-1 font-semibold text-blue-100/70">
+        {t(total > 1 ? "who.titleMany" : "who.titleOne", { n: total })}
+      </p>
       <div className="flex h-3 overflow-hidden rounded-full bg-white/10">
         <div className="bg-yellow-400" style={{ width: `${pct(s.home)}%` }} />
         <div className="bg-blue-300" style={{ width: `${pct(s.draw)}%` }} />
@@ -2154,7 +2213,7 @@ function WhoWins({
       </div>
       <div className="mt-1 flex justify-between text-blue-100/80">
         <span>🟨 {match.home_team} {pct(s.home)}%</span>
-        <span>🟩 Draw {pct(s.draw)}%</span>
+        <span>🟩 {t("common.draw")} {pct(s.draw)}%</span>
         <span>🟦 {match.away_team} {pct(s.away)}%</span>
       </div>
       {s.voters.length > 0 && (
@@ -2164,7 +2223,7 @@ function WhoWins({
               key={i}
               onClick={() => onOpenPlayer?.(v.username)}
               className="inline-flex items-center gap-1 hover:underline"
-              title={`View ${v.username}'s log`}
+              title={t("game.viewLog", { name: v.username })}
             >
               <Avatar avatar={v.avatar} size={16} />
               {v.username}: {label(v.pick)}
@@ -2190,6 +2249,7 @@ function MatchBetsCard({
   coins: number;
   onChange: () => void;
 }) {
+  const { t } = useLang();
   const m = bets[0].matches;
   const editable = !!m && new Date(m.kickoff_at) > new Date();
 
@@ -2198,10 +2258,10 @@ function MatchBetsCard({
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 font-semibold">
           <Crest url={m?.home_crest ?? null} />
-          {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+          {m ? `${m.home_team} ${t("common.vs")} ${m.away_team}` : t("common.match")}
           <Crest url={m?.away_crest ?? null} />
         </span>
-        <span className="text-xs text-blue-100/60">{editable ? "Open" : "Started"}</span>
+        <span className="text-xs text-blue-100/60">{editable ? t("card.open") : t("card.started")}</span>
       </div>
 
       <div className="mt-2 space-y-2">
@@ -2209,9 +2269,9 @@ function MatchBetsCard({
           <div key={p.id} className="rounded-lg bg-white/5 p-2">
             <div className="text-xs text-blue-100/80">
               <b>
-                {describeCall(p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? "Home", m?.away_team ?? "Away")}
+                {describeCall(t, p.type, p.pick, p.exact_home, p.exact_away, m?.home_team ?? t("common.home"), m?.away_team ?? t("common.away"))}
               </b>{" "}
-              · Stake {p.stake} · could win 🪙{potentialWin(p)} ({effMult(p)})
+              · {t("card.betLine", { s: p.stake, w: potentialWin(p), mult: effMult(p) })}
             </div>
             {editable && m && (
               <BetEditor
