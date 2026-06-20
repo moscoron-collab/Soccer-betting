@@ -126,6 +126,7 @@ export default function Home() {
   const [spinsLeft, setSpinsLeft] = useState(0);
   const [nextSpinFree, setNextSpinFree] = useState(false);
   const [canPenalty, setCanPenalty] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const firstLoad = useRef(true);
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
 
@@ -182,6 +183,7 @@ export default function Home() {
     setSpinsLeft(data.spinsLeft ?? 0);
     setNextSpinFree(!!data.nextSpinFree);
     setCanPenalty(!!data.canPenalty);
+    setLeaderboard(data.leaderboard ?? []);
   }, []);
 
   useEffect(() => {
@@ -224,6 +226,7 @@ export default function Home() {
           spinsLeft={spinsLeft}
           nextSpinFree={nextSpinFree}
           canPenalty={canPenalty}
+          leaderboard={leaderboard}
           onRefresh={() => loadMe(token)}
           onSignOut={signOut}
         />
@@ -452,6 +455,7 @@ function Game({
   spinsLeft,
   nextSpinFree,
   canPenalty,
+  leaderboard,
   onRefresh,
   onSignOut,
 }: {
@@ -462,11 +466,11 @@ function Game({
   spinsLeft: number;
   nextSpinFree: boolean;
   canPenalty: boolean;
+  leaderboard: LeaderRow[];
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
@@ -492,30 +496,20 @@ function Game({
     setMatches(data.matches ?? []);
   }, []);
 
-  const loadLeaderboard = useCallback(async () => {
-    const res = await fetch(`/api/leaderboard?_=${Date.now()}`, { cache: "no-store" });
-    const data = await res.json();
-    setLeaderboard(data.leaderboard ?? []);
-  }, []);
-
   useEffect(() => {
     loadMatches();
-    loadLeaderboard();
-    // Keep the leaderboard + matches fresh (other players' coins, avatars, picks).
-    const id = setInterval(() => {
-      loadMatches();
-      loadLeaderboard();
-    }, 60000);
+    // Keep matches fresh (other players' picks). The leaderboard comes from
+    // /api/me, which the parent polls every 60s.
+    const id = setInterval(loadMatches, 60000);
     return () => clearInterval(id);
-  }, [loadMatches, loadLeaderboard]);
+  }, [loadMatches]);
 
-  // Reload the player AND the leaderboard/matches together, so coin balances and
-  // profile pictures stay in sync everywhere after a spin, bet or settings change.
+  // Reload the player (+leaderboard, which now rides along on /api/me) and the
+  // matches together, so balances and pictures stay in sync after any action.
   const refreshAll = useCallback(() => {
     onRefresh();
-    loadLeaderboard();
     loadMatches();
-  }, [onRefresh, loadLeaderboard, loadMatches]);
+  }, [onRefresh, loadMatches]);
 
   async function share() {
     const url =
@@ -659,7 +653,7 @@ function Game({
       <Section title="🏆 Leaderboard">
         <div className="mb-2 flex justify-end">
           <button
-            onClick={loadLeaderboard}
+            onClick={refreshAll}
             className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100"
           >
             ↻ Refresh

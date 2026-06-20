@@ -43,14 +43,27 @@ export async function GET(req: Request) {
     !player.last_penalty_at ||
     Date.now() - new Date(player.last_penalty_at).getTime() > 86400000;
 
-  return NextResponse.json({
-    player,
-    predictions: predictions ?? [],
-    canBailout,
-    spinsLeft,
-    nextSpinFree,
-    canPenalty,
-  });
+  // Serve the leaderboard from here too: /api/me is always dynamic (it reads the
+  // player token), so it can't be edge-cached the way the public /api/leaderboard
+  // can — guaranteeing live coin totals and avatars for everyone.
+  const { data: leaderboard } = await supabase
+    .from("players")
+    .select("username, coins, avatar")
+    .order("coins", { ascending: false })
+    .limit(50);
+
+  return NextResponse.json(
+    {
+      player,
+      predictions: predictions ?? [],
+      canBailout,
+      spinsLeft,
+      nextSpinFree,
+      canPenalty,
+      leaderboard: leaderboard ?? [],
+    },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+  );
 }
 
 // POST /api/me/bailout-style top-up: if broke, top up to the floor once per day.

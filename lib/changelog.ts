@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "2.5";
+export const VERSION = "2.6";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "2.6",
+    date: "2026-06-20",
+    changes: [
+      "Leaderboard data now loads through the always-fresh account feed, so other players' coin totals and profile pictures finally show live (fixes the stuck/cached leaderboard)",
+    ],
+  },
   {
     version: "2.5",
     date: "2026-06-20",
