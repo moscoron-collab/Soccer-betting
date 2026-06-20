@@ -35,5 +35,8 @@ export async function POST(req: Request) {
     .eq("id", player.id);
   if (error) return NextResponse.json({ error: "Try again." }, { status: 500 });
 
+  // A little XP for playing, so progress moves even without a betting win.
+  await supabase.rpc("increment_xp", { p_player: player.id, p_amount: 5 });
+
   return NextResponse.json({ reward, goals, coins: player.coins + reward });
 }

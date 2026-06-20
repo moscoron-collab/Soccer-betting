@@ -1,10 +1,18 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.3";
+export const VERSION = "3.4";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.4",
+    date: "2026-06-20",
+    changes: [
+      "Leveling up is faster and friendlier! You now earn a little XP for playing the mini-games too (spin & penalty), not just for winning bets.",
+      "Ranks come sooner: you reach Analyst at level 5, Scout at 15, Expert at 35, and Legend at 75 — so it doesn't take forever to leave Rookie.",
+    ],
+  },
   {
     version: "3.3",
     date: "2026-06-20",

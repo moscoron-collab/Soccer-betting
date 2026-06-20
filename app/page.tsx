@@ -135,10 +135,11 @@ function effMult(p: Prediction): string {
 }
 
 // Level/tier from XP (100 XP per level). `tierKey` maps to an i18n `tier.*` key.
+// Tiers are intentionally easy to reach early so progress feels rewarding.
 function levelInfo(xp: number) {
   const level = Math.min(100, Math.floor((xp || 0) / 100) + 1);
   const tierKey =
-    level >= 100 ? "legend" : level >= 50 ? "expert" : level >= 25 ? "scout" : level >= 10 ? "analyst" : "rookie";
+    level >= 75 ? "legend" : level >= 35 ? "expert" : level >= 15 ? "scout" : level >= 5 ? "analyst" : "rookie";
   return { level, tierKey, intoLevel: (xp || 0) % 100 };
 }
 
