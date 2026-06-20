@@ -45,6 +45,23 @@ function normalizeStatus(s: string): "SCHEDULED" | "IN_PLAY" | "FINISHED" {
   return "SCHEDULED";
 }
 
+function mapMatch(m: any, fallbackCode = ""): FdMatch {
+  return {
+    id: m.id,
+    competition: m.competition?.name ?? fallbackCode,
+    homeTeam: m.homeTeam?.shortName || m.homeTeam?.name || "Home",
+    awayTeam: m.awayTeam?.shortName || m.awayTeam?.name || "Away",
+    homeCrest: m.homeTeam?.crest ?? null,
+    awayCrest: m.awayTeam?.crest ?? null,
+    kickoff: m.utcDate,
+    status: normalizeStatus(m.status),
+    homeScore: m.score?.fullTime?.home ?? null,
+    awayScore: m.score?.fullTime?.away ?? null,
+    halfHome: m.score?.halfTime?.home ?? null,
+    halfAway: m.score?.halfTime?.away ?? null,
+  };
+}
+
 async function fetchCompetitionMatches(
   code: string,
   dateFrom: string,
@@ -62,20 +79,26 @@ async function fetchCompetitionMatches(
   }
   const data = await res.json();
   const matches = Array.isArray(data?.matches) ? data.matches : [];
-  return matches.map((m: any): FdMatch => ({
-    id: m.id,
-    competition: m.competition?.name ?? code,
-    homeTeam: m.homeTeam?.shortName || m.homeTeam?.name || "Home",
-    awayTeam: m.awayTeam?.shortName || m.awayTeam?.name || "Away",
-    homeCrest: m.homeTeam?.crest ?? null,
-    awayCrest: m.awayTeam?.crest ?? null,
-    kickoff: m.utcDate,
-    status: normalizeStatus(m.status),
-    homeScore: m.score?.fullTime?.home ?? null,
-    awayScore: m.score?.fullTime?.away ?? null,
-    halfHome: m.score?.halfTime?.home ?? null,
-    halfAway: m.score?.halfTime?.away ?? null,
-  }));
+  return matches.map((m: any) => mapMatch(m, code));
+}
+
+// One cheap request across ALL competitions for a small date window. Used for
+// the fast "settle results while players are online" refresh (1 call, not 6).
+export async function fetchRecentResults(daysBack = 2, daysAhead = 1): Promise<FdMatch[]> {
+  const from = ymd(new Date(Date.now() - daysBack * 86400000));
+  const to = ymd(new Date(Date.now() + daysAhead * 86400000));
+  const url = `${BASE}/matches?dateFrom=${from}&dateTo=${to}`;
+  const res = await fetch(url, {
+    headers: { "X-Auth-Token": getKey() },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 404) return [];
+    throw new Error(`football-data /matches failed: ${res.status}`);
+  }
+  const data = await res.json();
+  const matches = Array.isArray(data?.matches) ? data.matches : [];
+  return matches.map((m: any) => mapMatch(m));
 }
 
 // Pulls matches for all tracked competitions from `daysBack` ago to `daysAhead`

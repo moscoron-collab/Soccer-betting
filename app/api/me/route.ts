@@ -3,16 +3,23 @@ import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { BAILOUT_AMOUNT, BAILOUT_FLOOR } from "@/lib/payout";
 import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
+import { quickRefresh } from "@/lib/settle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET /api/me -> current player + their predictions (header: x-player-token)
 export async function GET(req: Request) {
-  const player = await getPlayerFromRequest(req);
+  let player = await getPlayerFromRequest(req);
   if (!player) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+
+  // Settle freshly-finished games while players are online (throttled globally to
+  // one feed call per minute), so winnings appear within ~a minute. Best-effort.
+  await quickRefresh();
+  // Re-read the player so the balance/streak reflect any just-settled bets.
+  player = (await getPlayerFromRequest(req)) ?? player;
 
   const { data: predictions } = await supabase
     .from("predictions")

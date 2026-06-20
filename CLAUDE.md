@@ -52,6 +52,17 @@ match results, win/lose coins, climb a leaderboard, play mini-games. **No real m
 - players: `avatar`, `hide_picks`, `boost_2x`, `streak_shield`, `spin_day`, `spins_today`
 - predictions: `boosted`
 - function: `consume_shield(p_player uuid)`
+- table: `app_meta` (throttles the activity-driven results refresh)
+
+## Settlement / payouts (how coins get paid)
+- `lib/settle.ts` holds the shared logic: `settleAll()` (settles finished games from
+  DB only), `upsertMatches()`, and `quickRefresh()` (throttled fetch+settle).
+- `/api/sync` (hourly GitHub Action) = full fetch of all competitions + settleAll. Backup.
+- `/api/me` calls `quickRefresh()` on every load: globally throttled to ONE football-data
+  call per minute (`app_meta.last_results_fetch`), so finished games settle within ~a
+  minute while anyone is online. Uses the cheap single-request `/v4/matches` feed endpoint.
+- To force settlement now: GitHub → Actions → "Sync matches & settle predictions" →
+  Run workflow; or Claude can trigger it via the Actions API.
 
 ## Features built in this collaboration
 ### v2.2

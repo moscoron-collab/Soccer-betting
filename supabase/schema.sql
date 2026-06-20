@@ -151,6 +151,17 @@ create table if not exists achievement_claims (
   primary key (player_id, key)
 );
 
+-- ---------- app_meta (small key/value store) ----------
+-- Used to throttle the activity-driven results refresh to one feed call per minute.
+create table if not exists app_meta (
+  key        text primary key,
+  value      text,
+  updated_at timestamptz not null default now()
+);
+insert into app_meta (key, value)
+  values ('last_results_fetch', '1970-01-01T00:00:00.000Z')
+  on conflict (key) do nothing;
+
 -- Note: the app talks to the database only through server-side API routes using the
 -- service_role key, so Row Level Security is not required for V1. If you later expose
 -- the database directly to the browser, enable RLS and add policies.
