@@ -158,10 +158,12 @@ create table if not exists messages (
   id          uuid primary key default gen_random_uuid(),
   player_id   uuid not null references players(id) on delete cascade,
   body        text not null,                          -- already sanitized server-side (max 200 chars)
+  kind        text not null default 'user',           -- 'user' (typed) | 'join' (auto welcome)
   deleted     boolean not null default false,         -- soft delete (hidden by moderator or author)
   created_at  timestamptz not null default now()
 );
 create index if not exists messages_created_idx on messages (created_at desc);
+alter table messages add column if not exists kind text not null default 'user';
 
 -- ---------- app_meta (small key/value store) ----------
 -- Used to throttle the activity-driven results refresh to one feed call per minute.

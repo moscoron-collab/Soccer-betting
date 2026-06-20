@@ -153,6 +153,7 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "להיות נחמדים אחד לשני. בלי קישורים או מספרי טלפון.",
   },
   "chat.delete": { en: "Delete", he: "מחיקה" },
+  "chat.joined": { en: "👋 Everyone welcome {name}!", he: "👋 כולם, קבלו את {name}!" },
   "chat.errEmpty": { en: "Type a message first.", he: "הקלידו הודעה קודם." },
   "chat.errLong": { en: "Message too long (max 200).", he: "ההודעה ארוכה מדי (עד 200)." },
   "chat.errLinks": {

@@ -59,6 +59,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not create player. Try again." }, { status: 500 });
   }
 
+  // Announce the new player in the chat lobby (rendered as a friendly system
+  // greeting, translated client-side). Best-effort — never block signup on it.
+  await supabase.from("messages").insert({ player_id: data.id, body: data.username, kind: "join" });
+
   return NextResponse.json({
     token,
     player: { id: data.id, username: data.username, coins: data.coins },

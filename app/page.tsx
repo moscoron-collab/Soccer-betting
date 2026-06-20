@@ -64,6 +64,7 @@ type Player = {
   hide_picks?: boolean;
   boost_2x?: number;
   streak_shield?: number;
+  created_at?: string | null;
 };
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 type Match = {
@@ -941,7 +942,7 @@ function SettingsModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [avatar, setAvatar] = useState<string | null | undefined>(player.avatar);
   const [hidePicks, setHidePicks] = useState<boolean>(!!player.hide_picks);
   const [busy, setBusy] = useState(false);
@@ -1004,6 +1005,11 @@ function SettingsModal({
           <div>
             <p className="font-bold">{player.username}</p>
             <p className="text-xs text-blue-100/60">{t("settings.profilePic")}</p>
+            {player.created_at && (
+              <p className="text-xs text-blue-100/50">
+                {t("profile.memberSince", { date: joinedMonth(player.created_at, lang) })}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1452,6 +1458,7 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
 type ChatMessage = {
   id: string;
   body: string;
+  kind: string;
   created_at: string;
   player_id: string;
   username: string;
@@ -1548,6 +1555,14 @@ function ChatBox({ token, onOpenPlayer }: { token: string; onOpenPlayer?: (u: st
           <p className="py-10 text-center text-sm text-blue-100/60">{t("chat.empty")}</p>
         ) : (
           messages.map((m) => {
+            // Auto "join" announcements render as a centered system line.
+            if (m.kind === "join") {
+              return (
+                <p key={m.id} className="py-1 text-center text-xs font-semibold text-green-200/80">
+                  {t("chat.joined", { name: m.username })} 🌱
+                </p>
+              );
+            }
             const canDelete = !!viewer && (viewer.isAdmin || viewer.id === m.player_id);
             const mine = viewer?.id === m.player_id;
             return (

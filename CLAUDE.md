@@ -54,7 +54,8 @@ match results, win/lose coins, climb a leaderboard, play mini-games. **No real m
 - predictions: `boosted`
 - function: `consume_shield(p_player uuid)`
 - table: `app_meta` (throttles the activity-driven results refresh)
-- table: `messages` (global chat lobby; soft-deletable)
+- table: `messages` (global chat lobby; soft-deletable). Column `kind`
+  ('user' typed | 'join' auto welcome shown when a player signs up)
 
 ### Making yourself a chat moderator
 After running schema.sql, in the Supabase SQL editor run (use your in-app name,

@@ -11,6 +11,7 @@ const PAGE_SIZE = 60;
 type Row = {
   id: string;
   body: string;
+  kind: string;
   created_at: string;
   player_id: string;
   players: { username: string; avatar: string | null } | null;
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
   const { data } = await supabase
     .from("messages")
-    .select("id, body, created_at, player_id, players(username, avatar)")
+    .select("id, body, kind, created_at, player_id, players(username, avatar)")
     .eq("deleted", false)
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE);
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
   const messages = rows.map((m) => ({
     id: m.id,
     body: m.body,
+    kind: m.kind ?? "user",
     created_at: m.created_at,
     player_id: m.player_id,
     username: m.players?.username ?? "?",
