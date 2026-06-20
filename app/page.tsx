@@ -653,21 +653,21 @@ function Game({
       <Section title="🏆 Leaderboard">
         <div className="overflow-hidden rounded-xl bg-white/5">
           {leaderboard.map((row, i) => (
-            <div
+            <button
               key={row.username + i}
-              className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-blue-600/30" : ""}`}
+              onClick={() => setViewPlayer(row.username)}
+              title={`View ${row.username}'s log`}
+              className={`flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm hover:bg-white/5 ${row.username === player.username ? "bg-blue-600/30" : ""}`}
             >
-              <span className="flex items-center gap-2">
-                <span className="inline-block w-6 text-blue-100/60">{i + 1}.</span>
-                <button onClick={() => setViewPlayer(row.username)} title={`View ${row.username}'s log`}>
-                  <Avatar avatar={row.avatar} size={24} />
-                </button>
-                <button onClick={() => setViewPlayer(row.username)} className="hover:underline">
-                  {row.username}
-                </button>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="w-6 shrink-0 text-blue-100/60">{i + 1}.</span>
+                <Avatar avatar={row.avatar} size={24} />
+                <span className="truncate">{row.username}</span>
               </span>
-              <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
-            </div>
+              <span className="shrink-0 font-semibold text-yellow-300">
+                🪙 {(row.coins ?? 0).toLocaleString()}
+              </span>
+            </button>
           ))}
         </div>
       </Section>
