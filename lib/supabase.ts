@@ -19,7 +19,15 @@ function getClient(): SupabaseClient {
     );
   }
 
-  client = createClient(url, serviceKey, { auth: { persistSession: false } });
+  client = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+    // Force every query to bypass Next.js's fetch Data Cache, so reads (e.g. the
+    // leaderboard) are always live and never served from a stale snapshot.
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, cache: "no-store" }),
+    },
+  });
   return client;
 }
 
