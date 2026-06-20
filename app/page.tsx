@@ -1753,7 +1753,7 @@ function PenaltyShootout({
             <div
               ref={markRef}
               className="absolute top-0 h-full w-2 bg-yellow-400"
-              style={{ animation: done ? "none" : "pen-slide 0.4s linear infinite alternate" }}
+              style={{ animation: done ? "none" : "pen-slide 0.6s linear infinite alternate" }}
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-xs">
