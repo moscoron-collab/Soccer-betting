@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { BAILOUT_AMOUNT, BAILOUT_FLOOR } from "@/lib/payout";
+import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,15 +28,22 @@ export async function GET(req: Request) {
     (!player.last_bailout_at ||
       Date.now() - new Date(player.last_bailout_at).getTime() > 86400000);
 
-  const canSpin =
-    !player.last_spin_at ||
-    Date.now() - new Date(player.last_spin_at).getTime() > 86400000;
+  const used = spinsUsedToday(player.spin_day, player.spins_today);
+  const spinsLeft = Math.max(0, MAX_SPINS_PER_DAY - used);
+  const nextSpinFree = used === 0;
 
   const canPenalty =
     !player.last_penalty_at ||
     Date.now() - new Date(player.last_penalty_at).getTime() > 86400000;
 
-  return NextResponse.json({ player, predictions: predictions ?? [], canBailout, canSpin, canPenalty });
+  return NextResponse.json({
+    player,
+    predictions: predictions ?? [],
+    canBailout,
+    spinsLeft,
+    nextSpinFree,
+    canPenalty,
+  });
 }
 
 // POST /api/me/bailout-style top-up: if broke, top up to the floor once per day.

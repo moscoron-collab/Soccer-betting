@@ -17,6 +17,7 @@ export type WheelSlice = {
 export const WHEEL: WheelSlice[] = [
   { kind: "COINS", amount: 50, label: "50", emoji: "🪙", color: "#2563eb", weight: 5 },
   { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
+  { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#475569", weight: 3 },
   { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#3b82f6", weight: 5 },
   { kind: "SHIELD", amount: 1, label: "Shield", emoji: "🛡️", color: "#14b8a6", weight: 2 },
   { kind: "COINS", amount: 75, label: "75", emoji: "🪙", color: "#1d4ed8", weight: 4 },
@@ -25,8 +26,21 @@ export const WHEEL: WheelSlice[] = [
   { kind: "COINS", amount: 150, label: "150", emoji: "🪙", color: "#1e40af", weight: 3 },
 ];
 
-// Cost (in coins) of an extra spin once the free daily spin has been used.
-export const EXTRA_SPIN_COST = 75;
+// Cost (in coins) of a paid spin once the free daily spin has been used.
+export const EXTRA_SPIN_COST = 150;
+
+// Maximum spins allowed per day (1 free + the rest paid).
+export const MAX_SPINS_PER_DAY = 4;
+
+// Today's date (UTC) as YYYY-MM-DD, used to reset the daily spin counter.
+export function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// How many spins the player has already used today (0 if it's a new day).
+export function spinsUsedToday(spinDay: string | null, spinsToday: number): number {
+  return spinDay === todayUTC() ? spinsToday : 0;
+}
 
 // Picks a winning slice index, weighted by each slice's `weight`.
 export function pickSliceIndex(): number {
@@ -49,6 +63,8 @@ export function describePrize(slice: WheelSlice): string {
     case "JACKPOT":
       return `💰 JACKPOT! +🪙${slice.amount.toLocaleString()}`;
     default:
-      return `🪙 +${slice.amount.toLocaleString()} coins`;
+      return slice.amount === 0
+        ? "😬 No win this time — try another spin!"
+        : `🪙 +${slice.amount.toLocaleString()} coins`;
   }
 }

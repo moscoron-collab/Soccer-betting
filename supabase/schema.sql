@@ -14,9 +14,11 @@ create table if not exists players (
   last_spin_at    timestamptz,                       -- for the daily spin
   last_penalty_at timestamptz,                       -- for the daily penalty shootout
   avatar          text,                              -- emoji preset or uploaded image data URL
-  hide_picks      boolean not null default false,    -- hide others' picks until kickoff (personal)
+  hide_picks      boolean not null default false,    -- hide your own picks from others until kickoff
   boost_2x        integer not null default 0,        -- "2x payout" power-ups in inventory (from the wheel)
   streak_shield   integer not null default 0,        -- "streak shield" power-ups in inventory (from the wheel)
+  spin_day        date,                              -- the day the spin counter below applies to
+  spins_today     integer not null default 0,        -- spins used today (1 free, then paid up to the daily cap)
   created_at      timestamptz not null default now()
 );
 
@@ -25,6 +27,8 @@ alter table players add column if not exists avatar        text;
 alter table players add column if not exists hide_picks    boolean not null default false;
 alter table players add column if not exists boost_2x       integer not null default 0;
 alter table players add column if not exists streak_shield  integer not null default 0;
+alter table players add column if not exists spin_day        date;
+alter table players add column if not exists spins_today     integer not null default 0;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
-import { WHEEL, EXTRA_SPIN_COST, describePrize, type WheelSlice } from "@/lib/wheel";
+import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, describePrize, type WheelSlice } from "@/lib/wheel";
 
 // Preset avatars players can choose without uploading a photo.
 const AVATAR_PRESETS = ["⚽", "🥅", "🧤", "👟", "🏆", "🦁", "🐯", "🐉", "🦅", "🦊", "🔥", "⭐", "👑", "😎", "🤖", "👻"];
@@ -123,7 +123,8 @@ export default function Home() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [canBailout, setCanBailout] = useState(false);
-  const [canSpin, setCanSpin] = useState(false);
+  const [spinsLeft, setSpinsLeft] = useState(0);
+  const [nextSpinFree, setNextSpinFree] = useState(false);
   const [canPenalty, setCanPenalty] = useState(false);
   const firstLoad = useRef(true);
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
@@ -178,7 +179,8 @@ export default function Home() {
     setPlayer(data.player);
     setPredictions(preds);
     setCanBailout(!!data.canBailout);
-    setCanSpin(!!data.canSpin);
+    setSpinsLeft(data.spinsLeft ?? 0);
+    setNextSpinFree(!!data.nextSpinFree);
     setCanPenalty(!!data.canPenalty);
   }, []);
 
@@ -219,7 +221,8 @@ export default function Home() {
           player={player}
           predictions={predictions}
           canBailout={canBailout}
-          canSpin={canSpin}
+          spinsLeft={spinsLeft}
+          nextSpinFree={nextSpinFree}
           canPenalty={canPenalty}
           onRefresh={() => loadMe(token)}
           onSignOut={signOut}
@@ -446,7 +449,8 @@ function Game({
   player,
   predictions,
   canBailout,
-  canSpin,
+  spinsLeft,
+  nextSpinFree,
   canPenalty,
   onRefresh,
   onSignOut,
@@ -455,7 +459,8 @@ function Game({
   player: Player;
   predictions: Prediction[];
   canBailout: boolean;
-  canSpin: boolean;
+  spinsLeft: number;
+  nextSpinFree: boolean;
   canPenalty: boolean;
   onRefresh: () => void;
   onSignOut: () => void;
@@ -467,6 +472,7 @@ function Game({
   const [view, setView] = useState<"play" | "log">("play");
   const [showChanges, setShowChanges] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [viewPlayer, setViewPlayer] = useState<string | null>(null);
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
 
   useEffect(() => {
@@ -481,13 +487,13 @@ function Game({
   }
 
   const loadMatches = useCallback(async () => {
-    const res = await fetch("/api/matches");
+    const res = await fetch("/api/matches", { cache: "no-store" });
     const data = await res.json();
     setMatches(data.matches ?? []);
   }, []);
 
   const loadLeaderboard = useCallback(async () => {
-    const res = await fetch("/api/leaderboard");
+    const res = await fetch("/api/leaderboard", { cache: "no-store" });
     const data = await res.json();
     setLeaderboard(data.leaderboard ?? []);
   }, []);
@@ -496,6 +502,14 @@ function Game({
     loadMatches();
     loadLeaderboard();
   }, [loadMatches, loadLeaderboard]);
+
+  // Reload the player AND the leaderboard/matches together, so coin balances and
+  // profile pictures stay in sync everywhere after a spin, bet or settings change.
+  const refreshAll = useCallback(() => {
+    onRefresh();
+    loadLeaderboard();
+    loadMatches();
+  }, [onRefresh, loadLeaderboard, loadMatches]);
 
   async function share() {
     const url =
@@ -630,7 +644,7 @@ function Game({
       </div>
 
       {view === "log" && (
-        <MyLog predictions={predictions} player={player} token={token} onChange={onRefresh} />
+        <MyLog predictions={predictions} player={player} token={token} onChange={refreshAll} />
       )}
 
       {view === "play" && (
@@ -645,8 +659,12 @@ function Game({
             >
               <span className="flex items-center gap-2">
                 <span className="inline-block w-6 text-blue-100/60">{i + 1}.</span>
-                <Avatar avatar={row.avatar} size={24} />
-                {row.username}
+                <button onClick={() => setViewPlayer(row.username)} title={`View ${row.username}'s log`}>
+                  <Avatar avatar={row.avatar} size={24} />
+                </button>
+                <button onClick={() => setViewPlayer(row.username)} className="hover:underline">
+                  {row.username}
+                </button>
               </span>
               <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
             </div>
@@ -666,7 +684,7 @@ function Game({
                 bets={bets}
                 token={token}
                 coins={player.coins}
-                onChange={onRefresh}
+                onChange={refreshAll}
               />
             ))}
           </div>
@@ -675,7 +693,7 @@ function Game({
 
       {/* Daily challenges */}
       <Section title="🎯 Daily challenges">
-        <ChallengesSection token={token} onClaimed={onRefresh} />
+        <ChallengesSection token={token} onClaimed={refreshAll} />
       </Section>
 
       {/* Mini-games */}
@@ -683,13 +701,14 @@ function Game({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SpinWheel
             token={token}
-            canSpinFree={canSpin}
+            spinsLeft={spinsLeft}
+            nextSpinFree={nextSpinFree}
             coins={player.coins}
             boost={player.boost_2x ?? 0}
             shields={player.streak_shield ?? 0}
-            onDone={onRefresh}
+            onDone={refreshAll}
           />
-          <PenaltyShootout token={token} canPlay={canPenalty} onDone={onRefresh} />
+          <PenaltyShootout token={token} canPlay={canPenalty} onDone={refreshAll} />
         </div>
       </Section>
 
@@ -722,9 +741,9 @@ function Game({
                   coins={player.coins}
                   myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
-                  hidePicks={!!player.hide_picks}
                   boost={player.boost_2x ?? 0}
-                  onPlaced={onRefresh}
+                  onOpenPlayer={setViewPlayer}
+                  onPlaced={refreshAll}
                 />
               ))}
             </div>
@@ -764,8 +783,11 @@ function Game({
           player={player}
           token={token}
           onClose={() => setShowSettings(false)}
-          onSaved={onRefresh}
+          onSaved={refreshAll}
         />
+      )}
+      {viewPlayer && (
+        <PlayerLogModal username={viewPlayer} onClose={() => setViewPlayer(null)} />
       )}
     </main>
   );
@@ -891,9 +913,9 @@ function SettingsModal({
         {/* Privacy toggle */}
         <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
           <div>
-            <p className="text-sm font-semibold">Hide other players&apos; picks</p>
+            <p className="text-sm font-semibold">Hide my picks from others</p>
             <p className="text-xs text-blue-100/60">
-              When on, you won&apos;t see who picked what until a match kicks off.
+              When on, other players can&apos;t see your picks until a match kicks off.
             </p>
           </div>
           <button
@@ -946,6 +968,118 @@ function resizeImage(file: File, size: number): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/* --------------------------- Player log modal ----------------------------- */
+// Opens when you tap another player's avatar — shows their profile + bet log.
+
+function PlayerLogModal({ username, onClose }: { username: string; onClose: () => void }) {
+  const [data, setData] = useState<{
+    player: { username: string; avatar: string | null; coins: number; win_streak: number; hide_picks?: boolean };
+    predictions: Prediction[];
+    wins: number;
+    losses: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/player?username=${encodeURIComponent(username)}`, {
+          cache: "no-store",
+        });
+        const d = await res.json();
+        if (!live) return;
+        if (!res.ok) setError(d.error ?? "Could not load player.");
+        else setData(d);
+      } catch {
+        if (live) setError("Could not load player.");
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [username]);
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">Player log</h2>
+          <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
+            Close
+          </button>
+        </div>
+
+        {loading && <p className="mt-4 text-sm text-blue-100/70">Loading…</p>}
+        {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+
+        {data && (
+          <>
+            <div className="mt-4 flex items-center gap-3">
+              <Avatar avatar={data.player.avatar} size={48} />
+              <div>
+                <p className="text-lg font-bold">{data.player.username}</p>
+                <p className="text-xs text-blue-100/70">
+                  🪙 {data.player.coins.toLocaleString()} · ✅ {data.wins} W · ❌ {data.losses} L
+                  {data.player.win_streak > 0 && <> · 🔥 {data.player.win_streak}</>}
+                </p>
+              </div>
+            </div>
+
+            {data.player.hide_picks && (
+              <p className="mt-3 rounded-lg bg-white/5 p-2 text-xs text-blue-100/60">
+                🙈 This player hides their upcoming picks until kickoff.
+              </p>
+            )}
+
+            <div className="mt-4 space-y-2">
+              {data.predictions.length === 0 ? (
+                <p className="text-sm text-blue-100/70">No bets to show.</p>
+              ) : (
+                data.predictions.map((p) => {
+                  const m = p.matches;
+                  const color =
+                    p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-blue-100/70";
+                  return (
+                    <div key={p.id} className="rounded-lg bg-white/5 p-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">
+                          {m ? `${m.home_team} vs ${m.away_team}` : "Match"}
+                        </span>
+                        <span className={`font-bold ${color}`}>
+                          {p.status === "PENDING" ? "Pending" : p.status === "WON" ? `+🪙${p.payout}` : "Lost"}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-blue-100/70">
+                        {describeCall(
+                          p.type,
+                          p.pick,
+                          p.exact_home,
+                          p.exact_away,
+                          m?.home_team ?? "Home",
+                          m?.away_team ?? "Away"
+                        )}{" "}
+                        · 🪙{p.stake}
+                        {p.boosted && <span className="text-amber-300"> ⚡2×</span>}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ------------------------------ Changelog --------------------------------- */
@@ -1160,14 +1294,16 @@ const SPIN_MS = 4200;
 
 function SpinWheel({
   token,
-  canSpinFree,
+  spinsLeft,
+  nextSpinFree,
   coins,
   boost,
   shields,
   onDone,
 }: {
   token: string;
-  canSpinFree: boolean;
+  spinsLeft: number;
+  nextSpinFree: boolean;
   coins: number;
   boost: number;
   shields: number;
@@ -1182,8 +1318,8 @@ function SpinWheel({
     (w, i) => `${w.color} ${i * seg}deg ${(i + 1) * seg}deg`
   ).join(", ")})`;
 
-  const canPay = coins >= EXTRA_SPIN_COST;
-  const canSpin = !spinning && (canSpinFree || canPay);
+  const canPay = nextSpinFree || coins >= EXTRA_SPIN_COST;
+  const canSpin = !spinning && spinsLeft > 0 && canPay;
 
   async function doSpin() {
     if (!canSpin) return;
@@ -1218,7 +1354,8 @@ function SpinWheel({
     <div className="rounded-xl bg-white/5 p-4">
       <p className="font-bold">🎡 Spin the Wheel</p>
       <p className="mt-1 text-xs text-blue-100/70">
-        One free spin a day. Win coins, a jackpot, or power-ups!
+        First spin free daily, then 🪙{EXTRA_SPIN_COST} each (up to {MAX_SPINS_PER_DAY}/day). Win coins,
+        a jackpot, or power-ups!
       </p>
 
       {/* The wheel + pointer */}
@@ -1263,15 +1400,21 @@ function SpinWheel({
       >
         {spinning
           ? "Spinning…"
-          : canSpinFree
-            ? "Spin now 🎡 (free)"
-            : canPay
-              ? `Spin again 🎡 (🪙${EXTRA_SPIN_COST})`
-              : `Need 🪙${EXTRA_SPIN_COST} to spin`}
+          : spinsLeft <= 0
+            ? "No spins left today"
+            : nextSpinFree
+              ? "Spin now 🎡 (free)"
+              : coins >= EXTRA_SPIN_COST
+                ? `Spin again 🎡 (🪙${EXTRA_SPIN_COST})`
+                : `Need 🪙${EXTRA_SPIN_COST} to spin`}
       </button>
 
+      <p className="mt-2 text-center text-[11px] text-blue-100/60">
+        {spinsLeft > 0 ? `${spinsLeft} spin${spinsLeft > 1 ? "s" : ""} left today` : "Come back tomorrow"}
+      </p>
+
       {/* Power-up inventory */}
-      <div className="mt-3 flex justify-center gap-3 text-xs text-blue-100/80">
+      <div className="mt-2 flex justify-center gap-3 text-xs text-blue-100/80">
         <span title="2× payout power-ups">⚡ 2× boosts: <b>{boost}</b></span>
         <span title="Streak shields">🛡️ shields: <b>{shields}</b></span>
       </div>
@@ -1360,7 +1503,7 @@ function PenaltyShootout({
             <div
               ref={markRef}
               className="absolute top-0 h-full w-2 bg-yellow-400"
-              style={{ animation: done ? "none" : "pen-slide 0.85s linear infinite alternate" }}
+              style={{ animation: done ? "none" : "pen-slide 0.4s linear infinite alternate" }}
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-xs">
@@ -1831,8 +1974,8 @@ function MatchCard({
   coins,
   myBets,
   isMotd,
-  hidePicks,
   boost,
+  onOpenPlayer,
   onPlaced,
 }: {
   match: Match;
@@ -1840,8 +1983,8 @@ function MatchCard({
   coins: number;
   myBets: Prediction[];
   isMotd?: boolean;
-  hidePicks?: boolean;
   boost?: number;
+  onOpenPlayer?: (username: string) => void;
   onPlaced: () => void;
 }) {
   const kickoff = new Date(match.kickoff_at);
@@ -1947,7 +2090,7 @@ function MatchCard({
         </div>
       )}
 
-      <WhoWins match={match} hidePicks={hidePicks} />
+      <WhoWins match={match} onOpenPlayer={onOpenPlayer} />
     </div>
   );
 }
@@ -1955,24 +2098,18 @@ function MatchCard({
 /* ----------------------------- Who-wins split ----------------------------- */
 // Always-visible vote split (Winner bets) under a match that has bets.
 
-function WhoWins({ match, hidePicks }: { match: Match; hidePicks?: boolean }) {
+function WhoWins({
+  match,
+  onOpenPlayer,
+}: {
+  match: Match;
+  onOpenPlayer?: (username: string) => void;
+}) {
   const s = match.bet_stats;
   if (!s) return null;
   const total = s.home + s.draw + s.away;
   if (total === 0) return null;
   const pct = (n: number) => Math.round((n / total) * 100);
-
-  // Privacy: when the player has chosen to hide picks, keep everyone's bets
-  // secret until the match kicks off (then they're revealed).
-  const beforeKickoff = new Date(match.kickoff_at) > new Date();
-  if (hidePicks && beforeKickoff) {
-    return (
-      <div className="mt-3 border-t border-white/10 pt-2 text-xs text-blue-100/60">
-        🙈 Picks hidden until kickoff ({total} bet{total > 1 ? "s" : ""}) ·{" "}
-        <span className="text-blue-100/40">change in ⚙️ settings</span>
-      </div>
-    );
-  }
 
   function label(pick: string) {
     return pick === "HOME" ? match.home_team : pick === "AWAY" ? match.away_team : "Draw";
@@ -1994,10 +2131,15 @@ function WhoWins({ match, hidePicks }: { match: Match; hidePicks?: boolean }) {
       {s.voters.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-blue-100/60">
           {s.voters.map((v, i) => (
-            <span key={i} className="inline-flex items-center gap-1">
+            <button
+              key={i}
+              onClick={() => onOpenPlayer?.(v.username)}
+              className="inline-flex items-center gap-1 hover:underline"
+              title={`View ${v.username}'s log`}
+            >
               <Avatar avatar={v.avatar} size={16} />
               {v.username}: {label(v.pick)}
-            </span>
+            </button>
           ))}
         </div>
       )}

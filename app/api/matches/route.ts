@@ -35,10 +35,13 @@ export async function GET() {
   if (ids.length > 0) {
     const { data: bets } = await supabase
       .from("predictions")
-      .select("match_id, pick, players(username, avatar)")
+      .select("match_id, pick, players(username, avatar, hide_picks)")
       .eq("type", "WINNER")
       .in("match_id", ids);
     for (const b of bets ?? []) {
+      // These matches are all pre-kickoff; players who hide their picks are
+      // left out of the split and the named list until the game starts.
+      if ((b as any).players?.hide_picks) continue;
       const s =
         statsByMatch.get(b.match_id as number) ?? { home: 0, draw: 0, away: 0, voters: [] };
       if (b.pick === "HOME") s.home++;

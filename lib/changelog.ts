@@ -1,10 +1,21 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "2.2";
+export const VERSION = "2.3";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "2.3",
+    date: "2026-06-20",
+    changes: [
+      "👤 Tap any player's profile picture (leaderboard or picks list) to view their log",
+      "🙈 The privacy option now hides YOUR OWN picks from others until kickoff",
+      "🎡 Wheel update: spins now 🪙150 each, up to 4 per day (1 free + 3 paid), and a new 'no win' slice",
+      "🖼️ Fixed profile pictures not appearing on the leaderboard",
+      "⚽ Penalty Shootout is harder — the bar moves much faster",
+    ],
+  },
   {
     version: "2.2",
     date: "2026-06-20",
