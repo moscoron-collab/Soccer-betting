@@ -61,5 +61,8 @@ export async function GET() {
     bet_stats: statsByMatch.get(m.id) ?? { home: 0, draw: 0, away: 0, voters: [] },
   }));
 
-  return NextResponse.json({ matches: withStats });
+  return NextResponse.json(
+    { matches: withStats },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+  );
 }

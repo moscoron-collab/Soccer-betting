@@ -15,5 +15,8 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: "Could not load leaderboard" }, { status: 500 });
   }
-  return NextResponse.json({ leaderboard: data ?? [] });
+  return NextResponse.json(
+    { leaderboard: data ?? [] },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+  );
 }

@@ -487,13 +487,13 @@ function Game({
   }
 
   const loadMatches = useCallback(async () => {
-    const res = await fetch("/api/matches", { cache: "no-store" });
+    const res = await fetch(`/api/matches?_=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
     setMatches(data.matches ?? []);
   }, []);
 
   const loadLeaderboard = useCallback(async () => {
-    const res = await fetch("/api/leaderboard", { cache: "no-store" });
+    const res = await fetch(`/api/leaderboard?_=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
     setLeaderboard(data.leaderboard ?? []);
   }, []);
@@ -501,6 +501,12 @@ function Game({
   useEffect(() => {
     loadMatches();
     loadLeaderboard();
+    // Keep the leaderboard + matches fresh (other players' coins, avatars, picks).
+    const id = setInterval(() => {
+      loadMatches();
+      loadLeaderboard();
+    }, 60000);
+    return () => clearInterval(id);
   }, [loadMatches, loadLeaderboard]);
 
   // Reload the player AND the leaderboard/matches together, so coin balances and
