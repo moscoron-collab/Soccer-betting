@@ -71,6 +71,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You don't have enough coins." }, { status: 400 });
   }
 
+  // Optional "2x payout" power-up spent on this bet.
+  const wantsBoost = body?.boosted === true;
+  if (wantsBoost && player.boost_2x < 1) {
+    return NextResponse.json({ error: "You have no 2× power-ups left." }, { status: 400 });
+  }
+
   const open = await getOpenMatch(matchId);
   if ("error" in open) return NextResponse.json({ error: open.error }, { status: open.status });
 
@@ -100,6 +106,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not place prediction." }, { status: 500 });
   }
 
+  // Spend a 2× charge now (guarded so it can't go negative on a race).
+  let boostSpent = false;
+  if (wantsBoost) {
+    const { data: charged } = await supabase
+      .from("players")
+      .update({ boost_2x: player.boost_2x - 1 })
+      .eq("id", player.id)
+      .gte("boost_2x", 1)
+      .select("id")
+      .maybeSingle();
+    if (!charged) {
+      await supabase.from("players").update({ coins: player.coins }).eq("id", player.id);
+      return NextResponse.json({ error: "You have no 2× power-ups left." }, { status: 400 });
+    }
+    boostSpent = true;
+  }
+
   const bonusMult = await computeBonusMult(matchId, p.type, p.pick);
 
   const { data: created, error: insertErr } = await supabase
@@ -113,13 +136,18 @@ export async function POST(req: Request) {
       exact_away: p.exactAway,
       stake: p.stake,
       bonus_mult: bonusMult,
+      boosted: boostSpent,
       status: "PENDING",
     })
     .select("id")
     .single();
 
   if (insertErr || !created) {
+    // Roll back the stake (and the spent charge, if any).
     await supabase.from("players").update({ coins: player.coins }).eq("id", player.id);
+    if (boostSpent) {
+      await supabase.from("players").update({ boost_2x: player.boost_2x }).eq("id", player.id);
+    }
     return NextResponse.json({ error: "Could not place prediction." }, { status: 500 });
   }
 

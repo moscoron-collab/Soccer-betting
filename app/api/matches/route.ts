@@ -25,12 +25,17 @@ export async function GET() {
   // Winner-market bets across these matches, with usernames.
   const statsByMatch = new Map<
     number,
-    { home: number; draw: number; away: number; voters: { username: string; pick: string }[] }
+    {
+      home: number;
+      draw: number;
+      away: number;
+      voters: { username: string; avatar: string | null; pick: string }[];
+    }
   >();
   if (ids.length > 0) {
     const { data: bets } = await supabase
       .from("predictions")
-      .select("match_id, pick, players(username)")
+      .select("match_id, pick, players(username, avatar)")
       .eq("type", "WINNER")
       .in("match_id", ids);
     for (const b of bets ?? []) {
@@ -39,7 +44,11 @@ export async function GET() {
       if (b.pick === "HOME") s.home++;
       else if (b.pick === "DRAW") s.draw++;
       else if (b.pick === "AWAY") s.away++;
-      s.voters.push({ username: (b as any).players?.username ?? "Player", pick: b.pick as string });
+      s.voters.push({
+        username: (b as any).players?.username ?? "Player",
+        avatar: (b as any).players?.avatar ?? null,
+        pick: b.pick as string,
+      });
       statsByMatch.set(b.match_id as number, s);
     }
   }

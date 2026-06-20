@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const { data: predictions } = await supabase
     .from("predictions")
     .select(
-      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
+      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, boosted, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
     )
     .eq("player_id", player.id)
     .order("created_at", { ascending: false })
@@ -72,4 +72,57 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Try again." }, { status: 500 });
   }
   return NextResponse.json({ coins: data.coins });
+}
+
+// Uploaded avatars are stored inline in the database, so keep them small.
+const MAX_AVATAR_LEN = 400_000; // ~300 KB once base64-encoded
+
+// PATCH /api/me -> update profile/settings: { avatar?, hidePicks? }
+export async function PATCH(req: Request) {
+  const player = await getPlayerFromRequest(req);
+  if (!player) {
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const update: Record<string, string | boolean | null> = {};
+
+  if ("avatar" in body) {
+    const avatar = body.avatar;
+    if (avatar === null || avatar === "") {
+      update.avatar = null;
+    } else if (typeof avatar !== "string") {
+      return NextResponse.json({ error: "Invalid avatar." }, { status: 400 });
+    } else if (avatar.length > MAX_AVATAR_LEN) {
+      return NextResponse.json({ error: "That image is too large." }, { status: 400 });
+    } else if (
+      avatar.length > 16 &&
+      !avatar.startsWith("data:image/")
+    ) {
+      // Anything longer than a short emoji must be an image data URL.
+      return NextResponse.json({ error: "Invalid avatar." }, { status: 400 });
+    } else {
+      update.avatar = avatar;
+    }
+  }
+
+  if ("hidePicks" in body) {
+    update.hide_picks = body.hidePicks === true;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  const { error } = await supabase.from("players").update(update).eq("id", player.id);
+  if (error) {
+    return NextResponse.json({ error: "Could not save." }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }

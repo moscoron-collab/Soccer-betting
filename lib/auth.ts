@@ -9,6 +9,10 @@ export type Player = {
   last_bailout_at: string | null;
   last_spin_at: string | null;
   last_penalty_at: string | null;
+  avatar: string | null;
+  hide_picks: boolean;
+  boost_2x: number;
+  streak_shield: number;
   created_at: string;
 };
 
@@ -21,7 +25,7 @@ export async function getPlayerFromRequest(req: Request): Promise<Player | null>
   const { data, error } = await supabase
     .from("players")
     .select(
-      "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, created_at"
+      "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, avatar, hide_picks, boost_2x, streak_shield, created_at"
     )
     .eq("secret_token", token)
     .maybeSingle();

@@ -13,8 +13,18 @@ create table if not exists players (
   last_bailout_at timestamptz,                       -- for the "keep playing" top-up
   last_spin_at    timestamptz,                       -- for the daily spin
   last_penalty_at timestamptz,                       -- for the daily penalty shootout
+  avatar          text,                              -- emoji preset or uploaded image data URL
+  hide_picks      boolean not null default false,    -- hide others' picks until kickoff (personal)
+  boost_2x        integer not null default 0,        -- "2x payout" power-ups in inventory (from the wheel)
+  streak_shield   integer not null default 0,        -- "streak shield" power-ups in inventory (from the wheel)
   created_at      timestamptz not null default now()
 );
+
+-- Upgrade existing installs (these no-op if the columns already exist).
+alter table players add column if not exists avatar        text;
+alter table players add column if not exists hide_picks    boolean not null default false;
+alter table players add column if not exists boost_2x       integer not null default 0;
+alter table players add column if not exists streak_shield  integer not null default 0;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (
@@ -49,6 +59,7 @@ create table if not exists predictions (
   stake       integer not null,
   payout      integer not null default 0,
   bonus_mult  numeric not null default 1,            -- underdog + Match of the Day bonus, locked at bet time
+  boosted     boolean not null default false,        -- spent a "2x payout" power-up on this bet
   status      text not null default 'PENDING',       -- PENDING | WON | LOST
   created_at  timestamptz not null default now(),
   unique (player_id, match_id, type)                 -- one bet of each type per match per player
@@ -56,6 +67,9 @@ create table if not exists predictions (
 
 create index if not exists predictions_player_idx on predictions (player_id);
 create index if not exists predictions_match_idx on predictions (match_id);
+
+-- Upgrade existing installs.
+alter table predictions add column if not exists boosted boolean not null default false;
 
 -- ---------- crowd_guesses ("Beat the Crowd" mini-game) ----------
 create table if not exists crowd_guesses (
@@ -101,6 +115,16 @@ create or replace function increment_xp(p_player uuid, p_amount integer)
 returns void language sql as $$
   update players set xp = xp + p_amount where id = p_player;
 $$;
+
+-- Spend one "streak shield" power-up if the player has any. Returns true if a
+-- shield was consumed (so the caller can keep the win-streak alive on a loss).
+create or replace function consume_shield(p_player uuid)
+returns boolean language plpgsql as $$
+begin
+  update players set streak_shield = streak_shield - 1
+    where id = p_player and streak_shield > 0;
+  return found;
+end $$;
 
 -- Win/lose a bet: bumps or resets the streak and returns the new value.
 create or replace function bump_streak(p_player uuid, p_won boolean)

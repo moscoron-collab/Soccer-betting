@@ -1,10 +1,21 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "2.1";
+export const VERSION = "2.2";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "2.2",
+    date: "2026-06-20",
+    changes: [
+      "🖼️ Profile pictures — upload your own photo or pick an emoji avatar (shows on the leaderboard and next to picks)",
+      "🙈 Privacy option — hide other players' picks until kickoff (toggle in ⚙️ Profile & settings)",
+      "🎡 Spin the Wheel is now a real spinning wheel with power-ups: 2× payout boosts, streak shields and a jackpot",
+      "⚡ Spend a 2× boost on any bet to double your winnings; 🛡️ a streak shield saves your win-streak from one loss",
+      "Extra spins available any time for 🪙75",
+    ],
+  },
   {
     version: "2.1",
     date: "2026-06-19",

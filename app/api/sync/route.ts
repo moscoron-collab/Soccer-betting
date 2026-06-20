@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { fetchMatches } from "@/lib/footballData";
-import { computePayout, PredictionType } from "@/lib/payout";
+import { computePayout, PredictionType, BOOST_MULTIPLIER } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,12 +65,12 @@ async function runSync() {
 
     const { data: preds } = await supabase
       .from("predictions")
-      .select("id, player_id, type, pick, exact_home, exact_away, stake, bonus_mult")
+      .select("id, player_id, type, pick, exact_home, exact_away, stake, bonus_mult, boosted")
       .eq("match_id", match.id)
       .eq("status", "PENDING");
 
     for (const p of preds ?? []) {
-      const { won, payout } = computePayout(
+      const result = computePayout(
         p.type as PredictionType,
         p.pick ?? null,
         p.exact_home,
@@ -82,6 +82,9 @@ async function runSync() {
         halfAway,
         Number(p.bonus_mult ?? 1)
       );
+      const won = result.won;
+      // A spent "2x payout" power-up doubles a winning bet.
+      const payout = won && p.boosted ? result.payout * BOOST_MULTIPLIER : result.payout;
 
       await supabase
         .from("predictions")
@@ -93,15 +96,23 @@ async function runSync() {
         await supabase.rpc("increment_xp", { p_player: p.player_id, p_amount: 25 });
       }
 
-      // Update the player's win streak and pay streak-milestone bonuses.
-      const { data: newStreak } = await supabase.rpc("bump_streak", {
-        p_player: p.player_id,
-        p_won: won,
-      });
       if (won) {
+        // Update the player's win streak and pay streak-milestone bonuses.
+        const { data: newStreak } = await supabase.rpc("bump_streak", {
+          p_player: p.player_id,
+          p_won: true,
+        });
         const bonus = STREAK_BONUS[newStreak as number];
         if (bonus) {
           await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: bonus });
+        }
+      } else {
+        // On a loss, a "streak shield" power-up (if any) keeps the streak alive.
+        const { data: shielded } = await supabase.rpc("consume_shield", {
+          p_player: p.player_id,
+        });
+        if (!shielded) {
+          await supabase.rpc("bump_streak", { p_player: p.player_id, p_won: false });
         }
       }
       settledPredictions++;

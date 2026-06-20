@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { data, error } = await supabase
     .from("players")
-    .select("username, coins")
+    .select("username, coins, avatar")
     .order("coins", { ascending: false })
     .limit(50);
 

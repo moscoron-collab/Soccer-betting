@@ -14,6 +14,8 @@ export const BAILOUT_AMOUNT = 100;
 export const MOTD_BONUS = 0.5; // extra multiplier added for the Match of the Day
 export const MAX_BONUS = 3; // cap on the total bonus multiplier
 
+export const BOOST_MULTIPLIER = 2; // a "2x payout" power-up doubles a winning bet
+
 export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 export type WinnerPick = "HOME" | "DRAW" | "AWAY";
 

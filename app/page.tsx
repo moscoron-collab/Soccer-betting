@@ -3,10 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
+import { WHEEL, EXTRA_SPIN_COST, describePrize, type WheelSlice } from "@/lib/wheel";
+
+// Preset avatars players can choose without uploading a photo.
+const AVATAR_PRESETS = ["⚽", "🥅", "🧤", "👟", "🏆", "🦁", "🐯", "🐉", "🦅", "🦊", "🔥", "⭐", "👑", "😎", "🤖", "👻"];
 
 const TOKEN_KEY = "spg_token";
 
-type Player = { id: string; username: string; coins: number; xp: number; win_streak: number };
+type Player = {
+  id: string;
+  username: string;
+  coins: number;
+  xp: number;
+  win_streak: number;
+  avatar?: string | null;
+  hide_picks?: boolean;
+  boost_2x?: number;
+  streak_shield?: number;
+};
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 type Match = {
   id: number;
@@ -20,7 +34,7 @@ type Match = {
     home: number;
     draw: number;
     away: number;
-    voters: { username: string; pick: string }[];
+    voters: { username: string; avatar?: string | null; pick: string }[];
   };
 };
 type Prediction = {
@@ -32,6 +46,7 @@ type Prediction = {
   stake: number;
   payout: number;
   bonus_mult: number;
+  boosted?: boolean;
   status: "PENDING" | "WON" | "LOST";
   matches: {
     home_team: string;
@@ -74,16 +89,18 @@ const BET_PROMPTS: Record<BetType, string> = {
   TOTALS: "How many goals in total (both teams)?",
 };
 
-// Coins a pending bet would return if it wins (base × locked-in bonus).
+// Coins a pending bet would return if it wins (base × locked-in bonus × 2× boost).
 function potentialWin(p: Prediction): number {
-  return Math.round(p.stake * BASE_MULT[p.type] * (p.bonus_mult ?? 1));
+  return Math.round(p.stake * BASE_MULT[p.type] * (p.bonus_mult ?? 1) * (p.boosted ? 2 : 1));
 }
 
-// The effective multiplier shown to players (base × bonus), so stake × this = could-win.
+// The effective multiplier shown to players (base × bonus × boost), so stake × this = could-win.
 function effMult(p: Prediction): string {
-  const m = BASE_MULT[p.type] * (p.bonus_mult ?? 1);
+  const m = BASE_MULT[p.type] * (p.bonus_mult ?? 1) * (p.boosted ? 2 : 1);
   const s = Number.isInteger(m) ? `${m}` : m.toFixed(1);
-  return (p.bonus_mult ?? 1) > 1 ? `×${s} 🔥` : `×${s}`;
+  const flames = (p.bonus_mult ?? 1) > 1 ? " 🔥" : "";
+  const bolt = p.boosted ? " ⚡" : "";
+  return `×${s}${flames}${bolt}`;
 }
 
 // Level/tier from XP (100 XP per level, tiers match the original concept).
@@ -94,7 +111,7 @@ function levelInfo(xp: number) {
   return { level, tier, intoLevel: (xp || 0) % 100 };
 }
 
-type LeaderRow = { username: string; coins: number };
+type LeaderRow = { username: string; coins: number; avatar?: string | null };
 
 function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
@@ -449,6 +466,7 @@ function Game({
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
   const [showChanges, setShowChanges] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
 
   useEffect(() => {
@@ -539,24 +557,18 @@ function Game({
     setVisible(10);
   }
 
-  async function spin() {
-    const res = await fetch("/api/spin", { method: "POST", headers: authHeaders(token) });
-    const data = await res.json();
-    if (res.ok) {
-      celebrate(`🎰 Daily Spin: +🪙${data.reward}!`);
-      onRefresh();
-    } else {
-      toast(data.error ?? "Try again.");
-    }
-  }
-
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-blue-100/70">Playing as</p>
-          <h1 className="text-xl font-bold">{player.username}</h1>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowSettings(true)} title="Edit profile" className="shrink-0">
+            <Avatar avatar={player.avatar} size={44} />
+          </button>
+          <div>
+            <p className="text-sm text-blue-100/70">Playing as</p>
+            <h1 className="text-xl font-bold">{player.username}</h1>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-sm text-blue-100/70">Coins</p>
@@ -580,6 +592,9 @@ function Game({
       <div className="mt-3 flex flex-wrap gap-2">
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           🔗 Invite a friend
+        </button>
+        <button onClick={() => setShowSettings(true)} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
+          ⚙️ Profile &amp; settings
         </button>
         <button onClick={onSignOut} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm">
           Sign out
@@ -628,8 +643,9 @@ function Game({
               key={row.username + i}
               className={`flex items-center justify-between px-4 py-2 text-sm ${row.username === player.username ? "bg-blue-600/30" : ""}`}
             >
-              <span>
+              <span className="flex items-center gap-2">
                 <span className="inline-block w-6 text-blue-100/60">{i + 1}.</span>
+                <Avatar avatar={row.avatar} size={24} />
                 {row.username}
               </span>
               <span className="font-semibold text-yellow-300">🪙 {row.coins.toLocaleString()}</span>
@@ -665,17 +681,14 @@ function Game({
       {/* Mini-games */}
       <Section title="🎮 Mini-games">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-white/5 p-4">
-            <p className="font-bold">🎰 Daily Spin</p>
-            <p className="mt-1 text-xs text-blue-100/70">Spin once a day for free bonus coins.</p>
-            <button
-              onClick={spin}
-              disabled={!canSpin}
-              className="mt-3 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
-            >
-              {canSpin ? "Spin now 🎰" : "Come back tomorrow"}
-            </button>
-          </div>
+          <SpinWheel
+            token={token}
+            canSpinFree={canSpin}
+            coins={player.coins}
+            boost={player.boost_2x ?? 0}
+            shields={player.streak_shield ?? 0}
+            onDone={onRefresh}
+          />
           <PenaltyShootout token={token} canPlay={canPenalty} onDone={onRefresh} />
         </div>
       </Section>
@@ -709,6 +722,8 @@ function Game({
                   coins={player.coins}
                   myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
+                  hidePicks={!!player.hide_picks}
+                  boost={player.boost_2x ?? 0}
                   onPlaced={onRefresh}
                 />
               ))}
@@ -744,8 +759,193 @@ function Game({
       </p>
 
       {showChanges && <Changelog onClose={() => setShowChanges(false)} />}
+      {showSettings && (
+        <SettingsModal
+          player={player}
+          token={token}
+          onClose={() => setShowSettings(false)}
+          onSaved={onRefresh}
+        />
+      )}
     </main>
   );
+}
+
+/* ------------------------------ Settings ---------------------------------- */
+// Profile picture (preset emoji or uploaded photo) + the "hide others' picks
+// until kickoff" privacy toggle.
+
+function SettingsModal({
+  player,
+  token,
+  onClose,
+  onSaved,
+}: {
+  player: Player;
+  token: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [avatar, setAvatar] = useState<string | null | undefined>(player.avatar);
+  const [hidePicks, setHidePicks] = useState<boolean>(!!player.hide_picks);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Resize an uploaded image to a small square so it fits comfortably in the DB.
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    setError(null);
+    try {
+      const dataUrl = await resizeImage(file, 160);
+      setAvatar(dataUrl);
+    } catch {
+      setError("Could not read that image.");
+    }
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/me", {
+        method: "PATCH",
+        headers: authHeaders(token),
+        body: JSON.stringify({ avatar: avatar ?? null, hidePicks }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not save.");
+        return;
+      }
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-extrabold">⚙️ Profile &amp; settings</h2>
+          <button onClick={onClose} className="rounded-lg bg-white/10 px-2 py-1 text-sm">
+            ✕
+          </button>
+        </div>
+
+        {/* Current avatar preview */}
+        <div className="mt-4 flex items-center gap-3">
+          <Avatar avatar={avatar} size={56} />
+          <div>
+            <p className="font-bold">{player.username}</p>
+            <p className="text-xs text-blue-100/60">Profile picture</p>
+          </div>
+        </div>
+
+        {/* Upload your own */}
+        <div className="mt-4">
+          <label className="block">
+            <span className="text-sm font-semibold">Upload your own photo</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={onFile}
+              className="mt-1 block w-full text-xs text-blue-100/80 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+            />
+          </label>
+        </div>
+
+        {/* Or pick a preset */}
+        <div className="mt-4">
+          <p className="text-sm font-semibold">Or pick an emoji</p>
+          <div className="mt-2 grid grid-cols-8 gap-2">
+            {AVATAR_PRESETS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => setAvatar(emoji)}
+                className={`flex h-9 items-center justify-center rounded-lg text-lg ${avatar === emoji ? "bg-yellow-400" : "bg-white/10"}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+          {avatar != null && avatar !== "" && (
+            <button
+              onClick={() => setAvatar(null)}
+              className="mt-2 text-xs font-semibold text-blue-200 underline"
+            >
+              Remove picture
+            </button>
+          )}
+        </div>
+
+        {/* Privacy toggle */}
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-white/5 p-3">
+          <div>
+            <p className="text-sm font-semibold">Hide other players&apos; picks</p>
+            <p className="text-xs text-blue-100/60">
+              When on, you won&apos;t see who picked what until a match kicks off.
+            </p>
+          </div>
+          <button
+            onClick={() => setHidePicks((v) => !v)}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition ${hidePicks ? "bg-green-500" : "bg-white/20"}`}
+            aria-pressed={hidePicks}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all ${hidePicks ? "left-[22px]" : "left-0.5"}`}
+            />
+          </button>
+        </div>
+
+        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+
+        <button
+          onClick={save}
+          disabled={busy}
+          className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Reads an image File and returns a resized square JPEG data URL.
+function resizeImage(file: File, size: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("no canvas"));
+        // Center-crop to a square, then scale down.
+        const min = Math.min(img.width, img.height);
+        const sx = (img.width - min) / 2;
+        const sy = (img.height - min) / 2;
+        ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ------------------------------ Changelog --------------------------------- */
@@ -950,6 +1150,134 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
   );
 }
 
+
+/* ------------------------------ Spin Wheel -------------------------------- */
+// A real spinning prize wheel. The server picks the winning slice; the wheel
+// animates so the pointer lands on it. Prizes: coins, jackpot, and power-ups
+// (2× payout charges and streak shields). One free spin a day, then pay coins.
+
+const SPIN_MS = 4200;
+
+function SpinWheel({
+  token,
+  canSpinFree,
+  coins,
+  boost,
+  shields,
+  onDone,
+}: {
+  token: string;
+  canSpinFree: boolean;
+  coins: number;
+  boost: number;
+  shields: number;
+  onDone: () => void;
+}) {
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState<WheelSlice | null>(null);
+
+  const seg = 360 / WHEEL.length;
+  const gradient = `conic-gradient(${WHEEL.map(
+    (w, i) => `${w.color} ${i * seg}deg ${(i + 1) * seg}deg`
+  ).join(", ")})`;
+
+  const canPay = coins >= EXTRA_SPIN_COST;
+  const canSpin = !spinning && (canSpinFree || canPay);
+
+  async function doSpin() {
+    if (!canSpin) return;
+    setSpinning(true);
+    setResult(null);
+    const res = await fetch("/api/spin", { method: "POST", headers: authHeaders(token) });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.error ?? "Try again.");
+      setSpinning(false);
+      return;
+    }
+
+    const index = data.sliceIndex as number;
+    // Rotate forward (≥5 turns) so the middle of `index` ends under the top pointer.
+    const landing = (360 - (index * seg + seg / 2) + 360) % 360;
+    setRotation((cur) => {
+      const curMod = ((cur % 360) + 360) % 360;
+      return cur + 360 * 5 + ((landing - curMod + 360) % 360);
+    });
+
+    setTimeout(() => {
+      const slice = data.slice as WheelSlice;
+      setResult(slice);
+      celebrate(describePrize(slice));
+      setSpinning(false);
+      onDone();
+    }, SPIN_MS);
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-4">
+      <p className="font-bold">🎡 Spin the Wheel</p>
+      <p className="mt-1 text-xs text-blue-100/70">
+        One free spin a day. Win coins, a jackpot, or power-ups!
+      </p>
+
+      {/* The wheel + pointer */}
+      <div className="relative mx-auto mt-3 h-[200px] w-[200px]">
+        {/* pointer */}
+        <div className="absolute left-1/2 top-[-6px] z-10 -translate-x-1/2">
+          <div className="h-0 w-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-yellow-300 drop-shadow" />
+        </div>
+        <div
+          className="h-full w-full rounded-full border-4 border-white/30 shadow-inner"
+          style={{
+            background: gradient,
+            transform: `rotate(${rotation}deg)`,
+            transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.17,0.67,0.12,0.99)` : "none",
+          }}
+        >
+          {WHEEL.map((w, i) => (
+            <div
+              key={i}
+              className="pointer-events-none absolute inset-0"
+              style={{ transform: `rotate(${i * seg + seg / 2}deg)` }}
+            >
+              <div className="absolute left-1/2 top-[10px] -translate-x-1/2 text-center text-[10px] font-bold leading-tight text-white drop-shadow">
+                <div className="text-sm">{w.emoji}</div>
+                {w.label}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* hub */}
+        <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/40 bg-[#0f2143]" />
+      </div>
+
+      {result && !spinning && (
+        <p className="mt-3 text-center text-sm font-bold text-yellow-200">{describePrize(result)}</p>
+      )}
+
+      <button
+        onClick={doSpin}
+        disabled={!canSpin}
+        className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold disabled:opacity-40"
+      >
+        {spinning
+          ? "Spinning…"
+          : canSpinFree
+            ? "Spin now 🎡 (free)"
+            : canPay
+              ? `Spin again 🎡 (🪙${EXTRA_SPIN_COST})`
+              : `Need 🪙${EXTRA_SPIN_COST} to spin`}
+      </button>
+
+      {/* Power-up inventory */}
+      <div className="mt-3 flex justify-center gap-3 text-xs text-blue-100/80">
+        <span title="2× payout power-ups">⚡ 2× boosts: <b>{boost}</b></span>
+        <span title="Streak shields">🛡️ shields: <b>{shields}</b></span>
+      </div>
+    </div>
+  );
+}
 
 /* --------------------------- Penalty Shootout ----------------------------- */
 // Timing mini-game: tap Shoot when the ball lines up with the goal. Skill-based,
@@ -1161,6 +1489,33 @@ function Crest({ url }: { url: string | null }) {
   );
 }
 
+// A player's profile picture: an uploaded image (data URL), a preset emoji, or a
+// neutral fallback. `size` is the pixel dimension of the round badge.
+function Avatar({
+  avatar,
+  size = 28,
+}: {
+  avatar?: string | null;
+  size?: number;
+}) {
+  const isImage = !!avatar && avatar.startsWith("data:image/");
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 align-middle"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.62) }}
+    >
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatar as string} alt="" className="h-full w-full object-cover" />
+      ) : avatar ? (
+        <span>{avatar}</span>
+      ) : (
+        <span>🙂</span>
+      )}
+    </span>
+  );
+}
+
 function TeamLine({
   home,
   away,
@@ -1215,6 +1570,7 @@ function BetForm({
   home,
   away,
   coins,
+  boost = 0,
   initial,
   submitLabel,
   onSubmit,
@@ -1224,6 +1580,7 @@ function BetForm({
   home: string;
   away: string;
   coins: number; // max stake available
+  boost?: number; // available 2× power-ups (0 = no boost option shown)
   initial?: BetDraft;
   submitLabel: string;
   onSubmit: (body: any) => Promise<{ error?: string }>;
@@ -1233,6 +1590,7 @@ function BetForm({
   const [eh, setEh] = useState(initial?.exactHome != null ? String(initial.exactHome) : "");
   const [ea, setEa] = useState(initial?.exactAway != null ? String(initial.exactAway) : "");
   const [stake, setStake] = useState(initial?.stake ?? 100);
+  const [useBoost, setUseBoost] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1247,6 +1605,7 @@ function BetForm({
       } else {
         body.pick = pick;
       }
+      if (useBoost && boost > 0) body.boosted = true;
       const res = await onSubmit(body);
       if (res?.error) setError(res.error);
     } finally {
@@ -1343,9 +1702,25 @@ function BetForm({
         </button>
       </div>
 
+      {boost > 0 && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-lg bg-amber-400/10 px-3 py-2 text-xs">
+          <input
+            type="checkbox"
+            checked={useBoost}
+            onChange={(e) => setUseBoost(e.target.checked)}
+            className="h-4 w-4 accent-amber-400"
+          />
+          <span className="font-semibold text-amber-200">
+            ⚡ Use a 2× payout power-up <span className="text-amber-200/70">({boost} left)</span>
+          </span>
+        </label>
+      )}
+
       {stake > 0 && (
         <p className="mt-2 text-center text-sm font-semibold text-yellow-200">
-          → If correct, you win 🪙{(stake * BASE_MULT[type]).toLocaleString()}
+          → If correct, you win 🪙
+          {(stake * BASE_MULT[type] * (useBoost && boost > 0 ? 2 : 1)).toLocaleString()}
+          {useBoost && boost > 0 && <span className="text-amber-300"> ⚡2×</span>}
           <span className="block text-xs font-normal text-blue-100/60">
             (unpopular picks win even more)
           </span>
@@ -1456,6 +1831,8 @@ function MatchCard({
   coins,
   myBets,
   isMotd,
+  hidePicks,
+  boost,
   onPlaced,
 }: {
   match: Match;
@@ -1463,6 +1840,8 @@ function MatchCard({
   coins: number;
   myBets: Prediction[];
   isMotd?: boolean;
+  hidePicks?: boolean;
+  boost?: number;
   onPlaced: () => void;
 }) {
   const kickoff = new Date(match.kickoff_at);
@@ -1561,13 +1940,14 @@ function MatchCard({
             home={match.home_team}
             away={match.away_team}
             coins={coins}
+            boost={boost}
             submitLabel="Predict"
             onSubmit={place}
           />
         </div>
       )}
 
-      <WhoWins match={match} />
+      <WhoWins match={match} hidePicks={hidePicks} />
     </div>
   );
 }
@@ -1575,12 +1955,24 @@ function MatchCard({
 /* ----------------------------- Who-wins split ----------------------------- */
 // Always-visible vote split (Winner bets) under a match that has bets.
 
-function WhoWins({ match }: { match: Match }) {
+function WhoWins({ match, hidePicks }: { match: Match; hidePicks?: boolean }) {
   const s = match.bet_stats;
   if (!s) return null;
   const total = s.home + s.draw + s.away;
   if (total === 0) return null;
   const pct = (n: number) => Math.round((n / total) * 100);
+
+  // Privacy: when the player has chosen to hide picks, keep everyone's bets
+  // secret until the match kicks off (then they're revealed).
+  const beforeKickoff = new Date(match.kickoff_at) > new Date();
+  if (hidePicks && beforeKickoff) {
+    return (
+      <div className="mt-3 border-t border-white/10 pt-2 text-xs text-blue-100/60">
+        🙈 Picks hidden until kickoff ({total} bet{total > 1 ? "s" : ""}) ·{" "}
+        <span className="text-blue-100/40">change in ⚙️ settings</span>
+      </div>
+    );
+  }
 
   function label(pick: string) {
     return pick === "HOME" ? match.home_team : pick === "AWAY" ? match.away_team : "Draw";
@@ -1600,9 +1992,14 @@ function WhoWins({ match }: { match: Match }) {
         <span>🟦 {match.away_team} {pct(s.away)}%</span>
       </div>
       {s.voters.length > 0 && (
-        <p className="mt-1 text-blue-100/60">
-          {s.voters.map((v) => `${v.username}: ${label(v.pick)}`).join(" · ")}
-        </p>
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-blue-100/60">
+          {s.voters.map((v, i) => (
+            <span key={i} className="inline-flex items-center gap-1">
+              <Avatar avatar={v.avatar} size={16} />
+              {v.username}: {label(v.pick)}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
