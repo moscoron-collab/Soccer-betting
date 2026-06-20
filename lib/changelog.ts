@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.5";
+export const VERSION = "3.6";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.6",
+    date: "2026-06-20",
+    changes: [
+      "Extra wheel spins now cost 🪙100.",
+    ],
+  },
   {
     version: "3.5",
     date: "2026-06-20",

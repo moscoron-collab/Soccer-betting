@@ -27,7 +27,7 @@ export const WHEEL: WheelSlice[] = [
 ];
 
 // Cost (in coins) of a paid spin once the free daily spin has been used.
-export const EXTRA_SPIN_COST = 75;
+export const EXTRA_SPIN_COST = 100;
 
 // Maximum spins allowed per day (1 free + the rest paid).
 export const MAX_SPINS_PER_DAY = 4;
