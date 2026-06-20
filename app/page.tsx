@@ -5,6 +5,7 @@ import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, type WheelSlice } from "@/lib/wheel";
 import { LangProvider, useLang } from "@/lib/i18n";
+import { MAX_MESSAGE_LEN } from "@/lib/chat";
 
 // Translator type, so helpers can take `t` without importing React context.
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -735,6 +736,11 @@ function Game({
         </div>
       </Section>
 
+      {/* Chat */}
+      <Section title={t("chat.title")}>
+        <ChatBox token={token} onOpenPlayer={setViewPlayer} />
+      </Section>
+
       {/* My predictions (active bets only) */}
       <Section title={t("game.myPredictions")}>
         {pendingGroups.length === 0 ? (
@@ -1362,6 +1368,167 @@ function ChallengesSection({ token, onClaimed }: { token: string; onClaimed: () 
   );
 }
 
+
+/* --------------------------------- Chat ----------------------------------- */
+// One shared, moderated lobby. Polls every few seconds while open. Sending is
+// validated/filtered server-side; authors and moderators can delete messages.
+
+type ChatMessage = {
+  id: string;
+  body: string;
+  created_at: string;
+  player_id: string;
+  username: string;
+  avatar: string | null;
+};
+
+function ChatBox({ token, onOpenPlayer }: { token: string; onOpenPlayer?: (u: string) => void }) {
+  const { t } = useLang();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [viewer, setViewer] = useState<{ id: string; isAdmin: boolean } | null>(null);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/chat?_=${Date.now()}`, {
+      headers: authHeaders(token),
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    setMessages(data.messages ?? []);
+    setViewer(data.viewer ?? null);
+  }, [token]);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 4000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  // Keep the view pinned to the newest message unless the user scrolled up.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  }
+
+  async function send() {
+    const body = input.trim();
+    if (!body) {
+      toast(t("chat.errEmpty"));
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const code = data.code as string | undefined;
+        const key =
+          code === "TOO_LONG"
+            ? "chat.errLong"
+            : code === "NO_LINKS"
+              ? "chat.errLinks"
+              : code === "RATE"
+                ? "chat.errRate"
+                : code === "EMPTY"
+                  ? "chat.errEmpty"
+                  : "chat.errSend";
+        toast(t(key));
+        return;
+      }
+      setInput("");
+      atBottomRef.current = true;
+      load();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function remove(id: string) {
+    const res = await fetch("/api/chat", {
+      method: "DELETE",
+      headers: authHeaders(token),
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) load();
+  }
+
+  return (
+    <div className="rounded-xl bg-white/5 p-3">
+      <div ref={scrollRef} onScroll={onScroll} className="h-64 space-y-2 overflow-y-auto pr-1">
+        {messages.length === 0 ? (
+          <p className="py-10 text-center text-sm text-blue-100/60">{t("chat.empty")}</p>
+        ) : (
+          messages.map((m) => {
+            const canDelete = !!viewer && (viewer.isAdmin || viewer.id === m.player_id);
+            const mine = viewer?.id === m.player_id;
+            return (
+              <div key={m.id} className="group flex items-start gap-2 text-sm">
+                <button onClick={() => onOpenPlayer?.(m.username)} className="mt-0.5 shrink-0">
+                  <Avatar avatar={m.avatar} size={26} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <button
+                      onClick={() => onOpenPlayer?.(m.username)}
+                      className={`font-semibold hover:underline ${mine ? "text-yellow-200" : "text-blue-200"}`}
+                    >
+                      {m.username}
+                    </button>
+                    <span className="text-[10px] text-blue-100/40">
+                      {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {canDelete && (
+                      <button
+                        onClick={() => remove(m.id)}
+                        title={t("chat.delete")}
+                        className="ms-auto text-[11px] text-red-300/70 opacity-60 hover:text-red-300 group-hover:opacity-100"
+                      >
+                        🗑
+                      </button>
+                    )}
+                  </div>
+                  <p className="break-words text-blue-50/90">{m.body}</p>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !sending && send()}
+          maxLength={MAX_MESSAGE_LEN}
+          placeholder={t("chat.placeholder")}
+          className="min-w-0 flex-1 rounded-lg bg-white/95 px-3 py-2 text-sm text-gray-900 outline-none"
+        />
+        <button
+          onClick={send}
+          disabled={sending}
+          className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold disabled:opacity-50"
+        >
+          {t("chat.send")}
+        </button>
+      </div>
+      <p className="mt-1 text-center text-[10px] text-blue-100/40">{t("chat.rules")}</p>
+    </div>
+  );
+}
 
 /* ------------------------------ Spin Wheel -------------------------------- */
 // A real spinning prize wheel. The server picks the winning slice; the wheel

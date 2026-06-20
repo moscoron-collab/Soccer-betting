@@ -19,6 +19,7 @@ create table if not exists players (
   streak_shield   integer not null default 0,        -- "streak shield" power-ups in inventory (from the wheel)
   spin_day        date,                              -- the day the spin counter below applies to
   spins_today     integer not null default 0,        -- spins used today (1 free, then paid up to the daily cap)
+  is_admin        boolean not null default false,    -- can moderate (delete) any chat message
   created_at      timestamptz not null default now()
 );
 
@@ -29,6 +30,7 @@ alter table players add column if not exists boost_2x       integer not null def
 alter table players add column if not exists streak_shield  integer not null default 0;
 alter table players add column if not exists spin_day        date;
 alter table players add column if not exists spins_today     integer not null default 0;
+alter table players add column if not exists is_admin        boolean not null default false;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (
@@ -150,6 +152,16 @@ create table if not exists achievement_claims (
   created_at timestamptz not null default now(),
   primary key (player_id, key)
 );
+
+-- ---------- messages (global chat lobby) ----------
+create table if not exists messages (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  body        text not null,                          -- already sanitized server-side (max 200 chars)
+  deleted     boolean not null default false,         -- soft delete (hidden by moderator or author)
+  created_at  timestamptz not null default now()
+);
+create index if not exists messages_created_idx on messages (created_at desc);
 
 -- ---------- app_meta (small key/value store) ----------
 -- Used to throttle the activity-driven results refresh to one feed call per minute.

@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "2.9";
+export const VERSION = "3.0";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.0",
+    date: "2026-06-20",
+    changes: [
+      "💬 Chat! There's now a shared chat room on the Play tab — say hi, talk about the matches, cheer each other on. Tap a name or photo to see that player's log. To keep it safe for everyone: no links or phone numbers, bad words are filtered, and you can delete your own messages.",
+    ],
+  },
   {
     version: "2.9",
     date: "2026-06-20",

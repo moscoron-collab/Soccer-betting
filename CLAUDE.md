@@ -49,10 +49,18 @@ match results, win/lose coins, climb a leaderboard, play mini-games. **No real m
      `TRACKED_COMPETITIONS`, `SYNC_SECRET`, `NEXT_PUBLIC_SITE_URL`).
 
 ## Database columns added beyond the original V1 (run schema.sql to apply)
-- players: `avatar`, `hide_picks`, `boost_2x`, `streak_shield`, `spin_day`, `spins_today`
+- players: `avatar`, `hide_picks`, `boost_2x`, `streak_shield`, `spin_day`, `spins_today`,
+  `is_admin` (can moderate/delete any chat message)
 - predictions: `boosted`
 - function: `consume_shield(p_player uuid)`
 - table: `app_meta` (throttles the activity-driven results refresh)
+- table: `messages` (global chat lobby; soft-deletable)
+
+### Making yourself a chat moderator
+After running schema.sql, in the Supabase SQL editor run (use your in-app name,
+shown under "Playing as"):
+`update players set is_admin = true where username = 'YOUR_USERNAME';`
+Admins — and a message's own author — can delete chat messages.
 
 ## Settlement / payouts (how coins get paid)
 - `lib/settle.ts` holds the shared logic: `settleAll()` (settles finished games from
@@ -84,14 +92,33 @@ match results, win/lose coins, climb a leaderboard, play mini-games. **No real m
 - Penalty Shootout bar sped up (0.85s → 0.4s) in `app/page.tsx`.
 - Fixed avatars not showing on the leaderboard (no-store fetch + refresh after changes).
 
+### v2.8
+- Daily features (spin/penalty/top-up) reset at each player's **local midnight**.
+  Client sends its IANA timezone; server computes "today" via `lib/time.ts`.
+
+### v2.9 — Bilingual (English / Hebrew)
+- `lib/i18n.tsx`: single en/he dictionary + `translate()` + `LangProvider`/`useLang()`.
+  Auto-detects Hebrew browsers, persists choice, flips `<html dir>` to `rtl`.
+- Language toggle button on the auth screen and game header. All `app/page.tsx`
+  strings go through `t()`. Server-provided labels (challenges/achievements) are
+  translated client-side by their stable keys.
+
+### v3.0 — Chat (global lobby)
+- One shared, moderated chat room. `messages` table; `app/api/chat` (GET/POST/DELETE).
+- Kid-safety in `lib/chat.ts`: profanity mask, no links/phone numbers, length cap
+  (200), rate limit (6 msgs / 20s). Authors + admins (`players.is_admin`) can delete.
+- UI: `ChatBox` in `app/page.tsx` (Play tab), polls every 4s while open. Bilingual.
+
 ## Key files
-- `app/page.tsx` — entire UI (single file). Components: Game, SpinWheel, PenaltyShootout,
-  SettingsModal, PlayerLogModal, MatchCard, BetForm, WhoWins, Avatar.
-- `lib/wheel.ts` — wheel slices, prices, daily-spin helpers (single source of truth, shared
-  by API and UI).
+- `app/page.tsx` — entire UI (single file). Components: Game, ChatBox, SpinWheel,
+  PenaltyShootout, SettingsModal, PlayerLogModal, MatchCard, BetForm, WhoWins, Avatar.
+- `lib/i18n.tsx` — en/he dictionary + `useLang()`/`t()` (single source of truth for copy).
+- `lib/wheel.ts` — wheel slices, prices, daily-spin helpers (shared by API and UI).
+- `lib/chat.ts` — chat validation + kid-safe content filter (shared by API).
+- `lib/time.ts` — per-player local-day helpers (timezone-aware daily resets).
 - `lib/payout.ts` — scoring/multipliers. `lib/auth.ts` — player lookup by token.
 - `app/api/*` — server routes (me, players, login, matches, predictions, spin, sync,
-  leaderboard, player, penalty, challenges, achievements).
+  leaderboard, player, penalty, challenges, achievements, chat).
 
 ## Build / verify locally
 - `npm install`

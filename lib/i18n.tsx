@@ -115,6 +115,25 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "share.copied": { en: "Link copied! Send it to your friends.", he: "הקישור הועתק! שלחו אותו לחברים." },
 
+  // Chat
+  "chat.title": { en: "💬 Chat", he: "💬 צ'אט" },
+  "chat.placeholder": { en: "Write a message…", he: "כתבו הודעה…" },
+  "chat.send": { en: "Send", he: "שליחה" },
+  "chat.empty": { en: "No messages yet. Say hi! 👋", he: "אין עדיין הודעות. תגידו שלום! 👋" },
+  "chat.rules": {
+    en: "Be kind to each other. No links or phone numbers.",
+    he: "להיות נחמדים אחד לשני. בלי קישורים או מספרי טלפון.",
+  },
+  "chat.delete": { en: "Delete", he: "מחיקה" },
+  "chat.errEmpty": { en: "Type a message first.", he: "הקלידו הודעה קודם." },
+  "chat.errLong": { en: "Message too long (max 200).", he: "ההודעה ארוכה מדי (עד 200)." },
+  "chat.errLinks": {
+    en: "Links and phone numbers aren't allowed.",
+    he: "קישורים ומספרי טלפון אסורים.",
+  },
+  "chat.errRate": { en: "Slow down a moment 🙂", he: "רגע, לאט יותר 🙂" },
+  "chat.errSend": { en: "Couldn't send. Try again.", he: "השליחה נכשלה. נסו שוב." },
+
   // Settings modal
   "settings.profilePic": { en: "Profile picture", he: "תמונת פרופיל" },
   "settings.upload": { en: "Upload your own photo", he: "העלו תמונה משלכם" },
