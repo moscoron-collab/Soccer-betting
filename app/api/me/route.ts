@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   // can — guaranteeing live coin totals and avatars for everyone.
   const { data: leaderboard } = await supabase
     .from("players")
-    .select("username, coins, avatar")
+    .select("username, coins, avatar, created_at")
     .order("coins", { ascending: false })
     .limit(50);
 

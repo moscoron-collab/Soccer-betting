@@ -59,6 +59,34 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "חינם לחלוטין • מטבעות וירטואליים בלבד • בלי כסף אמיתי",
   },
 
+  // New-player welcome (shown once, right after signup)
+  "welcomeNew.title": { en: "Welcome, {name}! 🎉", he: "ברוכים הבאים, {name}! 🎉" },
+  "welcomeNew.subtitle": {
+    en: "You've joined the Soccer Prediction Game.",
+    he: "הצטרפתם למשחק חיזוי הכדורגל.",
+  },
+  "welcomeNew.coins": {
+    en: "You start with 🪙1,000 coins — here's how to play:",
+    he: "אתם מתחילים עם 🪙1,000 מטבעות — ככה משחקים:",
+  },
+  "welcomeNew.tip1": {
+    en: "🔮 Predict real matches to win coins.",
+    he: "🔮 נחשו תוצאות של משחקים אמיתיים כדי לזכות במטבעות.",
+  },
+  "welcomeNew.tip2": {
+    en: "🎡 Spin the wheel every day for prizes and power-ups.",
+    he: "🎡 סובבו את הגלגל כל יום לפרסים וכוחות-על.",
+  },
+  "welcomeNew.tip3": {
+    en: "🏆 Climb the leaderboard and beat your friends!",
+    he: "🏆 טפסו בטבלה ונצחו את החברים!",
+  },
+  "welcomeNew.start": { en: "Let's play! ⚽", he: "בואו נשחק! ⚽" },
+
+  // Join date / new-player badge
+  "profile.memberSince": { en: "Member since {date}", he: "חבר מאז {date}" },
+  "badge.new": { en: "New player", he: "שחקן חדש" },
+
   // Welcome-back recap
   "welcome.title": { en: "Welcome back!", he: "ברוכים השובים!" },
   "welcome.subtitle": {

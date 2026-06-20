@@ -141,10 +141,25 @@ function levelInfo(xp: number) {
   return { level, tierKey, intoLevel: (xp || 0) % 100 };
 }
 
-type LeaderRow = { username: string; coins: number; avatar?: string | null };
+type LeaderRow = { username: string; coins: number; avatar?: string | null; created_at?: string | null };
 
 function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
+}
+
+// A player counts as "new" (gets the 🌱 badge) for their first week.
+const NEW_PLAYER_DAYS = 7;
+function isNewPlayer(createdAt?: string | null): boolean {
+  if (!createdAt) return false;
+  return Date.now() - new Date(createdAt).getTime() < NEW_PLAYER_DAYS * 86_400_000;
+}
+
+// "June 2026" in the player's language, for "Member since …".
+function joinedMonth(createdAt: string, lang: string): string {
+  return new Date(createdAt).toLocaleDateString(lang === "he" ? "he-IL" : "en-US", {
+    year: "numeric",
+    month: "long",
+  });
 }
 
 // The player's local timezone, so daily features (spin/penalty/top-up) reset at
@@ -178,6 +193,7 @@ function Home() {
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const firstLoad = useRef(true);
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -242,6 +258,15 @@ function Home() {
     if (token) loadMe(token);
   }, [token, loadMe]);
 
+  // Show the one-time welcome once the new player's profile has loaded. The flag
+  // is set by the signup form (see AuthScreen).
+  useEffect(() => {
+    if (player && localStorage.getItem("spg_welcome") === "1") {
+      localStorage.removeItem("spg_welcome");
+      setShowWelcome(true);
+    }
+  }, [player]);
+
   // Poll every 60s so wins pop while you're watching.
   useEffect(() => {
     if (!token) return;
@@ -266,6 +291,9 @@ function Home() {
   return (
     <>
       <Toaster />
+      {showWelcome && player && (
+        <WelcomeNew name={player.username} onClose={() => setShowWelcome(false)} />
+      )}
       {recap && <WelcomeBack data={recap} onClose={() => setRecap(null)} />}
       {!token || !player ? (
         <AuthScreen onSignedIn={onSignedIn} />
@@ -284,6 +312,39 @@ function Home() {
         />
       )}
     </>
+  );
+}
+
+/* --------------------------- New-player welcome --------------------------- */
+// Shown once, right after signup: a warm greeting + a few how-to-play tips.
+
+function WelcomeNew({ name, onClose }: { name: string; onClose: () => void }) {
+  const { t } = useLang();
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[#0f2143] p-6 text-center shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-5xl">🎉</div>
+        <h2 className="mt-2 text-xl font-extrabold">{t("welcomeNew.title", { name })}</h2>
+        <p className="mt-1 text-sm text-blue-100/70">{t("welcomeNew.subtitle")}</p>
+        <p className="mt-3 text-sm font-semibold text-yellow-200">{t("welcomeNew.coins")}</p>
+
+        <div className="mt-3 space-y-2 text-start text-sm">
+          <p className="rounded-lg bg-white/5 p-2">{t("welcomeNew.tip1")}</p>
+          <p className="rounded-lg bg-white/5 p-2">{t("welcomeNew.tip2")}</p>
+          <p className="rounded-lg bg-white/5 p-2">{t("welcomeNew.tip3")}</p>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
+        >
+          {t("welcomeNew.start")}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -417,6 +478,8 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
         setError(data.error ?? t("auth.somethingWrong"));
         return;
       }
+      // Flag a fresh signup so Home shows the one-time welcome.
+      if (mode === "signup") localStorage.setItem("spg_welcome", "1");
       onSignedIn(data.token);
     } finally {
       setBusy(false);
@@ -727,6 +790,9 @@ function Game({
                 <span className="w-6 shrink-0 text-blue-100/60">{i + 1}.</span>
                 <Avatar avatar={row.avatar} size={24} />
                 <span className="truncate">{row.username}</span>
+                {isNewPlayer(row.created_at) && (
+                  <span title={t("badge.new")} className="shrink-0">🌱</span>
+                )}
               </span>
               <span className="shrink-0 font-semibold text-yellow-300">
                 🪙 {(row.coins ?? 0).toLocaleString()}
@@ -1040,9 +1106,9 @@ function resizeImage(file: File, size: number): Promise<string> {
 // Opens when you tap another player's avatar — shows their profile + bet log.
 
 function PlayerLogModal({ username, onClose }: { username: string; onClose: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [data, setData] = useState<{
-    player: { username: string; avatar: string | null; coins: number; win_streak: number; hide_picks?: boolean };
+    player: { username: string; avatar: string | null; coins: number; win_streak: number; hide_picks?: boolean; created_at?: string | null };
     predictions: Prediction[];
     wins: number;
     losses: number;
@@ -1093,7 +1159,12 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
             <div className="mt-4 flex items-center gap-3">
               <Avatar avatar={data.player.avatar} size={48} />
               <div>
-                <p className="text-lg font-bold">{data.player.username}</p>
+                <p className="flex items-center gap-1.5 text-lg font-bold">
+                  {data.player.username}
+                  {isNewPlayer(data.player.created_at) && (
+                    <span title={t("badge.new")}>🌱</span>
+                  )}
+                </p>
                 <p className="text-xs text-blue-100/70">
                   {t("playerLog.record", {
                     coins: data.player.coins.toLocaleString(),
@@ -1102,6 +1173,11 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
                   })}
                   {data.player.win_streak > 0 && <> · 🔥 {data.player.win_streak}</>}
                 </p>
+                {data.player.created_at && (
+                  <p className="text-xs text-blue-100/50">
+                    {t("profile.memberSince", { date: joinedMonth(data.player.created_at, lang) })}
+                  </p>
+                )}
               </div>
             </div>
 

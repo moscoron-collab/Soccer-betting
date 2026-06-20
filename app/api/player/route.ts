@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
   const { data: player } = await supabase
     .from("players")
-    .select("id, username, avatar, coins, xp, win_streak, hide_picks")
+    .select("id, username, avatar, coins, xp, win_streak, hide_picks, created_at")
     .ilike("username", escapeLike(username))
     .maybeSingle();
   if (!player) {
@@ -54,6 +54,7 @@ export async function GET(req: Request) {
       xp: player.xp,
       win_streak: player.win_streak,
       hide_picks: player.hide_picks,
+      created_at: player.created_at,
     },
     predictions,
     wins,
