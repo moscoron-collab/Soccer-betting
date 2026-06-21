@@ -83,6 +83,14 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "welcomeNew.start": { en: "Let's play! ⚽", he: "בואו נשחק! ⚽" },
 
+  // Warm-welcome coin gift
+  "gift.title": { en: "🎁 Warm welcome!", he: "🎁 ברוכים הבאים!" },
+  "gift.body": {
+    en: "Here's 🪙500 for joining and playing — have fun!",
+    he: "קבלו 🪙500 על ההצטרפות וההשתתפות — תיהנו!",
+  },
+  "gift.ok": { en: "Thanks! 🎉", he: "תודה! 🎉" },
+
   // Join date / new-player badge
   "profile.memberSince": { en: "Member since {date}", he: "חבר מאז {date}" },
   "badge.new": { en: "New player", he: "שחקן חדש" },

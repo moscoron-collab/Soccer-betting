@@ -165,6 +165,12 @@ create table if not exists messages (
 create index if not exists messages_created_idx on messages (created_at desc);
 alter table messages add column if not exists kind text not null default 'user';
 
+-- ---------- welcome_gifts (one-time "warm welcome" coin gift per player) ----------
+create table if not exists welcome_gifts (
+  player_id  uuid primary key references players(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- app_meta (small key/value store) ----------
 -- Used to throttle the activity-driven results refresh to one feed call per minute.
 create table if not exists app_meta (

@@ -220,6 +220,7 @@ function Home() {
   const firstLoad = useRef(true);
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showGift, setShowGift] = useState(false);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -254,6 +255,11 @@ function Home() {
       return;
     }
     if (!data || !data.player) return; // never blank out a logged-in player
+    if (data.welcomeGift) {
+      setShowGift(true);
+      confettiBurst();
+      playCheer();
+    }
     const preds: Prediction[] = data.predictions ?? [];
 
     // Results the player hasn't seen yet (settled while they were away or watching).
@@ -334,6 +340,7 @@ function Home() {
       {showWelcome && player && (
         <WelcomeNew name={player.username} onClose={() => setShowWelcome(false)} />
       )}
+      {showGift && <WelcomeGift onClose={() => setShowGift(false)} />}
       {recap && <WelcomeBack data={recap} onClose={() => setRecap(null)} />}
       {!token || !player ? (
         <AuthScreen onSignedIn={onSignedIn} />
@@ -382,6 +389,31 @@ function WelcomeNew({ name, onClose }: { name: string; onClose: () => void }) {
           className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
         >
           {t("welcomeNew.start")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------- Warm-welcome gift ---------------------------- */
+// One-time "+500 coins for participating" popup (server grants the coins).
+
+function WelcomeGift({ onClose }: { onClose: () => void }) {
+  const { t } = useLang();
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[#0f2143] p-6 text-center shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-5xl">🎁</div>
+        <h2 className="mt-2 text-xl font-extrabold">{t("gift.title")}</h2>
+        <p className="mt-2 text-sm text-blue-100/80">{t("gift.body")}</p>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
+        >
+          {t("gift.ok")}
         </button>
       </div>
     </div>

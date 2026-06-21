@@ -9,6 +9,41 @@ import { localDate, isNewLocalDay } from "@/lib/time";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// One-time "warm welcome" coin gift. It switches on once the Saudi Arabia–Spain
+// World Cup match is finished, with a safety fallback time so it can't get stuck
+// if that match can't be matched in our data.
+const WELCOME_GIFT_AMOUNT = 500;
+const WELCOME_GIFT_FALLBACK = Date.parse("2026-06-21T20:00:00Z"); // ~23:00 Israel
+
+async function welcomeGiftActive(): Promise<boolean> {
+  try {
+    const { data } = await supabase.from("matches").select("home_team, away_team, status").limit(300);
+    const m = (data ?? []).find((r) => {
+      const s = `${r.home_team} ${r.away_team}`.toLowerCase();
+      return s.includes("spain") && s.includes("saudi");
+    });
+    if (m && m.status === "FINISHED") return true;
+  } catch {
+    /* ignore — fall through to the time fallback */
+  }
+  return Date.now() >= WELCOME_GIFT_FALLBACK;
+}
+
+// Grants the gift once per player (the welcome_gifts PK prevents doubles).
+// Returns true only on the load where it was actually granted (to show a popup).
+async function grantWelcomeGift(player: { id: string; coins: number }): Promise<boolean> {
+  try {
+    if (!(await welcomeGiftActive())) return false;
+    const { error } = await supabase.from("welcome_gifts").insert({ player_id: player.id });
+    if (error) return false; // already gifted, or table not created yet
+    await supabase.rpc("increment_coins", { p_player: player.id, p_amount: WELCOME_GIFT_AMOUNT });
+    player.coins += WELCOME_GIFT_AMOUNT;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // GET /api/me?tz=America/New_York -> current player + their predictions.
 // `tz` is the player's timezone so daily features reset at their local midnight.
 export async function GET(req: Request) {
@@ -38,6 +73,9 @@ export async function GET(req: Request) {
   // If the re-read hits a blip, keep the copy we already have rather than failing.
   const reread = await lookupPlayerByToken(token);
   if (reread.player) player = reread.player;
+
+  // One-time warm-welcome gift (mutates player.coins so balances/popup are live).
+  const welcomeGift = await grantWelcomeGift(player);
 
   const { data: predictions } = await supabase
     .from("predictions")
@@ -75,6 +113,7 @@ export async function GET(req: Request) {
       nextSpinFree,
       canPenalty,
       leaderboard: leaderboard ?? [],
+      welcomeGift,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );
