@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.11";
+export const VERSION = "4.12";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.12",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "🔔 Reminders! Red dots on the Play/Log tabs (and on Challenges, Mini-games and Badges) now show when you have rewards or badges to claim, a free spin, a penalty shot, or a top-up waiting.",
+        he: "🔔 תזכורות! נקודות אדומות על לשוניות שחק/יומן (וגם על אתגרים, משחקונים ותגים) מראות עכשיו כשיש פרסים או תגים לאיסוף, סיבוב חינם, בעיטת עונשין או מילוי מטבעות שמחכים לכם.",
+      },
+    ],
+  },
   {
     version: "4.11",
     date: "2026-06-21",

@@ -743,6 +743,10 @@ function Game({
   const [showSettings, setShowSettings] = useState(false);
   const [viewPlayer, setViewPlayer] = useState<string | null>(null);
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
+  // How many claimable challenges / badges are waiting, for the reminder dots.
+  // Fetched here (not just inside the tab components) so the badge on the *other*
+  // tab still shows while it's unmounted.
+  const [claimCounts, setClaimCounts] = useState({ challenges: 0, badges: 0 });
 
   useEffect(() => {
     setSeenVersion(safeGet("spg_seen_version") ?? "");
@@ -772,12 +776,38 @@ function Game({
     return () => clearInterval(id);
   }, [loadMatches]);
 
+  // Count claimable challenges + badges so the reminder dots stay accurate even
+  // while their tab is closed. Recomputed whenever the player (stats) changes
+  // and after any claim (via refreshAll).
+  const loadClaimable = useCallback(async () => {
+    try {
+      const [cr, ar] = await Promise.all([
+        fetch("/api/challenges", { headers: authHeaders(token), cache: "no-store" }),
+        fetch("/api/achievements", { headers: authHeaders(token), cache: "no-store" }),
+      ]);
+      const challenges = cr.ok
+        ? ((await cr.json()).challenges ?? []).filter((c: any) => c.claimable).length
+        : 0;
+      const badges = ar.ok
+        ? ((await ar.json()).achievements ?? []).filter((a: any) => a.claimable).length
+        : 0;
+      setClaimCounts({ challenges, badges });
+    } catch {
+      /* network blip — keep the last known counts */
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadClaimable();
+  }, [loadClaimable, player]);
+
   // Reload the player (+leaderboard, which now rides along on /api/me) and the
   // matches together, so balances and pictures stay in sync after any action.
   const refreshAll = useCallback(() => {
     onRefresh();
     loadMatches();
-  }, [onRefresh, loadMatches]);
+    loadClaimable();
+  }, [onRefresh, loadMatches, loadClaimable]);
 
   // Manual ↻ Refresh button: awaits the reload and shows a "Refreshing…" state
   // so it's clearly doing something even when nothing changed.
@@ -859,6 +889,14 @@ function Game({
     setVisible(10);
   }
 
+  // Reminder dots: count everything the player can act on right now.
+  const freeSpinReady = nextSpinFree && spinsLeft > 0 ? 1 : 0;
+  const penaltyReady = canPenalty ? 1 : 0;
+  const bailoutReady = canBailout && player.coins <= LOW_COINS ? 1 : 0;
+  const miniGamesReady = freeSpinReady + penaltyReady;
+  const playBadge = claimCounts.challenges + miniGamesReady + bailoutReady;
+  const logBadge = claimCounts.badges;
+
   return (
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-6">
       {/* Always-visible coin balance while scrolling */}
@@ -917,17 +955,25 @@ function Game({
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "play" ? "bg-blue-600 text-white" : "text-blue-100"}`}
         >
           {t("game.tabPlay")}
+          <NotifDot count={playBadge} />
         </button>
         <button
           onClick={() => setView("log")}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "log" ? "bg-blue-600 text-white" : "text-blue-100"}`}
         >
           {t("game.tabLog")}
+          <NotifDot count={logBadge} />
         </button>
       </div>
 
       {view === "log" && (
-        <MyLog predictions={predictions} player={player} token={token} onChange={refreshAll} />
+        <MyLog
+          predictions={predictions}
+          player={player}
+          token={token}
+          onChange={refreshAll}
+          badgeCount={logBadge}
+        />
       )}
 
       {view === "play" && (
@@ -992,12 +1038,12 @@ function Game({
       </Section>
 
       {/* Daily challenges */}
-      <Section id="challenges" title={t("game.dailyChallenges")}>
+      <Section id="challenges" title={t("game.dailyChallenges")} badge={claimCounts.challenges}>
         <ChallengesSection token={token} onClaimed={refreshAll} />
       </Section>
 
       {/* Mini-games */}
-      <Section id="minigames" title={t("game.miniGames")}>
+      <Section id="minigames" title={t("game.miniGames")} badge={miniGamesReady}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SpinWheel
             token={token}
@@ -1480,11 +1526,13 @@ function MyLog({
   player,
   token,
   onChange,
+  badgeCount = 0,
 }: {
   predictions: Prediction[];
   player: Player;
   token: string;
   onChange: () => void;
+  badgeCount?: number;
 }) {
   const { t } = useLang();
   const settled = predictions.filter((p) => p.status !== "PENDING");
@@ -1533,7 +1581,10 @@ function MyLog({
       </div>
 
       {/* Achievements (claim coin rewards) */}
-      <h2 className="mb-2 mt-6 text-lg font-bold">{t("mylog.badges")}</h2>
+      <h2 className="mb-2 mt-6 flex items-center text-lg font-bold">
+        {t("mylog.badges")}
+        <NotifDot count={badgeCount} />
+      </h2>
       <Achievements token={token} onClaimed={onChange} />
 
       <h2 className="mb-2 mt-6 text-lg font-bold">{t("mylog.history")}</h2>
@@ -2217,16 +2268,35 @@ function Section({
   title,
   children,
   id,
+  badge,
 }: {
   title: string;
   children: React.ReactNode;
   id?: string;
+  badge?: number;
 }) {
   return (
     <section id={id} className="mt-7 scroll-mt-4">
-      <h2 className="mb-2 text-lg font-bold">{title}</h2>
+      <h2 className="mb-2 flex items-center text-lg font-bold">
+        {title}
+        <NotifDot count={badge ?? 0} />
+      </h2>
       <div className="space-y-3">{children}</div>
     </section>
+  );
+}
+
+// A small red "you have N things waiting" pill. Renders nothing when count is 0,
+// so callers can pass a count unconditionally.
+function NotifDot({ count }: { count: number }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span
+      aria-label={`${count} available`}
+      className="mx-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white"
+    >
+      {count}
+    </span>
   );
 }
 
