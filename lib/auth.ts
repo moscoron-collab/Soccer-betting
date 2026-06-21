@@ -19,22 +19,37 @@ export type Player = {
   created_at: string;
 };
 
+const PLAYER_COLUMNS =
+  "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, avatar, hide_picks, boost_2x, streak_shield, spin_day, spins_today, is_admin, created_at";
+
+// Looks up a player by session token, distinguishing a genuine "no such token"
+// (player: null, failed: false) from a transient database error (failed: true).
+// Retries once on error so a brief Supabase blip under load doesn't look like a
+// bad token (which would otherwise log the player out).
+export async function lookupPlayerByToken(
+  token: string
+): Promise<{ player: Player | null; failed: boolean }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await supabase
+      .from("players")
+      .select(PLAYER_COLUMNS)
+      .eq("secret_token", token)
+      .maybeSingle();
+    if (!error) return { player: (data as Player) ?? null, failed: false };
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 150));
+  }
+  return { player: null, failed: true };
+}
+
 // Reads the player's secret token from the request header and returns the player.
-// Returns null if the header is missing or the token doesn't match anyone.
+// Returns null if the header is missing or the token doesn't match anyone (or on
+// a database error — callers that must tell those apart should use
+// lookupPlayerByToken directly).
 export async function getPlayerFromRequest(req: Request): Promise<Player | null> {
   const token = req.headers.get("x-player-token");
   if (!token) return null;
-
-  const { data, error } = await supabase
-    .from("players")
-    .select(
-      "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, avatar, hide_picks, boost_2x, streak_shield, spin_day, spins_today, is_admin, created_at"
-    )
-    .eq("secret_token", token)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as Player;
+  const { player } = await lookupPlayerByToken(token);
+  return player;
 }
 
 // Escapes LIKE wildcards so an exact (case-insensitive) username match via ilike

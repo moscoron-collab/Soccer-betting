@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { getPlayerFromRequest } from "@/lib/auth";
+import { getPlayerFromRequest, lookupPlayerByToken } from "@/lib/auth";
 import { BAILOUT_AMOUNT, BAILOUT_FLOOR } from "@/lib/payout";
 import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
 import { quickRefresh } from "@/lib/settle";
@@ -12,10 +12,21 @@ export const dynamic = "force-dynamic";
 // GET /api/me?tz=America/New_York -> current player + their predictions.
 // `tz` is the player's timezone so daily features reset at their local midnight.
 export async function GET(req: Request) {
-  let player = await getPlayerFromRequest(req);
-  if (!player) {
+  const token = req.headers.get("x-player-token");
+  if (!token) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+
+  // Tell a genuinely bad token (401 -> sign out) apart from a transient database
+  // problem (503 -> the client retries on its next poll WITHOUT logging out).
+  const first = await lookupPlayerByToken(token);
+  if (first.failed) {
+    return NextResponse.json({ error: "Temporary problem, try again." }, { status: 503 });
+  }
+  if (!first.player) {
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  let player = first.player;
 
   const tz = new URL(req.url).searchParams.get("tz");
   const today = localDate(tz);
@@ -24,7 +35,9 @@ export async function GET(req: Request) {
   // one feed call per minute), so winnings appear within ~a minute. Best-effort.
   await quickRefresh();
   // Re-read the player so the balance/streak reflect any just-settled bets.
-  player = (await getPlayerFromRequest(req)) ?? player;
+  // If the re-read hits a blip, keep the copy we already have rather than failing.
+  const reread = await lookupPlayerByToken(token);
+  if (reread.player) player = reread.player;
 
   const { data: predictions } = await supabase
     .from("predictions")

@@ -54,6 +54,30 @@ const AVATAR_PRESETS = ["⚽", "🥅", "🧤", "👟", "🏆", "🦁", "🐯", "
 
 const TOKEN_KEY = "spg_token";
 
+// localStorage can throw (Safari Private Mode, storage disabled) — never let that
+// crash the app or, worse, look like a sign-out.
+function safeGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+function safeRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 type Player = {
   id: string;
   username: string;
@@ -199,28 +223,42 @@ function Home() {
 
   // Load token from storage on first render.
   useEffect(() => {
-    const t = localStorage.getItem(TOKEN_KEY);
-    setToken(t);
+    setToken(safeGet(TOKEN_KEY));
     setReady(true);
   }, []);
 
   const loadMe = useCallback(async (tok: string) => {
-    const res = await fetch(`/api/me?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
-      headers: authHeaders(tok),
-      cache: "no-store",
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/me?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
+        headers: authHeaders(tok),
+        cache: "no-store",
+      });
+    } catch {
+      // Network blip (flaky mobile/Wi-Fi) — keep the session, retry next poll.
+      return;
+    }
+    // Only a genuine 401 (unknown token) signs out. A 5xx/503 is a temporary
+    // server/database hiccup: keep the player logged in and try again later.
     if (res.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+      safeRemove(TOKEN_KEY);
       setToken(null);
       setPlayer(null);
       return;
     }
-    const data = await res.json();
+    if (!res.ok) return;
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      return;
+    }
+    if (!data || !data.player) return; // never blank out a logged-in player
     const preds: Prediction[] = data.predictions ?? [];
 
     // Results the player hasn't seen yet (settled while they were away or watching).
     const settled = preds.filter((p) => p.status !== "PENDING");
-    const raw = localStorage.getItem("spg_seen_settled");
+    const raw = safeGet("spg_seen_settled");
     const seen = new Set<string>(raw ? JSON.parse(raw) : []);
     const fresh = settled.filter((p) => !seen.has(p.id));
 
@@ -244,7 +282,7 @@ function Home() {
         celebrate(t("welcome.liveWin", { g: gained.toLocaleString() }));
       }
     }
-    localStorage.setItem("spg_seen_settled", JSON.stringify(settled.map((p) => p.id)));
+    safeSet("spg_seen_settled", JSON.stringify(settled.map((p) => p.id)));
     firstLoad.current = false;
 
     setPlayer(data.player);
@@ -263,8 +301,8 @@ function Home() {
   // Show the one-time welcome once the new player's profile has loaded. The flag
   // is set by the signup form (see AuthScreen).
   useEffect(() => {
-    if (player && localStorage.getItem("spg_welcome") === "1") {
-      localStorage.removeItem("spg_welcome");
+    if (player && safeGet("spg_welcome") === "1") {
+      safeRemove("spg_welcome");
       setShowWelcome(true);
     }
   }, [player]);
@@ -277,12 +315,12 @@ function Home() {
   }, [token, loadMe]);
 
   function onSignedIn(tok: string) {
-    localStorage.setItem(TOKEN_KEY, tok);
+    safeSet(TOKEN_KEY, tok);
     setToken(tok);
   }
 
   function signOut() {
-    localStorage.removeItem(TOKEN_KEY);
+    safeRemove(TOKEN_KEY);
     setToken(null);
     setPlayer(null);
     setPredictions([]);
@@ -493,7 +531,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
         return;
       }
       // Flag a fresh signup so Home shows the one-time welcome.
-      if (mode === "signup") localStorage.setItem("spg_welcome", "1");
+      if (mode === "signup") safeSet("spg_welcome", "1");
       onSignedIn(data.token);
     } finally {
       setBusy(false);
@@ -609,13 +647,13 @@ function Game({
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
 
   useEffect(() => {
-    setSeenVersion(localStorage.getItem("spg_seen_version") ?? "");
+    setSeenVersion(safeGet("spg_seen_version") ?? "");
   }, []);
   const hasUpdate = seenVersion !== VERSION;
 
   function openChanges() {
     setShowChanges(true);
-    localStorage.setItem("spg_seen_version", VERSION);
+    safeSet("spg_seen_version", VERSION);
     setSeenVersion(VERSION);
   }
 

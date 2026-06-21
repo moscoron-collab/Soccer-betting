@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   if (username.length < 2 || username.length > 20) {
     return NextResponse.json({ error: "Username must be 2–20 characters." }, { status: 400 });
   }
-  if (!/^[a-zA-Z0-9_ -]+$/.test(username)) {
+  // Allow letters from any language (incl. Hebrew), numbers, spaces, _ and -.
+  if (!/^[\p{L}\p{N} _-]+$/u.test(username)) {
     return NextResponse.json({ error: "Use only letters, numbers, spaces, _ or -." }, { status: 400 });
   }
   if (password.length < 4 || password.length > 50) {
