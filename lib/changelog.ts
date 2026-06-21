@@ -2,12 +2,34 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.7";
+export const VERSION = "4.8";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.8",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "🔥 Daily login bonus: coins just for opening the app, growing each day in a row (50 up to 200).",
+        he: "🔥 בונוס כניסה יומי: מטבעות רק על פתיחת האפליקציה, שגדל בכל יום ברצף (מ-50 ועד 200).",
+      },
+      {
+        en: "💸 Daily loss cashback: get 15% of a losing day's net losses back automatically (up to 1,000).",
+        he: "💸 החזר יומי על הפסדים: מקבלים אוטומטית 15% מההפסדים של יום מפסיד (עד 1,000).",
+      },
+      {
+        en: "🪙 Bigger safety net: low on coins? Top up to 500 once a day. Plus a new 'how to get more coins' panel that shows you every way to earn when you're running low.",
+        he: "🪙 רשת ביטחון גדולה יותר: נגמרו המטבעות? מלאו ל-500 פעם ביום. ובנוסף פאנל חדש 'איך משיגים עוד מטבעות' שמציג את כל הדרכים להרוויח כשנגמר לכם.",
+      },
+      {
+        en: "Every reward shows a clear message so you always know what you got and why.",
+        he: "כל פרס מוצג עם הודעה ברורה כדי שתמיד תדעו מה קיבלתם ולמה.",
+      },
+    ],
+  },
   {
     version: "4.7",
     date: "2026-06-21",

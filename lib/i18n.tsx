@@ -123,6 +123,37 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "נגמרים לכם המטבעות! קבלו תוספת יומית חינם.",
   },
   "game.getCoins": { en: "Get 100 coins", he: "קבלו 100 מטבעות" },
+
+  // Daily rewards popup (login bonus + loss cashback)
+  "rewards.title": { en: "🎁 Daily rewards", he: "🎁 פרסים יומיים" },
+  "rewards.login": {
+    en: "Daily login — Day {n}: +🪙{amount}",
+    he: "כניסה יומית — יום {n}: +🪙{amount}",
+  },
+  "rewards.cashback": {
+    en: "Loss cashback (15% of yesterday): +🪙{amount}",
+    he: "החזר על הפסדים (15% מאתמול): +🪙{amount}",
+  },
+  "rewards.ok": { en: "Nice! 🎉", he: "מעולה! 🎉" },
+  "topup.done": { en: "Topped up! +🪙{amount}", he: "מילאנו! +🪙{amount}" },
+
+  // Low-on-coins helper panel
+  "lowcoins.title": {
+    en: "Low on coins? Here's how to get more 👇",
+    he: "נגמרים המטבעות? ככה משיגים עוד 👇",
+  },
+  "lowcoins.topup": { en: "🪙 Daily top-up to 500", he: "🪙 מילוי יומי ל-500" },
+  "lowcoins.spin": { en: "🎡 Spin the wheel", he: "🎡 סובבו את הגלגל" },
+  "lowcoins.penalty": { en: "⚽ Penalty Shootout (up to 🪙150)", he: "⚽ דו-קרב פנדלים (עד 🪙150)" },
+  "lowcoins.challenges": { en: "🎯 Daily challenges", he: "🎯 אתגרים יומיים" },
+  "lowcoins.loginHint": {
+    en: "🔥 Open the app every day for a growing login bonus",
+    he: "🔥 היכנסו כל יום לבונוס כניסה שהולך וגדל",
+  },
+  "lowcoins.cashbackHint": {
+    en: "💸 You automatically get 15% of your daily losses back",
+    he: "💸 אתם מקבלים אוטומטית 15% מההפסדים היומיים בחזרה",
+  },
   "game.tabPlay": { en: "🎮 Play", he: "🎮 משחק" },
   "game.tabLog": { en: "📊 My Log", he: "📊 היומן שלי" },
   "game.leaderboard": { en: "🏆 Leaderboard", he: "🏆 טבלת מובילים" },

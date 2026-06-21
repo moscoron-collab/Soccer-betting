@@ -8,8 +8,19 @@ export const BTTS_MULTIPLIER = 2; // correct "both teams to score" returns 2x
 export const TOTALS_MULTIPLIER = 3; // correct total-goals band returns 3x
 
 export const STARTING_COINS = 1000;
-export const BAILOUT_FLOOR = 100; // if you drop below this you can top up once a day
-export const BAILOUT_AMOUNT = 100;
+// Low-balance help: if you're below the floor you can top up to it once a day.
+export const BAILOUT_FLOOR = 500;
+export const BAILOUT_AMOUNT = 500;
+
+// Daily loss cashback: a slice of your net losses refunded once a day, capped.
+export const CASHBACK_PCT = 0.15;
+export const CASHBACK_CAP = 1000;
+
+// Daily login bonus by consecutive-day streak (index 1..7+, capped at day 7).
+export const LOGIN_BONUS = [0, 50, 75, 100, 125, 150, 175, 200] as const;
+export function loginBonusFor(streakDay: number): number {
+  return LOGIN_BONUS[Math.min(Math.max(streakDay, 1), 7)];
+}
 
 export const MOTD_BONUS = 0.5; // extra multiplier added for the Match of the Day
 export const MAX_BONUS = 3; // cap on the total bonus multiplier

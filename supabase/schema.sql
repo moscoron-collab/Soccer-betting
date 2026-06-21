@@ -20,6 +20,9 @@ create table if not exists players (
   spin_day        date,                              -- the day the spin counter below applies to
   spins_today     integer not null default 0,        -- spins used today (1 free, then paid up to the daily cap)
   is_admin        boolean not null default false,    -- can moderate (delete) any chat message
+  login_streak    integer not null default 0,        -- consecutive-day login streak (daily login bonus)
+  last_login_day  date,                              -- last local day the login bonus was granted
+  last_cashback_at timestamptz,                      -- last time daily loss-cashback was granted
   created_at      timestamptz not null default now()
 );
 
@@ -31,6 +34,9 @@ alter table players add column if not exists streak_shield  integer not null def
 alter table players add column if not exists spin_day        date;
 alter table players add column if not exists spins_today     integer not null default 0;
 alter table players add column if not exists is_admin        boolean not null default false;
+alter table players add column if not exists login_streak     integer not null default 0;
+alter table players add column if not exists last_login_day   date;
+alter table players add column if not exists last_cashback_at timestamptz;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (
@@ -76,6 +82,7 @@ create index if not exists predictions_match_idx on predictions (match_id);
 
 -- Upgrade existing installs.
 alter table predictions add column if not exists boosted boolean not null default false;
+alter table predictions add column if not exists settled_at timestamptz; -- when it settled (for daily loss cashback)
 
 -- ---------- crowd_guesses ("Beat the Crowd" mini-game) ----------
 create table if not exists crowd_guesses (

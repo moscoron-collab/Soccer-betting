@@ -80,7 +80,7 @@ export async function settleAll() {
 
       await supabase
         .from("predictions")
-        .update({ status: won ? "WON" : "LOST", payout })
+        .update({ status: won ? "WON" : "LOST", payout, settled_at: new Date().toISOString() })
         .eq("id", p.id);
 
       if (payout > 0) {
@@ -269,7 +269,7 @@ export async function settleEarly(): Promise<number> {
 
       await supabase
         .from("predictions")
-        .update({ status: won ? "WON" : "LOST", payout })
+        .update({ status: won ? "WON" : "LOST", payout, settled_at: new Date().toISOString() })
         .eq("id", p.id);
 
       if (payout > 0) {

@@ -173,6 +173,14 @@ function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
 }
 
+// Show the "ways to earn" helper when a player is at or below this balance.
+const LOW_COINS = 500;
+
+// Smooth-scroll to a section by id (used by the low-coins helper buttons).
+function scrollToId(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 // A player counts as "new" (gets the 🌱 badge) for their first week.
 const NEW_PLAYER_DAYS = 7;
 function isNewPlayer(createdAt?: string | null): boolean {
@@ -221,6 +229,10 @@ function Home() {
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showGift, setShowGift] = useState(false);
+  const [rewards, setRewards] = useState<{
+    login: { day: number; amount: number } | null;
+    cashback: { amount: number } | null;
+  } | null>(null);
 
   // Load token from storage on first render.
   useEffect(() => {
@@ -259,6 +271,10 @@ function Home() {
       setShowGift(true);
       confettiBurst();
       playCheer();
+    }
+    if (data.loginBonus || data.cashback) {
+      setRewards({ login: data.loginBonus ?? null, cashback: data.cashback ?? null });
+      confettiBurst();
     }
     const preds: Prediction[] = data.predictions ?? [];
 
@@ -341,6 +357,7 @@ function Home() {
         <WelcomeNew name={player.username} onClose={() => setShowWelcome(false)} />
       )}
       {showGift && <WelcomeGift onClose={() => setShowGift(false)} />}
+      {rewards && <DailyRewards data={rewards} onClose={() => setRewards(null)} />}
       {recap && <WelcomeBack data={recap} onClose={() => setRecap(null)} />}
       {!token || !player ? (
         <AuthScreen onSignedIn={onSignedIn} />
@@ -414,6 +431,48 @@ function WelcomeGift({ onClose }: { onClose: () => void }) {
           className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
         >
           {t("gift.ok")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Daily rewards ------------------------------ */
+// "Here's what you just earned" — login bonus and/or loss cashback, on app open.
+
+function DailyRewards({
+  data,
+  onClose,
+}: {
+  data: { login: { day: number; amount: number } | null; cashback: { amount: number } | null };
+  onClose: () => void;
+}) {
+  const { t } = useLang();
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[#0f2143] p-6 text-center shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-5xl">🎁</div>
+        <h2 className="mt-2 text-xl font-extrabold">{t("rewards.title")}</h2>
+        <div className="mt-4 space-y-2 text-start text-sm">
+          {data.login && (
+            <p className="rounded-lg bg-white/5 p-2 text-green-200">
+              {t("rewards.login", { n: data.login.day, amount: data.login.amount.toLocaleString() })}
+            </p>
+          )}
+          {data.cashback && (
+            <p className="rounded-lg bg-white/5 p-2 text-green-200">
+              {t("rewards.cashback", { amount: data.cashback.amount.toLocaleString() })}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white"
+        >
+          {t("rewards.ok")}
         </button>
       </div>
     </div>
@@ -745,11 +804,15 @@ function Game({
   }
 
   async function bailout() {
-    await fetch("/api/me", {
+    const res = await fetch("/api/me", {
       method: "POST",
       headers: authHeaders(token),
       body: JSON.stringify({ tz: clientTz() }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && typeof data.added === "number" && data.added > 0) {
+      celebrate(t("topup.done", { amount: data.added.toLocaleString() }));
+    }
     onRefresh();
   }
 
@@ -836,16 +899,8 @@ function Game({
         </button>
       </div>
 
-      {canBailout && (
-        <div className="mt-4 rounded-xl bg-yellow-500/20 p-4">
-          <p className="text-sm">{t("game.lowCoins")}</p>
-          <button
-            onClick={bailout}
-            className="mt-2 rounded-lg bg-yellow-400 px-3 py-1.5 text-sm font-bold text-gray-900"
-          >
-            {t("game.getCoins")}
-          </button>
-        </div>
+      {player.coins <= LOW_COINS && (
+        <LowCoinsPanel canBailout={canBailout} onBailout={bailout} />
       )}
 
       {/* Tabs */}
@@ -930,12 +985,12 @@ function Game({
       </Section>
 
       {/* Daily challenges */}
-      <Section title={t("game.dailyChallenges")}>
+      <Section id="challenges" title={t("game.dailyChallenges")}>
         <ChallengesSection token={token} onClaimed={refreshAll} />
       </Section>
 
       {/* Mini-games */}
-      <Section title={t("game.miniGames")}>
+      <Section id="minigames" title={t("game.miniGames")}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SpinWheel
             token={token}
@@ -2071,12 +2126,67 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  id,
+}: {
+  title: string;
+  children: React.ReactNode;
+  id?: string;
+}) {
   return (
-    <section className="mt-7">
+    <section id={id} className="mt-7 scroll-mt-4">
       <h2 className="mb-2 text-lg font-bold">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
+  );
+}
+
+// The "Low on coins? Here's how to get more" helper, shown when a player is at or
+// below LOW_COINS. Surfaces every way to earn, with one-tap access to each.
+function LowCoinsPanel({
+  canBailout,
+  onBailout,
+}: {
+  canBailout: boolean;
+  onBailout: () => void;
+}) {
+  const { t } = useLang();
+  return (
+    <div className="mt-4 rounded-xl bg-yellow-500/15 p-4 ring-1 ring-yellow-400/30">
+      <p className="text-sm font-bold text-yellow-200">{t("lowcoins.title")}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {canBailout && (
+          <button
+            onClick={onBailout}
+            className="rounded-lg bg-yellow-400 px-3 py-1.5 text-sm font-bold text-gray-900"
+          >
+            {t("lowcoins.topup")}
+          </button>
+        )}
+        <button
+          onClick={() => scrollToId("minigames")}
+          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
+        >
+          {t("lowcoins.spin")}
+        </button>
+        <button
+          onClick={() => scrollToId("minigames")}
+          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
+        >
+          {t("lowcoins.penalty")}
+        </button>
+        <button
+          onClick={() => scrollToId("challenges")}
+          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold"
+        >
+          {t("lowcoins.challenges")}
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-blue-100/70">{t("lowcoins.loginHint")}</p>
+      <p className="mt-1 text-xs text-blue-100/70">{t("lowcoins.cashbackHint")}</p>
+    </div>
   );
 }
 

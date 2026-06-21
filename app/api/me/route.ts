@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, lookupPlayerByToken } from "@/lib/auth";
-import { BAILOUT_AMOUNT, BAILOUT_FLOOR } from "@/lib/payout";
+import {
+  BAILOUT_AMOUNT,
+  BAILOUT_FLOOR,
+  CASHBACK_PCT,
+  CASHBACK_CAP,
+  loginBonusFor,
+} from "@/lib/payout";
+import type { Player } from "@/lib/auth";
 import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
 import { quickRefresh } from "@/lib/settle";
 import { localDate, isNewLocalDay } from "@/lib/time";
@@ -44,6 +51,64 @@ async function grantWelcomeGift(player: { id: string; coins: number }): Promise<
   }
 }
 
+// Daily login bonus: once per local day, growing with the consecutive-day streak.
+// Returns the granted { day, amount } only on the load it was awarded.
+async function grantLoginBonus(
+  player: Player,
+  tz: string | null,
+  today: string
+): Promise<{ day: number; amount: number } | null> {
+  if (player.last_login_day === today) return null;
+  const yesterday = localDate(tz, new Date(Date.now() - 86_400_000));
+  const streak = player.last_login_day === yesterday ? (player.login_streak || 0) + 1 : 1;
+  const amount = loginBonusFor(streak);
+  const { error } = await supabase
+    .from("players")
+    .update({ login_streak: streak, last_login_day: today })
+    .eq("id", player.id);
+  if (error) return null;
+  await supabase.rpc("increment_coins", { p_player: player.id, p_amount: amount });
+  player.coins += amount;
+  player.login_streak = streak;
+  player.last_login_day = today;
+  return { day: streak, amount };
+}
+
+// Daily loss cashback: once per local day, refund a slice of net losses since the
+// last cashback. Returns the granted { amount } only when something is refunded.
+async function grantCashback(
+  player: Player,
+  tz: string | null
+): Promise<{ amount: number } | null> {
+  if (!isNewLocalDay(player.last_cashback_at, tz)) return null;
+  const since = player.last_cashback_at ?? new Date(Date.now() - 86_400_000).toISOString();
+
+  let refund = 0;
+  try {
+    const { data: rows } = await supabase
+      .from("predictions")
+      .select("stake, payout")
+      .eq("player_id", player.id)
+      .neq("status", "PENDING")
+      .gte("settled_at", since);
+    let net = 0;
+    for (const r of rows ?? []) net += (r.payout ?? 0) - (r.stake ?? 0);
+    if (net < 0) refund = Math.min(CASHBACK_CAP, Math.round(-net * CASHBACK_PCT));
+  } catch {
+    return null; // settled_at column missing (schema not run yet) — skip safely
+  }
+
+  // Mark processed regardless, so it's strictly once per local day.
+  const now = new Date().toISOString();
+  await supabase.from("players").update({ last_cashback_at: now }).eq("id", player.id);
+  player.last_cashback_at = now;
+
+  if (refund <= 0) return null;
+  await supabase.rpc("increment_coins", { p_player: player.id, p_amount: refund });
+  player.coins += refund;
+  return { amount: refund };
+}
+
 // GET /api/me?tz=America/New_York -> current player + their predictions.
 // `tz` is the player's timezone so daily features reset at their local midnight.
 export async function GET(req: Request) {
@@ -76,6 +141,10 @@ export async function GET(req: Request) {
 
   // One-time warm-welcome gift (mutates player.coins so balances/popup are live).
   const welcomeGift = await grantWelcomeGift(player);
+
+  // Daily login bonus + daily loss cashback (both once per player's local day).
+  const loginBonus = await grantLoginBonus(player, tz, today);
+  const cashback = await grantCashback(player, tz);
 
   const { data: predictions } = await supabase
     .from("predictions")
@@ -114,6 +183,8 @@ export async function GET(req: Request) {
       canPenalty,
       leaderboard: leaderboard ?? [],
       welcomeGift,
+      loginBonus,
+      cashback,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );
@@ -146,6 +217,7 @@ export async function POST(req: Request) {
     );
   }
 
+  const added = Math.max(0, BAILOUT_AMOUNT - player.coins);
   const { data, error } = await supabase
     .from("players")
     .update({ coins: BAILOUT_AMOUNT, last_bailout_at: new Date().toISOString() })
@@ -156,7 +228,7 @@ export async function POST(req: Request) {
   if (error || !data) {
     return NextResponse.json({ error: "Try again." }, { status: 500 });
   }
-  return NextResponse.json({ coins: data.coins });
+  return NextResponse.json({ coins: data.coins, added });
 }
 
 // Uploaded avatars are stored inline in the database, so keep them small.
