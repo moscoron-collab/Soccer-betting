@@ -300,13 +300,14 @@ function Home() {
 
       if (firstLoad.current) {
         // Opened the app and found new results — show a welcome-back recap.
+        // Only celebrate on a NET gain, so an overall loss never gets confetti.
         setRecap({ won: won.length, lost: lost.length, net, gained });
-        if (won.length > 0) {
+        if (net > 0) {
           confettiBurst();
           playCheer();
         }
-      } else if (won.length > 0) {
-        // A win landed while watching live.
+      } else if (net > 0) {
+        // Came out ahead while watching live.
         celebrate(t("welcome.liveWin", { g: gained.toLocaleString() }));
       }
     }
@@ -503,7 +504,7 @@ function WelcomeBack({
         className="w-full max-w-sm rounded-2xl bg-[#0f2143] p-6 text-center shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-4xl">{data.won > 0 ? "🎉" : "👋"}</div>
+        <div className="text-4xl">{data.net > 0 ? "🎉" : "👋"}</div>
         <h2 className="mt-2 text-xl font-extrabold">{t("welcome.title")}</h2>
         <p className="mt-1 text-sm text-blue-100/70">{t("welcome.subtitle")}</p>
 

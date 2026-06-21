@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.10";
+export const VERSION = "4.11";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.11",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "🎉 Fixed the welcome-back recap celebrating (confetti + cheer) when you actually lost coins overall — it now only celebrates a net win.",
+        he: "🎉 תוקן סיכום החזרה שחגג (קונפטי + תרועה) גם כשבסך הכול הפסדתם מטבעות — עכשיו הוא חוגג רק כשיש רווח נטו.",
+      },
+    ],
+  },
   {
     version: "4.10",
     date: "2026-06-21",
