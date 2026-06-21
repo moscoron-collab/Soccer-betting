@@ -87,12 +87,13 @@ async function grantCashback(
   try {
     const { data: rows } = await supabase
       .from("predictions")
-      .select("stake, payout")
+      .select("stake, payout, free_bet")
       .eq("player_id", player.id)
       .neq("status", "PENDING")
       .gte("settled_at", since);
     let net = 0;
-    for (const r of rows ?? []) net += (r.payout ?? 0) - (r.stake ?? 0);
+    // Free bets risk no coins, so a free-bet loss shouldn't count toward cashback.
+    for (const r of rows ?? []) net += (r.payout ?? 0) - (r.free_bet ? 0 : r.stake ?? 0);
     if (net < 0) refund = Math.min(CASHBACK_CAP, Math.round(-net * CASHBACK_PCT));
   } catch {
     return null; // settled_at column missing (schema not run yet) — skip safely
@@ -149,7 +150,7 @@ export async function GET(req: Request) {
   const { data: predictions } = await supabase
     .from("predictions")
     .select(
-      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, boosted, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
+      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, boosted, free_bet, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
     )
     .eq("player_id", player.id)
     .order("created_at", { ascending: false })

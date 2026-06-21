@@ -291,22 +291,37 @@ const DICT: Record<string, { en: string; he: string }> = {
   "spin.comeback": { en: "Come back tomorrow", he: "חזרו מחר" },
   "spin.boosts": { en: "⚡ 2× boosts:", he: "⚡ הכפלות 2×:" },
   "spin.shields": { en: "🛡️ shields:", he: "🛡️ מגנים:" },
+  "spin.freeBets": { en: "🎟️ free bets:", he: "🎟️ הימורי חינם:" },
 
   // Wheel slice labels
   "wheel.noWin": { en: "No win", he: "אין זכייה" },
   "wheel.boost": { en: "2× Boost", he: "בוסט 2×" },
   "wheel.shield": { en: "Shield", he: "מגן" },
-  "wheel.jackpot": { en: "JACKPOT", he: "ג'קפוט" },
+  "wheel.jackpot": { en: "up to 2K", he: "עד 2K" },
+  "wheel.freebet": { en: "Free bet", he: "הימור חינם" },
 
   // Prize toasts
   "prize.boost": { en: "⚡ {n} × 2× payout power-up!", he: "⚡ {n} × כוח הכפלת זכייה 2×!" },
   "prize.shield": { en: "🛡️ {n} × streak shield!", he: "🛡️ {n} × מגן רצף!" },
   "prize.jackpot": { en: "💰 JACKPOT! +🪙{n}", he: "💰 ג'קפוט! +🪙{n}" },
+  "prize.freebet": { en: "🎟️ {n} × free bet token!", he: "🎟️ {n} × אסימון הימור חינם!" },
   "prize.noWin": {
     en: "😬 No win this time — try another spin!",
     he: "😬 אין זכייה הפעם — נסו סיבוב נוסף!",
   },
   "prize.coins": { en: "🪙 +{n} coins", he: "🪙 +{n} מטבעות" },
+
+  // Double-or-nothing (after a coin win)
+  "gamble.offer": {
+    en: "🎲 Double or nothing? Risk your 🪙{n} on a 50/50.",
+    he: "🎲 הכפלה או כלום? סכנו את 🪙{n} שלכם בהגרלת 50/50.",
+  },
+  "gamble.go": { en: "🎲 Double or nothing", he: "🎲 הכפלה או כלום" },
+  "gamble.keep": { en: "Keep 🪙{n}", he: "השאירו 🪙{n}" },
+  "gamble.won": { en: "🎲 Doubled! You now have 🪙{n}!", he: "🎲 הכפלתם! יש לכם עכשיו 🪙{n}!" },
+  "gamble.lost": { en: "🎲 Lost the 🪙{n} — better luck next time!", he: "🎲 הפסדתם את ה-🪙{n} — בהצלחה בפעם הבאה!" },
+  "gamble.wonShort": { en: "🎉 Doubled it!", he: "🎉 הכפלתם!" },
+  "gamble.lostShort": { en: "😬 Lost it — no worries!", he: "😬 הפסדתם — אין נורא!" },
 
   // Penalty shootout
   "penalty.title": { en: "⚽ Penalty Shootout", he: "⚽ דו-קרב פנדלים" },
@@ -369,6 +384,11 @@ const DICT: Record<string, { en: string; he: string }> = {
   "form.coins": { en: "coins", he: "מטבעות" },
   "form.useBoost": { en: "⚡ Use a 2× payout power-up", he: "⚡ השתמשו בכוח הכפלת זכייה 2×" },
   "form.boostLeft": { en: "({n} left)", he: "(נשארו {n})" },
+  "form.useFreeBet": {
+    en: "🎟️ Use a free bet token (🪙{stake} on the house)",
+    he: "🎟️ השתמשו באסימון הימור חינם (🪙{stake} על חשבון הבית)",
+  },
+  "form.freeBetLeft": { en: "({n} left)", he: "(נשארו {n})" },
   "form.ifCorrect": { en: "→ If correct, you win 🪙{n}", he: "→ אם צדקתם, תזכו ב-🪙{n}" },
   "form.unpopular": {
     en: "(unpopular picks win even more)",

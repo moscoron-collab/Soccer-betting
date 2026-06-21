@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, type WheelSlice } from "@/lib/wheel";
+import { FREE_BET_STAKE } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
 
@@ -19,6 +20,8 @@ function prizeText(t: T, slice: WheelSlice): string {
       return t("prize.shield", { n: slice.amount });
     case "JACKPOT":
       return t("prize.jackpot", { n: slice.amount.toLocaleString() });
+    case "FREEBET":
+      return t("prize.freebet", { n: slice.amount });
     default:
       return slice.amount === 0
         ? t("prize.noWin")
@@ -31,6 +34,7 @@ function sliceLabel(t: T, slice: WheelSlice): string {
   if (slice.kind === "JACKPOT") return t("wheel.jackpot");
   if (slice.kind === "BOOST") return t("wheel.boost");
   if (slice.kind === "SHIELD") return t("wheel.shield");
+  if (slice.kind === "FREEBET") return t("wheel.freebet");
   if (slice.amount === 0) return t("wheel.noWin");
   return slice.label;
 }
@@ -88,6 +92,7 @@ type Player = {
   hide_picks?: boolean;
   boost_2x?: number;
   streak_shield?: number;
+  free_bets?: number;
   created_at?: string | null;
 };
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
@@ -116,6 +121,7 @@ type Prediction = {
   payout: number;
   bonus_mult: number;
   boosted?: boolean;
+  free_bet?: boolean;
   status: "PENDING" | "WON" | "LOST";
   matches: {
     home_team: string;
@@ -999,6 +1005,7 @@ function Game({
             coins={player.coins}
             boost={player.boost_2x ?? 0}
             shields={player.streak_shield ?? 0}
+            freeBets={player.free_bets ?? 0}
             onDone={refreshAll}
           />
           <PenaltyShootout token={token} canPlay={canPenalty} onDone={refreshAll} />
@@ -1035,6 +1042,7 @@ function Game({
                   myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
                   boost={player.boost_2x ?? 0}
+                  freeBets={player.free_bets ?? 0}
                   onOpenPlayer={setViewPlayer}
                   onPlaced={refreshAll}
                 />
@@ -1408,6 +1416,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
                         )}{" "}
                         · 🪙{p.stake}
                         {p.boosted && <span className="text-amber-300"> ⚡2×</span>}
+                        {p.free_bet && <span className="text-purple-300"> 🎟️</span>}
                       </div>
                     </div>
                   );
@@ -1818,6 +1827,7 @@ function SpinWheel({
   coins,
   boost,
   shields,
+  freeBets,
   onDone,
 }: {
   token: string;
@@ -1826,12 +1836,17 @@ function SpinWheel({
   coins: number;
   boost: number;
   shields: number;
+  freeBets: number;
   onDone: () => void;
 }) {
   const { t } = useLang();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<WheelSlice | null>(null);
+  // Double-or-nothing: coins from a plain coin win that can be gambled 50/50 once.
+  const [gambleAmount, setGambleAmount] = useState(0);
+  const [gambling, setGambling] = useState(false);
+  const [gambleOutcome, setGambleOutcome] = useState<"won" | "lost" | null>(null);
 
   const seg = 360 / WHEEL.length;
   const gradient = `conic-gradient(${WHEEL.map(
@@ -1845,6 +1860,8 @@ function SpinWheel({
     if (!canSpin) return;
     setSpinning(true);
     setResult(null);
+    setGambleAmount(0);
+    setGambleOutcome(null);
     const res = await fetch("/api/spin", {
       method: "POST",
       headers: authHeaders(token),
@@ -1870,8 +1887,32 @@ function SpinWheel({
       setResult(slice);
       celebrate(prizeText(t, slice));
       setSpinning(false);
+      // A plain coin win can be gambled double-or-nothing once.
+      if (slice.kind === "COINS" && slice.amount > 0) {
+        setGambleAmount(data.gambleAmount ?? slice.amount);
+      }
       onDone();
     }, SPIN_MS);
+  }
+
+  async function doGamble() {
+    if (gambling || gambleAmount <= 0) return;
+    setGambling(true);
+    const res = await fetch("/api/gamble", { method: "POST", headers: authHeaders(token) });
+    const data = await res.json();
+    setGambling(false);
+    if (!res.ok) {
+      toast(data.error ?? t("common.tryAgain"));
+      return;
+    }
+    setGambleOutcome(data.won ? "won" : "lost");
+    setGambleAmount(0);
+    celebrate(
+      data.won
+        ? t("gamble.won", { n: (data.amount * 2).toLocaleString() })
+        : t("gamble.lost", { n: data.amount.toLocaleString() })
+    );
+    onDone();
   }
 
   return (
@@ -1916,6 +1957,38 @@ function SpinWheel({
         <p className="mt-3 text-center text-sm font-bold text-yellow-200">{prizeText(t, result)}</p>
       )}
 
+      {/* Double-or-nothing on a coin win */}
+      {!spinning && gambleAmount > 0 && gambleOutcome === null && (
+        <div className="mt-2 rounded-lg bg-purple-500/15 p-2 text-center">
+          <p className="text-xs font-semibold text-purple-100">
+            {t("gamble.offer", { n: gambleAmount.toLocaleString() })}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={doGamble}
+              disabled={gambling}
+              className="flex-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
+            >
+              {gambling ? t("spin.spinning") : t("gamble.go")}
+            </button>
+            <button
+              onClick={() => setGambleAmount(0)}
+              disabled={gambling}
+              className="flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
+            >
+              {t("gamble.keep", { n: gambleAmount.toLocaleString() })}
+            </button>
+          </div>
+        </div>
+      )}
+      {gambleOutcome && (
+        <p
+          className={`mt-2 text-center text-sm font-bold ${gambleOutcome === "won" ? "text-green-300" : "text-red-300"}`}
+        >
+          {gambleOutcome === "won" ? t("gamble.wonShort") : t("gamble.lostShort")}
+        </p>
+      )}
+
       <button
         onClick={doSpin}
         disabled={!canSpin}
@@ -1939,9 +2012,10 @@ function SpinWheel({
       </p>
 
       {/* Power-up inventory */}
-      <div className="mt-2 flex justify-center gap-3 text-xs text-blue-100/80">
+      <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs text-blue-100/80">
         <span>{t("spin.boosts")} <b>{boost}</b></span>
         <span>{t("spin.shields")} <b>{shields}</b></span>
+        <span>{t("spin.freeBets")} <b>{freeBets}</b></span>
       </div>
     </div>
   );
@@ -2324,6 +2398,7 @@ function BetForm({
   away,
   coins,
   boost = 0,
+  freeBets = 0,
   initial,
   submitLabel,
   onSubmit,
@@ -2334,6 +2409,7 @@ function BetForm({
   away: string;
   coins: number; // max stake available
   boost?: number; // available 2× power-ups (0 = no boost option shown)
+  freeBets?: number; // available free bet tokens (0 = no free-bet option shown)
   initial?: BetDraft;
   submitLabel: string;
   onSubmit: (body: any) => Promise<{ error?: string }>;
@@ -2345,21 +2421,26 @@ function BetForm({
   const [ea, setEa] = useState(initial?.exactAway != null ? String(initial.exactAway) : "");
   const [stake, setStake] = useState(initial?.stake ?? 100);
   const [useBoost, setUseBoost] = useState(false);
+  const [useFreeBet, setUseFreeBet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A free bet forces a fixed stake and can't be combined with a 2× boost.
+  const effStake = useFreeBet ? FREE_BET_STAKE : stake;
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const body: any = { type, stake };
+      const body: any = { type, stake: effStake };
       if (type === "EXACT") {
         body.exactHome = Number(eh);
         body.exactAway = Number(ea);
       } else {
         body.pick = pick;
       }
-      if (useBoost && boost > 0) body.boosted = true;
+      if (useFreeBet && freeBets > 0) body.freeBet = true;
+      else if (useBoost && boost > 0) body.boosted = true;
       const res = await onSubmit(body);
       if (res?.error) setError(res.error);
     } finally {
@@ -2368,8 +2449,7 @@ function BetForm({
   }
 
   const canSubmit =
-    stake > 0 &&
-    stake <= coins &&
+    (useFreeBet || (stake > 0 && stake <= coins)) &&
     (type === "EXACT" ? eh !== "" && ea !== "" : pick !== null);
 
   const sideButtons: ReadonlyArray<readonly [string, string]> =
@@ -2437,9 +2517,10 @@ function BetForm({
           type="number"
           min={1}
           max={coins}
-          value={stake}
+          value={effStake}
+          disabled={useFreeBet}
           onChange={(e) => setStake(Math.max(0, Math.floor(Number(e.target.value))))}
-          className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900"
+          className="w-24 rounded-lg bg-white/95 px-2 py-1.5 text-center text-gray-900 disabled:opacity-60"
         />
         <span className="text-xs text-blue-100/70">{t("form.coins")}</span>
         {onCancel && (
@@ -2456,7 +2537,25 @@ function BetForm({
         </button>
       </div>
 
-      {boost > 0 && (
+      {freeBets > 0 && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-lg bg-purple-400/10 px-3 py-2 text-xs">
+          <input
+            type="checkbox"
+            checked={useFreeBet}
+            onChange={(e) => {
+              setUseFreeBet(e.target.checked);
+              if (e.target.checked) setUseBoost(false);
+            }}
+            className="h-4 w-4 accent-purple-400"
+          />
+          <span className="font-semibold text-purple-200">
+            {t("form.useFreeBet", { stake: FREE_BET_STAKE })}{" "}
+            <span className="text-purple-200/70">{t("form.freeBetLeft", { n: freeBets })}</span>
+          </span>
+        </label>
+      )}
+
+      {boost > 0 && !useFreeBet && (
         <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-lg bg-amber-400/10 px-3 py-2 text-xs">
           <input
             type="checkbox"
@@ -2471,12 +2570,13 @@ function BetForm({
         </label>
       )}
 
-      {stake > 0 && (
+      {effStake > 0 && (
         <p className="mt-2 text-center text-sm font-semibold text-yellow-200">
           {t("form.ifCorrect", {
-            n: (stake * BASE_MULT[type] * (useBoost && boost > 0 ? 2 : 1)).toLocaleString(),
+            n: (effStake * BASE_MULT[type] * (useBoost && boost > 0 && !useFreeBet ? 2 : 1)).toLocaleString(),
           })}
-          {useBoost && boost > 0 && <span className="text-amber-300"> ⚡2×</span>}
+          {useBoost && boost > 0 && !useFreeBet && <span className="text-amber-300"> ⚡2×</span>}
+          {useFreeBet && <span className="text-purple-300"> 🎟️</span>}
           <span className="block text-xs font-normal text-blue-100/60">{t("form.unpopular")}</span>
         </p>
       )}
@@ -2587,6 +2687,7 @@ function MatchCard({
   myBets,
   isMotd,
   boost,
+  freeBets,
   onOpenPlayer,
   onPlaced,
 }: {
@@ -2596,6 +2697,7 @@ function MatchCard({
   myBets: Prediction[];
   isMotd?: boolean;
   boost?: number;
+  freeBets?: number;
   onOpenPlayer?: (username: string) => void;
   onPlaced: () => void;
 }) {
@@ -2694,6 +2796,7 @@ function MatchCard({
             away={match.away_team}
             coins={coins}
             boost={boost}
+            freeBets={freeBets}
             submitLabel={t("form.predict")}
             onSubmit={place}
           />

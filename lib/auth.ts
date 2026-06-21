@@ -13,6 +13,8 @@ export type Player = {
   hide_picks: boolean;
   boost_2x: number;
   streak_shield: number;
+  free_bets: number;
+  pending_gamble: number;
   spin_day: string | null;
   spins_today: number;
   is_admin: boolean;
@@ -23,7 +25,7 @@ export type Player = {
 };
 
 const PLAYER_COLUMNS =
-  "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, avatar, hide_picks, boost_2x, streak_shield, spin_day, spins_today, is_admin, login_streak, last_login_day, last_cashback_at, created_at";
+  "id, username, coins, xp, win_streak, last_bailout_at, last_spin_at, last_penalty_at, avatar, hide_picks, boost_2x, streak_shield, free_bets, pending_gamble, spin_day, spins_today, is_admin, login_streak, last_login_day, last_cashback_at, created_at";
 
 // Looks up a player by session token, distinguishing a genuine "no such token"
 // (player: null, failed: false) from a transient database error (failed: true).

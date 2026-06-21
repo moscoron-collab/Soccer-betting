@@ -2,12 +2,30 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.8";
+export const VERSION = "4.9";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.9",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "🎡 Bigger, better wheel: new 🪙25 and 🪙500 prizes, and the jackpot now pays a random amount up to 🪙2,000!",
+        he: "🎡 גלגל גדול וטוב יותר: פרסים חדשים של 🪙25 ו-🪙500, והג'קפוט משלם עכשיו סכום אקראי עד 🪙2,000!",
+      },
+      {
+        en: "🎟️ Free bet tokens: win one on the wheel, then place a bet on the house — if it wins you keep the full payout, if it loses it costs you nothing.",
+        he: "🎟️ אסימוני הימור חינם: זכו באחד בגלגל, והמרו על חשבון הבית — אם תזכו תקבלו את כל הזכייה, ואם תפסידו זה לא עולה כלום.",
+      },
+      {
+        en: "🎲 Double or nothing: after a coin win on the wheel you can gamble it on a 50/50 — double it or lose it!",
+        he: "🎲 הכפלה או כלום: אחרי זכייה במטבעות בגלגל אפשר להמר עליה ב-50/50 — להכפיל או להפסיד!",
+      },
+    ],
+  },
   {
     version: "4.8",
     date: "2026-06-21",

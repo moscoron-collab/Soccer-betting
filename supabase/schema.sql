@@ -17,6 +17,8 @@ create table if not exists players (
   hide_picks      boolean not null default false,    -- hide your own picks from others until kickoff
   boost_2x        integer not null default 0,        -- "2x payout" power-ups in inventory (from the wheel)
   streak_shield   integer not null default 0,        -- "streak shield" power-ups in inventory (from the wheel)
+  free_bets       integer not null default 0,        -- "free bet" tokens in inventory (from the wheel)
+  pending_gamble  integer not null default 0,        -- coins from the last spin win that can be double-or-nothing'd
   spin_day        date,                              -- the day the spin counter below applies to
   spins_today     integer not null default 0,        -- spins used today (1 free, then paid up to the daily cap)
   is_admin        boolean not null default false,    -- can moderate (delete) any chat message
@@ -31,6 +33,8 @@ alter table players add column if not exists avatar        text;
 alter table players add column if not exists hide_picks    boolean not null default false;
 alter table players add column if not exists boost_2x       integer not null default 0;
 alter table players add column if not exists streak_shield  integer not null default 0;
+alter table players add column if not exists free_bets       integer not null default 0;
+alter table players add column if not exists pending_gamble  integer not null default 0;
 alter table players add column if not exists spin_day        date;
 alter table players add column if not exists spins_today     integer not null default 0;
 alter table players add column if not exists is_admin        boolean not null default false;
@@ -72,6 +76,7 @@ create table if not exists predictions (
   payout      integer not null default 0,
   bonus_mult  numeric not null default 1,            -- underdog + Match of the Day bonus, locked at bet time
   boosted     boolean not null default false,        -- spent a "2x payout" power-up on this bet
+  free_bet    boolean not null default false,        -- placed with a "free bet" token (no coins risked)
   status      text not null default 'PENDING',       -- PENDING | WON | LOST
   created_at  timestamptz not null default now(),
   unique (player_id, match_id, type)                 -- one bet of each type per match per player
@@ -82,6 +87,7 @@ create index if not exists predictions_match_idx on predictions (match_id);
 
 -- Upgrade existing installs.
 alter table predictions add column if not exists boosted boolean not null default false;
+alter table predictions add column if not exists free_bet boolean not null default false;
 alter table predictions add column if not exists settled_at timestamptz; -- when it settled (for daily loss cashback)
 
 -- ---------- crowd_guesses ("Beat the Crowd" mini-game) ----------

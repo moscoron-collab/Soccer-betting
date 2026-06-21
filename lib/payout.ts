@@ -27,6 +27,10 @@ export const MAX_BONUS = 3; // cap on the total bonus multiplier
 
 export const BOOST_MULTIPLIER = 2; // a "2x payout" power-up doubles a winning bet
 
+// A "free bet" token (won from the wheel) places a bet at this fixed stake with no
+// coins risked: a win pays the full payout, a loss costs nothing.
+export const FREE_BET_STAKE = 100;
+
 export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 export type WinnerPick = "HOME" | "DRAW" | "AWAY";
 

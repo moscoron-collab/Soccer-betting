@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
 import { computeBonusMult } from "@/lib/bonus";
-import { PredictionType, validateSelection } from "@/lib/payout";
+import { PredictionType, validateSelection, FREE_BET_STAKE } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,12 +67,20 @@ export async function POST(req: Request) {
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const p = parsed.value;
 
-  if (p.stake > player.coins) {
+  // A "free bet" token places a fixed-stake bet with no coins risked. It can't be
+  // combined with a 2× boost, and the stake is forced to the token's value.
+  const wantsFreeBet = body?.freeBet === true;
+  if (wantsFreeBet) {
+    if ((player.free_bets ?? 0) < 1) {
+      return NextResponse.json({ error: "You have no free bet tokens left." }, { status: 400 });
+    }
+    p.stake = FREE_BET_STAKE;
+  } else if (p.stake > player.coins) {
     return NextResponse.json({ error: "You don't have enough coins." }, { status: 400 });
   }
 
-  // Optional "2x payout" power-up spent on this bet.
-  const wantsBoost = body?.boosted === true;
+  // Optional "2x payout" power-up spent on this bet (ignored for free bets).
+  const wantsBoost = !wantsFreeBet && body?.boosted === true;
   if (wantsBoost && player.boost_2x < 1) {
     return NextResponse.json({ error: "You have no 2× power-ups left." }, { status: 400 });
   }
@@ -95,15 +103,31 @@ export async function POST(req: Request) {
     );
   }
 
-  // Deduct the stake now (escrow), guarding against a race on balance.
-  const newBalance = player.coins - p.stake;
-  const { error: balanceErr } = await supabase
-    .from("players")
-    .update({ coins: newBalance })
-    .eq("id", player.id)
-    .gte("coins", p.stake);
-  if (balanceErr) {
-    return NextResponse.json({ error: "Could not place prediction." }, { status: 500 });
+  // Free bet: spend a token instead of coins (no stake escrowed). Otherwise deduct
+  // the stake now (escrow), guarding against a race on balance.
+  let freeBetSpent = false;
+  const newBalance = wantsFreeBet ? player.coins : player.coins - p.stake;
+  if (wantsFreeBet) {
+    const { data: token } = await supabase
+      .from("players")
+      .update({ free_bets: (player.free_bets ?? 0) - 1 })
+      .eq("id", player.id)
+      .gte("free_bets", 1)
+      .select("id")
+      .maybeSingle();
+    if (!token) {
+      return NextResponse.json({ error: "You have no free bet tokens left." }, { status: 400 });
+    }
+    freeBetSpent = true;
+  } else {
+    const { error: balanceErr } = await supabase
+      .from("players")
+      .update({ coins: newBalance })
+      .eq("id", player.id)
+      .gte("coins", p.stake);
+    if (balanceErr) {
+      return NextResponse.json({ error: "Could not place prediction." }, { status: 500 });
+    }
   }
 
   // Spend a 2× charge now (guarded so it can't go negative on a race).
@@ -137,14 +161,18 @@ export async function POST(req: Request) {
       stake: p.stake,
       bonus_mult: bonusMult,
       boosted: boostSpent,
+      free_bet: freeBetSpent,
       status: "PENDING",
     })
     .select("id")
     .single();
 
   if (insertErr || !created) {
-    // Roll back the stake (and the spent charge, if any).
+    // Roll back the stake / token (and the spent charge, if any).
     await supabase.from("players").update({ coins: player.coins }).eq("id", player.id);
+    if (freeBetSpent) {
+      await supabase.from("players").update({ free_bets: player.free_bets }).eq("id", player.id);
+    }
     if (boostSpent) {
       await supabase.from("players").update({ boost_2x: player.boost_2x }).eq("id", player.id);
     }
