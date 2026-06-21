@@ -1357,7 +1357,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
 /* ------------------------------ Changelog --------------------------------- */
 
 function Changelog({ onClose }: { onClose: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   return (
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4"
@@ -1380,9 +1380,9 @@ function Changelog({ onClose }: { onClose: () => void }) {
                 <span className="font-bold text-blue-300">v{r.version}</span>
                 <span className="text-xs text-blue-100/50">{r.date}</span>
               </div>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-blue-100/80">
+              <ul className="mt-1 list-disc space-y-1 pe-0 ps-5 text-sm text-blue-100/80">
                 {r.changes.map((c, i) => (
-                  <li key={i}>{c}</li>
+                  <li key={i}>{lang === "he" ? c.he : c.en}</li>
                 ))}
               </ul>
             </div>
