@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.9";
+export const VERSION = "4.10";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.10",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "🎡 Cleaner wheel: prize labels now run along each slice so longer names no longer overlap.",
+        he: "🎡 גלגל נקי יותר: תוויות הפרסים מסודרות עכשיו לאורך כל פרוסה כך ששמות ארוכים כבר לא חופפים.",
+      },
+    ],
+  },
   {
     version: "4.9",
     date: "2026-06-21",

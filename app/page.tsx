@@ -1936,18 +1936,30 @@ function SpinWheel({
             transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.17,0.67,0.12,0.99)` : "none",
           }}
         >
-          {WHEEL.map((w, i) => (
-            <div
-              key={i}
-              className="pointer-events-none absolute inset-0"
-              style={{ transform: `rotate(${i * seg + seg / 2}deg)` }}
-            >
-              <div className="absolute left-1/2 top-[10px] -translate-x-1/2 text-center text-[10px] font-bold leading-tight text-white drop-shadow">
-                <div className="text-sm">{w.emoji}</div>
-                {sliceLabel(t, w)}
+          {WHEEL.map((w, i) => {
+            // Place each label along its slice's centre line and rotate it so the
+            // word runs radially (hub → rim). This keeps long labels like
+            // "Free bet" / "up to 2K" inside their wedge instead of spilling over.
+            const a = i * seg + seg / 2; // slice centre angle, clockwise from top
+            const rad = (a * Math.PI) / 180;
+            const d = 54; // distance from the hub to the label's centre
+            const cx = 100 + d * Math.sin(rad);
+            const cy = 100 - d * Math.cos(rad);
+            return (
+              <div
+                key={i}
+                className="pointer-events-none absolute flex items-center gap-1 whitespace-nowrap text-[10px] font-bold leading-none text-white drop-shadow"
+                style={{
+                  left: `${cx}px`,
+                  top: `${cy}px`,
+                  transform: `translate(-50%, -50%) rotate(${a - 90}deg)`,
+                }}
+              >
+                <span>{sliceLabel(t, w)}</span>
+                <span className="text-sm">{w.emoji}</span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {/* hub */}
         <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/40 bg-[#0f2143]" />
