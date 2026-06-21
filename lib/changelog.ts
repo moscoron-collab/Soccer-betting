@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.5";
+export const VERSION = "4.6";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.6",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "📱 Optional chat notifications: in Profile & settings you can turn on a phone notification for new chat messages while you're away. (Android: tap Turn on. iPhone: add the app to your Home Screen first, then turn it on.)",
+        he: "📱 התראות צ'אט (לבחירתכם): ב'פרופיל והגדרות' אפשר להפעיל התראה בטלפון על הודעות חדשות בצ'אט כשאתם לא באפליקציה. (אנדרואיד: לחצו 'הפעלה'. אייפון: קודם הוסיפו את האפליקציה למסך הבית ואז הפעילו.)",
+      },
+    ],
+  },
   {
     version: "4.5",
     date: "2026-06-21",

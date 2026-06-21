@@ -189,6 +189,26 @@ const DICT: Record<string, { en: string; he: string }> = {
   "settings.errRead": { en: "Could not read that image.", he: "לא הצלחנו לקרוא את התמונה." },
   "settings.errSave": { en: "Could not save.", he: "השמירה נכשלה." },
 
+  // Chat push notifications
+  "notify.title": { en: "Chat notifications", he: "התראות צ'אט" },
+  "notify.desc": {
+    en: "Get a phone notification when there's a new chat message.",
+    he: "קבלו התראה בטלפון כשיש הודעה חדשה בצ'אט.",
+  },
+  "notify.enable": { en: "Turn on", he: "הפעלה" },
+  "notify.enabling": { en: "Turning on…", he: "מפעיל…" },
+  "notify.enabled": { en: "On ✓", he: "פעיל ✓" },
+  "notify.denied": {
+    en: "Blocked — allow notifications in your browser settings.",
+    he: "חסום — אפשרו התראות בהגדרות הדפדפן.",
+  },
+  "notify.unavailable": { en: "Not available yet.", he: "עדיין לא זמין." },
+  "notify.unsupported": {
+    en: "On iPhone: add this app to your Home Screen first, then turn this on.",
+    he: "באייפון: קודם הוסיפו את האפליקציה למסך הבית, ואז הפעילו.",
+  },
+  "notify.error": { en: "Couldn't turn on. Try again.", he: "ההפעלה נכשלה. נסו שוב." },
+
   // Player log modal
   "playerLog.title": { en: "Player log", he: "יומן שחקן" },
   "playerLog.errLoad": { en: "Could not load player.", he: "לא הצלחנו לטעון את השחקן." },

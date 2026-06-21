@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { cleanMessage, RATE_MAX, RATE_WINDOW_MS } from "@/lib/chat";
+import { sendChatPush } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,9 @@ export async function POST(req: Request) {
     .select("id, body, created_at")
     .single();
   if (error || !data) return NextResponse.json({ error: "Try again." }, { status: 500 });
+
+  // Notify other players' phones (best-effort; no-ops if push isn't configured).
+  await sendChatPush(player.id, player.username, clean.text);
 
   return NextResponse.json({ ok: true, message: data });
 }

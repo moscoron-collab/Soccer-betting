@@ -1,0 +1,13 @@
+{
+  "name": "Soccer Predictor",
+  "short_name": "Soccer",
+  "description": "Predict real matches, win coins, climb the leaderboard.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1c38",
+  "theme_color": "#0b1c38",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

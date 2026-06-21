@@ -6,6 +6,7 @@ import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, type WheelSlice } from "@/lib/wheel";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
+import { registerSW, enablePush, pushSupported, pushConfigured, notificationPermission } from "@/lib/pushClient";
 
 // Translator type, so helpers can take `t` without importing React context.
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -226,6 +227,7 @@ function Home() {
   useEffect(() => {
     setToken(safeGet(TOKEN_KEY));
     setReady(true);
+    registerSW(); // for push notifications (handles notification taps)
   }, []);
 
   const loadMe = useCallback(async (tok: string) => {
@@ -1163,6 +1165,9 @@ function SettingsModal({
           </button>
         </div>
 
+        {/* Chat push notifications */}
+        <NotifyToggle token={token} />
+
         {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
 
         <button
@@ -1176,6 +1181,52 @@ function SettingsModal({
     </div>
     {zoom && <ImageViewer src={zoom} onClose={() => setZoom(null)} />}
     </>
+  );
+}
+
+// Enable phone notifications for new chat messages (Web Push).
+function NotifyToggle({ token }: { token: string }) {
+  const { t } = useLang();
+  const [status, setStatus] = useState<"idle" | "enabling" | "enabled" | "denied" | "error">("idle");
+  const [supported, setSupported] = useState(true);
+  const [available, setAvailable] = useState(true);
+
+  useEffect(() => {
+    setSupported(pushSupported());
+    setAvailable(pushConfigured());
+    if (pushSupported() && notificationPermission() === "granted") setStatus("enabled");
+  }, []);
+
+  async function turnOn() {
+    setStatus("enabling");
+    const r = await enablePush(token);
+    setStatus(r === "enabled" ? "enabled" : r === "denied" ? "denied" : "error");
+  }
+
+  return (
+    <div className="mt-5 rounded-xl bg-white/5 p-3">
+      <p className="text-sm font-semibold">{t("notify.title")}</p>
+      <p className="text-xs text-blue-100/60">{t("notify.desc")}</p>
+      {!supported ? (
+        <p className="mt-2 text-xs text-blue-100/50">{t("notify.unsupported")}</p>
+      ) : !available ? (
+        <p className="mt-2 text-xs text-blue-100/50">{t("notify.unavailable")}</p>
+      ) : status === "enabled" ? (
+        <p className="mt-2 text-sm font-semibold text-green-300">{t("notify.enabled")}</p>
+      ) : (
+        <>
+          <button
+            onClick={turnOn}
+            disabled={status === "enabling"}
+            className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold disabled:opacity-50"
+          >
+            {status === "enabling" ? t("notify.enabling") : t("notify.enable")}
+          </button>
+          {status === "denied" && <p className="mt-2 text-xs text-red-300">{t("notify.denied")}</p>}
+          {status === "error" && <p className="mt-2 text-xs text-red-300">{t("notify.error")}</p>}
+        </>
+      )}
+    </div>
   );
 }
 
