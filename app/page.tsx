@@ -1035,6 +1035,7 @@ function SettingsModal({
   const [hidePicks, setHidePicks] = useState<boolean>(!!player.hide_picks);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
 
   // Resize an uploaded image to a small square so it fits comfortably in the DB.
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1075,6 +1076,7 @@ function SettingsModal({
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-6 shadow-xl"
@@ -1089,7 +1091,13 @@ function SettingsModal({
 
         {/* Current avatar preview */}
         <div className="mt-4 flex items-center gap-3">
-          <Avatar avatar={avatar} size={56} />
+          {isPhoto(avatar) ? (
+            <button onClick={() => setZoom(avatar!)} title={t("photo.view")} className="shrink-0">
+              <Avatar avatar={avatar} size={56} />
+            </button>
+          ) : (
+            <Avatar avatar={avatar} size={56} />
+          )}
           <div>
             <p className="font-bold">{player.username}</p>
             <p className="text-xs text-blue-100/60">{t("settings.profilePic")}</p>
@@ -1166,6 +1174,8 @@ function SettingsModal({
         </button>
       </div>
     </div>
+    {zoom && <ImageViewer src={zoom} onClose={() => setZoom(null)} />}
+    </>
   );
 }
 
@@ -1209,6 +1219,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -1233,6 +1244,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
   }, [username, t]);
 
   return (
+    <>
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-5 shadow-xl"
@@ -1251,7 +1263,13 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
         {data && (
           <>
             <div className="mt-4 flex items-center gap-3">
-              <Avatar avatar={data.player.avatar} size={48} />
+              {isPhoto(data.player.avatar) ? (
+                <button onClick={() => setZoom(data.player.avatar!)} title={t("photo.view")} className="shrink-0">
+                  <Avatar avatar={data.player.avatar} size={48} />
+                </button>
+              ) : (
+                <Avatar avatar={data.player.avatar} size={48} />
+              )}
               <div>
                 <p className="flex items-center gap-1.5 text-lg font-bold">
                   {data.player.username}
@@ -1331,6 +1349,8 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
         )}
       </div>
     </div>
+    {zoom && <ImageViewer src={zoom} onClose={() => setZoom(null)} />}
+    </>
   );
 }
 
@@ -2063,6 +2083,35 @@ function Crest({ url }: { url: string | null }) {
       className="inline-block h-5 w-5 object-contain align-middle"
       onError={(e) => ((e.currentTarget.style.display = "none"))}
     />
+  );
+}
+
+// True only for uploaded photos (data URLs) — emoji/fallback avatars don't zoom.
+function isPhoto(avatar?: string | null): boolean {
+  return !!avatar && avatar.startsWith("data:image/");
+}
+
+// Full-screen photo viewer (tap anywhere or ✕ to close). Sits above modals.
+function ImageViewer({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/85 p-4"
+      onClick={onClose}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        onClick={onClose}
+        className="absolute right-4 top-4 rounded-full bg-white/15 px-3 py-1 text-lg font-bold text-white"
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 

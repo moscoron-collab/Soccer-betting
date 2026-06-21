@@ -91,6 +91,8 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "gift.ok": { en: "Thanks! 🎉", he: "תודה! 🎉" },
 
+  "photo.view": { en: "View photo", he: "צפו בתמונה" },
+
   // Join date / new-player badge
   "profile.memberSince": { en: "Member since {date}", he: "חבר מאז {date}" },
   "badge.new": { en: "New player", he: "שחקן חדש" },

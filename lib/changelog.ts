@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "4.2";
+export const VERSION = "4.3";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.3",
+    date: "2026-06-21",
+    changes: [
+      "Tap a player's photo (at the top of their profile) to see it full-screen — and your own photo in Profile & settings too. Works for uploaded photos.",
+    ],
+  },
   {
     version: "4.2",
     date: "2026-06-21",
