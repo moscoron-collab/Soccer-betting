@@ -171,16 +171,6 @@ create table if not exists welcome_gifts (
   created_at timestamptz not null default now()
 );
 
--- ---------- push_subscriptions (Web Push: phone notifications for chat) ----------
-create table if not exists push_subscriptions (
-  endpoint   text primary key,                       -- unique per device/browser
-  player_id  uuid not null references players(id) on delete cascade,
-  p256dh     text not null,                          -- subscription public key
-  auth       text not null,                          -- subscription auth secret
-  created_at timestamptz not null default now()
-);
-create index if not exists push_subs_player_idx on push_subscriptions (player_id);
-
 -- ---------- app_meta (small key/value store) ----------
 -- Used to throttle the activity-driven results refresh to one feed call per minute.
 create table if not exists app_meta (
