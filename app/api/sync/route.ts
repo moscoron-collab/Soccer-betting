@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchMatches } from "@/lib/footballData";
-import { upsertMatches, settleAll } from "@/lib/settle";
+import { upsertMatches, settleAll, settleEarly } from "@/lib/settle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,11 @@ async function runSync() {
   // 2) Settle everything that's now ready (predictions, crowd guesses, parlays).
   const counts = await settleAll();
 
-  return { upserted, ...counts };
+  // 3) Early-settle already-decided bets on in-play matches (half-time leader,
+  //    "guaranteed yes" goal markets) so winnings free up before full-time.
+  const settledEarly = await settleEarly();
+
+  return { upserted, ...counts, settledEarly };
 }
 
 export async function POST(req: Request) {

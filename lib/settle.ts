@@ -203,9 +203,103 @@ export async function settleAll() {
   return { settledMatches, settledPredictions, settledGuesses, settledParlays };
 }
 
+// Matches kicking off on/after this moment are eligible for EARLY settlement of
+// already-decided bets. Set just after the in-play games at launch so they aren't
+// retroactively settled ("start it from upcoming games, not now").
+const EARLY_SETTLE_FROM = "2026-06-21T18:00:00Z";
+
+// Pay out bets whose outcome is already locked, before the match finishes — so
+// the coins free up for new bets. Only for matches that kicked off on/after
+// EARLY_SETTLE_FROM. Cases handled:
+//   • HALFTIME: once the half-time score is known (win OR loss — it's decided).
+//   • GOALS3 = YES once 3+ goals have been scored.
+//   • BTTS  = YES once both teams have scored.
+//   • TOTALS = "4+" once 4+ goals have been scored.
+// (The "no/under" sides and Winner/Exact can still change, so they wait for
+// full-time as usual. Goals can't be un-scored, so the YES sides are safe.)
+export async function settleEarly(): Promise<number> {
+  const { data: live } = await supabase
+    .from("matches")
+    .select("id, home_score, away_score, half_home, half_away, status, kickoff_at")
+    .eq("status", "IN_PLAY") // our feed maps the half-time PAUSED state to IN_PLAY too
+    .gte("kickoff_at", EARLY_SETTLE_FROM)
+    .not("home_score", "is", null)
+    .not("away_score", "is", null);
+
+  let settled = 0;
+  for (const m of live ?? []) {
+    const homeScore = m.home_score as number;
+    const awayScore = m.away_score as number;
+    const halfHome = (m.half_home as number | null) ?? null;
+    const halfAway = (m.half_away as number | null) ?? null;
+    const total = homeScore + awayScore;
+    const halfKnown = halfHome != null && halfAway != null;
+
+    const { data: preds } = await supabase
+      .from("predictions")
+      .select("id, player_id, type, pick, exact_home, exact_away, stake, bonus_mult, boosted")
+      .eq("match_id", m.id)
+      .eq("status", "PENDING")
+      .in("type", ["HALFTIME", "GOALS3", "BTTS", "TOTALS"]);
+
+    for (const p of preds ?? []) {
+      const type = p.type as PredictionType;
+      // Is this bet's result already locked in?
+      let locked = false;
+      if (type === "HALFTIME") locked = halfKnown;
+      else if (type === "GOALS3" && p.pick === "YES") locked = total >= 3;
+      else if (type === "BTTS" && p.pick === "YES") locked = homeScore >= 1 && awayScore >= 1;
+      else if (type === "TOTALS" && p.pick === "4+") locked = total >= 4;
+      if (!locked) continue;
+
+      const result = computePayout(
+        type,
+        p.pick ?? null,
+        p.exact_home,
+        p.exact_away,
+        p.stake,
+        homeScore,
+        awayScore,
+        halfHome,
+        halfAway,
+        Number(p.bonus_mult ?? 1)
+      );
+      const won = result.won;
+      const payout = won && p.boosted ? result.payout * BOOST_MULTIPLIER : result.payout;
+
+      await supabase
+        .from("predictions")
+        .update({ status: won ? "WON" : "LOST", payout })
+        .eq("id", p.id);
+
+      if (payout > 0) {
+        await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: payout });
+        await supabase.rpc("increment_xp", { p_player: p.player_id, p_amount: 25 });
+      }
+
+      if (won) {
+        const { data: newStreak } = await supabase.rpc("bump_streak", {
+          p_player: p.player_id,
+          p_won: true,
+        });
+        const bonus = STREAK_BONUS[newStreak as number];
+        if (bonus) {
+          await supabase.rpc("increment_coins", { p_player: p.player_id, p_amount: bonus });
+        }
+      } else {
+        const { data: shielded } = await supabase.rpc("consume_shield", { p_player: p.player_id });
+        if (!shielded) {
+          await supabase.rpc("bump_streak", { p_player: p.player_id, p_won: false });
+        }
+      }
+      settled++;
+    }
+  }
+  return settled;
+}
+
 // How often (ms) the activity-driven refresh may hit the football-data feed.
 const REFRESH_THROTTLE_MS = 60_000;
-
 // Triggered on app activity (from /api/me). At most once per REFRESH_THROTTLE_MS
 // globally, it pulls fresh results (one cheap request) and settles them, so coins
 // land within ~a minute while anyone is online. Best-effort: never throws.
@@ -227,6 +321,7 @@ export async function quickRefresh(): Promise<void> {
     const recent = await fetchRecentResults(2, 1);
     await upsertMatches(recent);
     await settleAll();
+    await settleEarly();
   } catch (err) {
     console.error("[quickRefresh]", err);
   }

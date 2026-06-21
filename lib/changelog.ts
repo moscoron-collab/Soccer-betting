@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.4";
+export const VERSION = "4.5";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.5",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "Faster winnings: bets already decided pay out before the match ends — half-time leader (at the break), and 3+ goals / both teams score / 4+ goals the moment it happens — so you can reuse those coins right away. (Applies to matches kicking off from now on.)",
+        he: "זכיות מהירות יותר: הימורים שכבר הוכרעו משולמים לפני סוף המשחק — מוביל במחצית (בהפסקה), ו-3+ גולים / שתי הקבוצות כובשות / 4+ גולים ברגע שזה קורה — כך שאפשר להשתמש במטבעות מיד. (חל על משחקים שמתחילים מעכשיו והלאה.)",
+      },
+    ],
+  },
   {
     version: "4.4",
     date: "2026-06-21",
