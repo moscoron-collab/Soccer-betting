@@ -455,6 +455,18 @@ function CountUp({ value }: { value: number }) {
   return <>{display.toLocaleString()}</>;
 }
 
+// Always-visible coin balance, pinned to the bottom corner so it stays on screen
+// while scrolling. `pointer-events-none` so it never blocks taps underneath.
+function CoinChip({ coins }: { coins: number }) {
+  return (
+    <div className="pointer-events-none fixed bottom-4 z-50 ltr:right-4 rtl:left-4">
+      <div className="flex items-center gap-1 rounded-full bg-[#0f2143]/90 px-4 py-2 text-lg font-extrabold text-yellow-300 shadow-lg ring-1 ring-white/15 backdrop-blur">
+        🪙 <CountUp value={coins} />
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------- Auth screen ------------------------------- */
 
 function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
@@ -695,7 +707,9 @@ function Game({
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6">
+    <main className="mx-auto max-w-5xl px-4 pb-24 pt-6">
+      {/* Always-visible coin balance while scrolling */}
+      <CoinChip coins={player.coins} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

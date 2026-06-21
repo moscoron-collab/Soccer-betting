@@ -1,10 +1,17 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.7";
+export const VERSION = "3.8";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.8",
+    date: "2026-06-20",
+    changes: [
+      "Your coin balance now floats in the bottom corner, so it's always visible while you scroll (and it counts up when you win).",
+    ],
+  },
   {
     version: "3.7",
     date: "2026-06-20",
