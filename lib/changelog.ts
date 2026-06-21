@@ -1,10 +1,18 @@
 // Bump VERSION and add an entry at the top whenever you ship something.
 
-export const VERSION = "3.8";
+export const VERSION = "3.9";
 
 export type Release = { version: string; date: string; changes: string[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "3.9",
+    date: "2026-06-20",
+    changes: [
+      "Fixed the daily challenges: removed 'Place 3 bets' and the 'Place a combo' one (combos weren't available to play, so it could never be completed).",
+      "New daily challenges everyone can actually finish: Place a bet, Spin the wheel, and Play the Penalty Shootout — 🪙50 each.",
+    ],
+  },
   {
     version: "3.8",
     date: "2026-06-20",

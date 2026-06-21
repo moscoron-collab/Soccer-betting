@@ -225,9 +225,9 @@ const DICT: Record<string, { en: string; he: string }> = {
   "tier.rookie": { en: "Rookie", he: "מתחיל" },
 
   // Daily challenges (keyed by server challenge key)
-  "challenge.bets_3": { en: "Place 3 bets", he: "בצעו 3 הימורים" },
-  "challenge.combo_1": { en: "Place a combo", he: "בצעו קומבו" },
-  "challenge.minigame_1": { en: "Play a mini-game", he: "שחקו מיני-משחק" },
+  "challenge.bet_1": { en: "Place a bet", he: "בצעו הימור" },
+  "challenge.spin_1": { en: "Spin the wheel", he: "סובבו את הגלגל" },
+  "challenge.penalty_1": { en: "Play the Penalty Shootout", he: "שחקו דו-קרב פנדלים" },
   "challenge.done": { en: "🎯 Challenge done: +🪙{r}!", he: "🎯 אתגר הושלם: +🪙{r}!" },
   "challenge.claimed": { en: "✓ Claimed", he: "✓ נאסף" },
   "challenge.claim": { en: "Claim reward", he: "אספו פרס" },

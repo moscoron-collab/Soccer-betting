@@ -6,9 +6,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CHALLENGES = [
-  { key: "bets_3", label: "Place 3 bets", target: 3, reward: 75 },
-  { key: "combo_1", label: "Place a combo", target: 1, reward: 100 },
-  { key: "minigame_1", label: "Play a mini-game", target: 1, reward: 50 },
+  { key: "bet_1", label: "Place a bet", target: 1, reward: 50 },
+  { key: "spin_1", label: "Spin the wheel", target: 1, reward: 50 },
+  { key: "penalty_1", label: "Play the Penalty Shootout", target: 1, reward: 50 },
 ] as const;
 
 function todayStartISO(): string {
@@ -30,16 +30,15 @@ async function countSince(table: string, playerId: string, sinceISO: string): Pr
 
 async function computeProgress(player: Player): Promise<Record<string, number>> {
   const since = todayStartISO();
-  const [bets, combos, crowd] = await Promise.all([
-    countSince("predictions", player.id, since),
-    countSince("parlays", player.id, since),
-    countSince("crowd_guesses", player.id, since),
-  ]);
+  const bets = await countSince("predictions", player.id, since);
   const spunToday = player.last_spin_at ? new Date(player.last_spin_at) >= new Date(since) : false;
+  const penaltyToday = player.last_penalty_at
+    ? new Date(player.last_penalty_at) >= new Date(since)
+    : false;
   return {
-    bets_3: bets,
-    combo_1: combos,
-    minigame_1: (spunToday ? 1 : 0) + crowd,
+    bet_1: bets,
+    spin_1: spunToday ? 1 : 0,
+    penalty_1: penaltyToday ? 1 : 0,
   };
 }
 
