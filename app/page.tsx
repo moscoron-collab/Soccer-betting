@@ -664,7 +664,7 @@ function Game({
   nextSpinFree: boolean;
   canPenalty: boolean;
   leaderboard: LeaderRow[];
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   onSignOut: () => void;
 }) {
   const { t } = useLang();
@@ -712,6 +712,19 @@ function Game({
     onRefresh();
     loadMatches();
   }, [onRefresh, loadMatches]);
+
+  // Manual ↻ Refresh button: awaits the reload and shows a "Refreshing…" state
+  // so it's clearly doing something even when nothing changed.
+  const [refreshing, setRefreshing] = useState(false);
+  async function manualRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([Promise.resolve(onRefresh()), loadMatches()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function share() {
     const url =
@@ -861,10 +874,11 @@ function Game({
       <Section title={t("game.leaderboard")}>
         <div className="mb-2 flex justify-end">
           <button
-            onClick={refreshAll}
-            className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100"
+            onClick={manualRefresh}
+            disabled={refreshing}
+            className="rounded-lg bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100 disabled:opacity-60"
           >
-            {t("game.refresh")}
+            {refreshing ? t("game.refreshing") : t("game.refresh")}
           </button>
         </div>
         <div className="overflow-hidden rounded-xl bg-white/5">

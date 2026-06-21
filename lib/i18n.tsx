@@ -127,6 +127,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   "game.tabLog": { en: "📊 My Log", he: "📊 היומן שלי" },
   "game.leaderboard": { en: "🏆 Leaderboard", he: "🏆 טבלת מובילים" },
   "game.refresh": { en: "↻ Refresh", he: "↻ רענון" },
+  "game.refreshing": { en: "↻ Refreshing…", he: "↻ מרענן…" },
   "game.viewLog": { en: "View {name}'s log", he: "צפו ביומן של {name}" },
   "game.myPredictions": { en: "My predictions", he: "התחזיות שלי" },
   "game.noActiveBets": {

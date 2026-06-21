@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.5";
+export const VERSION = "4.7";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.7",
+    date: "2026-06-21",
+    changes: [
+      {
+        en: "The leaderboard ↻ Refresh button now shows a 'Refreshing…' state so you can see it working.",
+        he: "כפתור הרענון ↻ בטבלה מציג עכשיו מצב 'מרענן…' כדי שתראו שהוא עובד.",
+      },
+    ],
+  },
   {
     version: "4.5",
     date: "2026-06-21",
