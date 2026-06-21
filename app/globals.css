@@ -2,10 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark base on <html> too, so overscroll/rubber-band at the edges never flashes
+   the default white background (the "white bar flickering at the bottom"). */
+html {
+  background-color: #060f20;
+}
+
 body {
-  background: radial-gradient(circle at top, #13294d 0%, #0b1c38 55%, #060f20 100%);
-  background-attachment: fixed;
+  /* Solid fallback colour behind the gradient. NOTE: no `background-attachment:
+     fixed` — it causes scroll flicker/jank on mobile browsers. */
+  background: radial-gradient(circle at top, #13294d 0%, #0b1c38 55%, #060f20 100%) #060f20 no-repeat;
   min-height: 100vh;
+  min-height: 100dvh;
   color: #e8eef9;
 }
 
