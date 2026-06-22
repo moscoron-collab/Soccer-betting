@@ -144,7 +144,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "lowcoins.topup": { en: "🪙 Daily top-up to 500", he: "🪙 מילוי יומי ל-500" },
   "lowcoins.spin": { en: "🎡 Spin the wheel", he: "🎡 סובבו את הגלגל" },
-  "lowcoins.penalty": { en: "⚽ Penalty Shootout (up to 🪙150)", he: "⚽ דו-קרב פנדלים (עד 🪙150)" },
+  "lowcoins.penalty": { en: "⚽ Penalty Shootout (up to 🪙250)", he: "⚽ דו-קרב פנדלים (עד 🪙250)" },
   "lowcoins.challenges": { en: "🎯 Daily challenges", he: "🎯 אתגרים יומיים" },
   "lowcoins.loginHint": {
     en: "🔥 Open the app every day for a growing login bonus",
@@ -326,8 +326,8 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Penalty shootout
   "penalty.title": { en: "⚽ Penalty Shootout", he: "⚽ דו-קרב פנדלים" },
   "penalty.desc": {
-    en: "Tap Shoot when the ball lines up with the goal. 5 shots, 🪙30 each.",
-    he: "לחצו «בעיטה» כשהכדור מיושר עם השער. 5 בעיטות, 🪙30 כל אחת.",
+    en: "Tap Shoot when the ball lines up with the goal. 5 shots, 🪙50 each.",
+    he: "לחצו «בעיטה» כשהכדור מיושר עם השער. 5 בעיטות, 🪙50 כל אחת.",
   },
   "penalty.comeback": { en: "Come back tomorrow ⚽", he: "חזרו מחר ⚽" },
   "penalty.play": { en: "Play", he: "שחקו" },

@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.12";
+export const VERSION = "4.13";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.13",
+    date: "2026-06-22",
+    changes: [
+      {
+        en: "⚽ Bigger Penalty Shootout rewards: each goal now pays 🪙50 (up from 🪙30) — score all 5 for 🪙250 a day.",
+        he: "⚽ פרסים גדולים יותר בדו-קרב הפנדלים: כל גול משלם עכשיו 🪙50 (במקום 🪙30) — הבקיעו את כל ה-5 ל-🪙250 ביום.",
+      },
+    ],
+  },
   {
     version: "4.12",
     date: "2026-06-21",
