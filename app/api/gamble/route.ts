@@ -34,6 +34,26 @@ export async function POST(req: Request) {
   const delta = won ? amount : -amount;
   await supabase.rpc("increment_coins", { p_player: player.id, p_amount: delta });
 
+  // Temporary diagnostic: tally wins vs losses so we can confirm the 50/50 is fair
+  // in production (players reported it "always loses"). Best-effort — it must never
+  // block or fail the gamble. Uses the existing app_meta store, so no schema change.
+  // Read it any time with: select key, value from app_meta where key like 'gamble_%';
+  try {
+    console.log("[gamble]", { player: player.id, won, amount });
+    const key = won ? "gamble_wins" : "gamble_losses";
+    const { data: row } = await supabase
+      .from("app_meta")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+    const next = String((parseInt(row?.value ?? "0", 10) || 0) + 1);
+    await supabase
+      .from("app_meta")
+      .upsert({ key, value: next, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  } catch {
+    /* diagnostic only — ignore any logging failure */
+  }
+
   return NextResponse.json({
     won,
     amount,
