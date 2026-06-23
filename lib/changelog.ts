@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.14";
+export const VERSION = "4.15";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.15",
+    date: "2026-06-23",
+    changes: [
+      {
+        en: "🗂️ Your bet log now keeps all bets on the same match stacked together (most recent match on top) instead of scattering them across the list — much easier to read your history.",
+        he: "🗂️ יומן ההימורים שלכם שומר עכשיו את כל ההימורים על אותו משחק יחד (המשחק האחרון למעלה) במקום לפזר אותם ברשימה — הרבה יותר קל לקרוא את ההיסטוריה.",
+      },
+    ],
+  },
   {
     version: "4.14",
     date: "2026-06-23",

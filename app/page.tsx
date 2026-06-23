@@ -113,6 +113,8 @@ type Match = {
 };
 type Prediction = {
   id: string;
+  match_id: number;
+  created_at?: string | null;
   type: BetType;
   pick: string | null;
   exact_home: number | null;
@@ -137,6 +139,23 @@ type Prediction = {
     away_crest: string | null;
   } | null;
 };
+
+// Group a player's bet log so every bet on the same match sits together, with the
+// most recently-placed match first and the newest bet first within each match.
+// (The lists arrive newest-first; a stable group-by-match preserves that order.)
+function groupBetsByMatch(predictions: Prediction[]): Prediction[] {
+  const byTime = [...predictions].sort(
+    (a, b) =>
+      new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+  );
+  const byMatch = new Map<number, Prediction[]>();
+  for (const p of byTime) {
+    const arr = byMatch.get(p.match_id) ?? [];
+    arr.push(p);
+    byMatch.set(p.match_id, arr);
+  }
+  return Array.from(byMatch.values()).flat();
+}
 
 // All bet markets, in display order. Labels/prompts are translated via i18n keys
 // `bet.<TYPE>` and `prompt.<TYPE>`.
@@ -1433,7 +1452,7 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
               {data.predictions.length === 0 ? (
                 <p className="text-sm text-blue-100/70">{t("playerLog.noBets")}</p>
               ) : (
-                data.predictions.map((p) => {
+                groupBetsByMatch(data.predictions).map((p) => {
                   const m = p.matches;
                   const color =
                     p.status === "WON" ? "text-green-300" : p.status === "LOST" ? "text-red-300" : "text-blue-100/70";
@@ -1592,7 +1611,7 @@ function MyLog({
         <Empty text={pending > 0 ? t("mylog.pendingEmpty") : t("mylog.noFinished")} />
       ) : (
         <div className="space-y-2">
-          {settled.map((p) => {
+          {groupBetsByMatch(settled).map((p) => {
             const m = p.matches;
             const delta = p.status === "WON" ? p.payout - p.stake : -p.stake;
             return (
