@@ -311,18 +311,6 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "prize.coins": { en: "🪙 +{n} coins", he: "🪙 +{n} מטבעות" },
 
-  // Double-or-nothing (after a coin win)
-  "gamble.offer": {
-    en: "🎲 Double or nothing? Risk your 🪙{n} on a 50/50.",
-    he: "🎲 הכפלה או כלום? סכנו את 🪙{n} שלכם בהגרלת 50/50.",
-  },
-  "gamble.go": { en: "🎲 Double or nothing", he: "🎲 הכפלה או כלום" },
-  "gamble.keep": { en: "Keep 🪙{n}", he: "השאירו 🪙{n}" },
-  "gamble.won": { en: "🎲 Doubled! You now have 🪙{n}!", he: "🎲 הכפלתם! יש לכם עכשיו 🪙{n}!" },
-  "gamble.lost": { en: "🎲 Lost the 🪙{n} — better luck next time!", he: "🎲 הפסדתם את ה-🪙{n} — בהצלחה בפעם הבאה!" },
-  "gamble.wonShort": { en: "🎉 Doubled it!", he: "🎉 הכפלתם!" },
-  "gamble.lostShort": { en: "😬 Lost it — no worries!", he: "😬 הפסדתם — אין נורא!" },
-
   // Penalty shootout
   "penalty.title": { en: "⚽ Penalty Shootout", he: "⚽ דו-קרב פנדלים" },
   "penalty.desc": {

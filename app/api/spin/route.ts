@@ -72,9 +72,6 @@ export async function POST(req: Request) {
   update.spin_day = today;
   update.spins_today = used + 1;
   update.last_spin_at = new Date().toISOString();
-  // Double-or-nothing: a plain coin win (not a jackpot, no-win or token) can be
-  // gambled 50/50 once via /api/gamble. Store the stake; any new spin overwrites it.
-  update.pending_gamble = slice.kind === "COINS" && awarded > 0 ? awarded : 0;
 
   const { error } = await supabase.from("players").update(update).eq("id", player.id);
   if (error) return NextResponse.json({ error: "Try again." }, { status: 500 });
@@ -95,6 +92,5 @@ export async function POST(req: Request) {
     boost_2x: update.boost_2x ?? player.boost_2x,
     streak_shield: update.streak_shield ?? player.streak_shield,
     free_bets: update.free_bets ?? player.free_bets ?? 0,
-    gambleAmount: update.pending_gamble,
   });
 }

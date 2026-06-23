@@ -1914,10 +1914,6 @@ function SpinWheel({
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<WheelSlice | null>(null);
-  // Double-or-nothing: coins from a plain coin win that can be gambled 50/50 once.
-  const [gambleAmount, setGambleAmount] = useState(0);
-  const [gambling, setGambling] = useState(false);
-  const [gambleOutcome, setGambleOutcome] = useState<"won" | "lost" | null>(null);
 
   const seg = 360 / WHEEL.length;
   const gradient = `conic-gradient(${WHEEL.map(
@@ -1931,8 +1927,6 @@ function SpinWheel({
     if (!canSpin) return;
     setSpinning(true);
     setResult(null);
-    setGambleAmount(0);
-    setGambleOutcome(null);
     const res = await fetch("/api/spin", {
       method: "POST",
       headers: authHeaders(token),
@@ -1958,32 +1952,8 @@ function SpinWheel({
       setResult(slice);
       celebrate(prizeText(t, slice));
       setSpinning(false);
-      // A plain coin win can be gambled double-or-nothing once.
-      if (slice.kind === "COINS" && slice.amount > 0) {
-        setGambleAmount(data.gambleAmount ?? slice.amount);
-      }
       onDone();
     }, SPIN_MS);
-  }
-
-  async function doGamble() {
-    if (gambling || gambleAmount <= 0) return;
-    setGambling(true);
-    const res = await fetch("/api/gamble", { method: "POST", headers: authHeaders(token) });
-    const data = await res.json();
-    setGambling(false);
-    if (!res.ok) {
-      toast(data.error ?? t("common.tryAgain"));
-      return;
-    }
-    setGambleOutcome(data.won ? "won" : "lost");
-    setGambleAmount(0);
-    celebrate(
-      data.won
-        ? t("gamble.won", { n: (data.amount * 2).toLocaleString() })
-        : t("gamble.lost", { n: data.amount.toLocaleString() })
-    );
-    onDone();
   }
 
   return (
@@ -2038,38 +2008,6 @@ function SpinWheel({
 
       {result && !spinning && (
         <p className="mt-3 text-center text-sm font-bold text-yellow-200">{prizeText(t, result)}</p>
-      )}
-
-      {/* Double-or-nothing on a coin win */}
-      {!spinning && gambleAmount > 0 && gambleOutcome === null && (
-        <div className="mt-2 rounded-lg bg-purple-500/15 p-2 text-center">
-          <p className="text-xs font-semibold text-purple-100">
-            {t("gamble.offer", { n: gambleAmount.toLocaleString() })}
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={doGamble}
-              disabled={gambling}
-              className="flex-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
-            >
-              {gambling ? t("spin.spinning") : t("gamble.go")}
-            </button>
-            <button
-              onClick={() => setGambleAmount(0)}
-              disabled={gambling}
-              className="flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
-            >
-              {t("gamble.keep", { n: gambleAmount.toLocaleString() })}
-            </button>
-          </div>
-        </div>
-      )}
-      {gambleOutcome && (
-        <p
-          className={`mt-2 text-center text-sm font-bold ${gambleOutcome === "won" ? "text-green-300" : "text-red-300"}`}
-        >
-          {gambleOutcome === "won" ? t("gamble.wonShort") : t("gamble.lostShort")}
-        </p>
       )}
 
       <button
