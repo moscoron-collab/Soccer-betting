@@ -2107,8 +2107,16 @@ function PenaltyShootout({
   const [reward, setReward] = useState<number | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const markRef = useRef<HTMLDivElement>(null);
+  // Running tally kept in refs so rapid taps (or a laggy phone) can't lose a goal
+  // to React's async state batching — the count must be exact when we submit it.
+  const shotsRef = useRef(0);
+  const goalsRef = useRef(0);
+  const doneRef = useRef(false);
 
   function start() {
+    shotsRef.current = 0;
+    goalsRef.current = 0;
+    doneRef.current = false;
     setStarted(true);
     setShots(0);
     setGoals(0);
@@ -2120,18 +2128,23 @@ function PenaltyShootout({
   async function shoot() {
     const bar = barRef.current;
     const mark = markRef.current;
-    if (!bar || !mark || done) return;
+    if (!bar || !mark || doneRef.current) return;
     const b = bar.getBoundingClientRect();
     const m = mark.getBoundingClientRect();
     const frac = (m.left + m.width / 2 - b.left) / b.width; // 0..1
     const isGoal = frac >= 0.38 && frac <= 0.62;
-    const newGoals = goals + (isGoal ? 1 : 0);
-    const newShots = shots + 1;
+    // Advance the authoritative counters via refs (immune to render timing),
+    // then mirror them into state for the on-screen display.
+    const newGoals = goalsRef.current + (isGoal ? 1 : 0);
+    const newShots = shotsRef.current + 1;
+    goalsRef.current = newGoals;
+    shotsRef.current = newShots;
     setResult(isGoal ? t("penalty.goal") : t("penalty.saved"));
     setGoals(newGoals);
     setShots(newShots);
 
     if (newShots >= 5) {
+      doneRef.current = true;
       setDone(true);
       const res = await fetch("/api/penalty", {
         method: "POST",

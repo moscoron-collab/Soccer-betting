@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.13";
+export const VERSION = "4.14";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.14",
+    date: "2026-06-23",
+    changes: [
+      {
+        en: "⚽ Fixed a Penalty Shootout bug: when you tapped quickly, some of the goals you scored weren't being counted — so you got fewer coins than you earned. Every goal now counts.",
+        he: "⚽ תוקן באג בדו-קרב הפנדלים: כשבעטתם מהר, חלק מהגולים שהבקעתם לא נספרו — וקיבלתם פחות מטבעות ממה שהרווחתם. עכשיו כל גול נספר.",
+      },
+    ],
+  },
   {
     version: "4.13",
     date: "2026-06-22",
