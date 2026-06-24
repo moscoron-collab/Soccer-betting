@@ -951,7 +951,7 @@ function BannerMarquee({
   myRank: number | null;
   welcomeBack: { giftAmount: number; awayHours: number } | null;
 }) {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const [data, setData] = useState<any | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
   // Each player's own scroll speed, remembered in their browser (no DB).
@@ -993,20 +993,28 @@ function BannerMarquee({
   const speedFactor = speed === "slow" ? 1.8 : speed === "fast" ? 0.55 : 1;
   const duration = `${Math.round(base * speedFactor)}s`;
   const speedIcon = speed === "slow" ? "🐢" : speed === "fast" ? "🐇" : "🚶";
-  const isHe = lang === "he";
 
   return (
     <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-700 text-white shadow-md">
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-3">
         {messages.length > 0 ? (
-          <div className="flex-1 overflow-hidden py-1.5">
-            <div
-              className="marquee-track text-sm font-semibold"
-              style={{ animationDuration: duration, animationDirection: isHe ? "reverse" : "normal" }}
-            >
-              <span className="marquee-seg">{joined}</span>
+          // dir="ltr" keeps the scroll mechanics consistent in both languages;
+          // each message uses dir="auto" so Hebrew text still renders right-to-left.
+          <div className="flex-1 overflow-hidden py-1.5" dir="ltr">
+            <div className="marquee-track text-sm font-semibold" style={{ animationDuration: duration }}>
+              <span className="marquee-seg">
+                {messages.map((m, i) => (
+                  <span key={i} dir="auto" className="marquee-msg">
+                    {m}
+                  </span>
+                ))}
+              </span>
               <span className="marquee-seg" aria-hidden="true">
-                {joined}
+                {messages.map((m, i) => (
+                  <span key={i} dir="auto" className="marquee-msg">
+                    {m}
+                  </span>
+                ))}
               </span>
             </div>
           </div>
@@ -1037,7 +1045,8 @@ function BannerMarquee({
       <style>{`
         .marquee-track { display:inline-flex; white-space:nowrap; will-change:transform; animation-name:spg-marquee; animation-timing-function:linear; animation-iteration-count:infinite; }
         .marquee-track:hover { animation-play-state:paused; }
-        .marquee-seg { padding-inline-end:3rem; }
+        .marquee-seg { display:inline-flex; }
+        .marquee-msg::after { content:"•"; margin:0 0.9rem; opacity:0.5; }
         @keyframes spg-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
       `}</style>
     </div>
