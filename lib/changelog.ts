@@ -13,8 +13,8 @@ export const CHANGELOG: Release[] = [
     date: "2026-06-24",
     changes: [
       {
-        en: "🎡 Wheel sounds & a fix: landing on 'No win' no longer throws confetti — you'll hear a little sad 'womp' instead. And the wheel now ratchets and whirrs while it spins.",
-        he: "🎡 צלילים בגלגל ותיקון: נחיתה על 'אין זכייה' כבר לא מקפיצה קונפטי — במקום זה תשמעו צליל אכזבה קטן. והגלגל עכשיו מרשרש ומזמזם בזמן שהוא מסתובב.",
+        en: "🎡 Wheel sounds & a fix: landing on 'No win' no longer throws confetti — you'll hear a little sad 'womp' instead. And the wheel now clicks like a real prize wheel while it spins.",
+        he: "🎡 צלילים בגלגל ותיקון: נחיתה על 'אין זכייה' כבר לא מקפיצה קונפטי — במקום זה תשמעו צליל אכזבה קטן. והגלגל עכשיו מתקתק כמו גלגל פרסים אמיתי בזמן שהוא מסתובב.",
       },
     ],
   },
