@@ -31,6 +31,11 @@ export const BOOST_MULTIPLIER = 2; // a "2x payout" power-up doubles a winning b
 // coins risked: a win pays the full payout, a loss costs nothing.
 export const FREE_BET_STAKE = 100;
 
+// "We missed you" welcome-back gift: granted once when a player returns after being
+// away at least this many hours. Re-armed only by another absence of this length.
+export const WELCOMEBACK_GIFT = 250;
+export const WELCOMEBACK_AWAY_HOURS = 48;
+
 export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 export type WinnerPick = "HOME" | "DRAW" | "AWAY";
 

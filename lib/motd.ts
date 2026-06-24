@@ -59,6 +59,21 @@ export function pickMotd(
   return upcoming[0]?.id ?? null;
 }
 
+// Global "featured match" for the Road-to-the-Final event: ONE pick shared by all
+// players (unlike the per-player Match of the Day). It's the biggest-league match that
+// hasn't kicked off yet (ties broken by soonest kickoff), so everyone can still bet on
+// it. Returns null if nothing's upcoming.
+export function pickFeaturedGlobal(matches: MotdMatch[], now: Date = new Date()): number | null {
+  const upcoming = matches.filter((m) => new Date(m.kickoff_at).getTime() > now.getTime());
+  if (upcoming.length === 0) return null;
+  const best = [...upcoming].sort((a, b) => {
+    const d = leagueScore(a.competition) - leagueScore(b.competition);
+    if (d !== 0) return d;
+    return new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime();
+  });
+  return best[0].id;
+}
+
 // Server-side: load a small window of matches and pick the MOTD for a timezone.
 // Includes already-started/finished matches from today so the pick stays fixed
 // for the whole day instead of sliding to the next game.

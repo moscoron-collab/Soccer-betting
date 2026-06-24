@@ -7,11 +7,14 @@ import {
   CASHBACK_PCT,
   CASHBACK_CAP,
   loginBonusFor,
+  WELCOMEBACK_GIFT,
+  WELCOMEBACK_AWAY_HOURS,
 } from "@/lib/payout";
 import type { Player } from "@/lib/auth";
 import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
 import { quickRefresh } from "@/lib/settle";
 import { localDate, isNewLocalDay } from "@/lib/time";
+import { netWorthLeaderboard, toPublic } from "@/lib/networth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,6 +113,41 @@ async function grantCashback(
   return { amount: refund };
 }
 
+// "We missed you" welcome-back gift. Reads/writes last_seen_at defensively so a
+// missing column (schema not run yet) can never break the load. The gap since the
+// player's previous load is the "time away"; if it's >= WELCOMEBACK_AWAY_HOURS we
+// grant the gift once, then stamp "now". Re-armed only by another long absence.
+// Returns { giftAmount, awayHours } when the player was away long enough to greet.
+async function grantWelcomeBack(
+  player: Player
+): Promise<{ giftAmount: number; awayHours: number } | null> {
+  try {
+    const { data } = await supabase
+      .from("players")
+      .select("last_seen_at")
+      .eq("id", player.id)
+      .maybeSingle();
+    const lastSeen = (data as any)?.last_seen_at as string | null | undefined;
+    const now = Date.now();
+    const awayHours = lastSeen ? (now - new Date(lastSeen).getTime()) / 3_600_000 : Infinity;
+
+    // Always refresh the heartbeat (no-ops safely if the column is missing).
+    await supabase
+      .from("players")
+      .update({ last_seen_at: new Date(now).toISOString() })
+      .eq("id", player.id);
+
+    if (lastSeen == null) return null; // first load — just start the heartbeat
+    if (awayHours < WELCOMEBACK_AWAY_HOURS) return null;
+
+    await supabase.rpc("increment_coins", { p_player: player.id, p_amount: WELCOMEBACK_GIFT });
+    player.coins += WELCOMEBACK_GIFT;
+    return { giftAmount: WELCOMEBACK_GIFT, awayHours: Math.round(awayHours) };
+  } catch {
+    return null; // last_seen_at column missing — skip safely
+  }
+}
+
 // GET /api/me?tz=America/New_York -> current player + their predictions.
 // `tz` is the player's timezone so daily features reset at their local midnight.
 export async function GET(req: Request) {
@@ -146,6 +184,8 @@ export async function GET(req: Request) {
   // Daily login bonus + daily loss cashback (both once per player's local day).
   const loginBonus = await grantLoginBonus(player, tz, today);
   const cashback = await grantCashback(player, tz);
+  // "We missed you" gift for players returning after a long absence (>= 48h).
+  const welcomeBack = await grantWelcomeBack(player);
 
   const { data: predictions } = await supabase
     .from("predictions")
@@ -167,12 +207,13 @@ export async function GET(req: Request) {
 
   // Serve the leaderboard from here too: /api/me is always dynamic (it reads the
   // player token), so it can't be edge-cached the way the public /api/leaderboard
-  // can — guaranteeing live coin totals and avatars for everyone.
-  const { data: leaderboard } = await supabase
-    .from("players")
-    .select("username, coins, avatar, created_at")
-    .order("coins", { ascending: false })
-    .limit(50);
+  // can — guaranteeing live totals and avatars for everyone. Ranked by Net Worth
+  // (coins + coins locked in pending bets) so betting never drops your rank.
+  const rankedAll = await netWorthLeaderboard(1000);
+  const myIndex = rankedAll.findIndex((r) => r.id === player.id);
+  const myRank = myIndex >= 0 ? myIndex + 1 : null;
+  const myInPlay = myIndex >= 0 ? rankedAll[myIndex].inPlay : 0;
+  const myNetWorth = myIndex >= 0 ? rankedAll[myIndex].netWorth : player.coins;
 
   return NextResponse.json(
     {
@@ -182,10 +223,15 @@ export async function GET(req: Request) {
       spinsLeft,
       nextSpinFree,
       canPenalty,
-      leaderboard: leaderboard ?? [],
+      leaderboard: toPublic(rankedAll.slice(0, 50)),
+      myRank,
+      myInPlay,
+      myNetWorth,
+      totalPlayers: rankedAll.length,
       welcomeGift,
       loginBonus,
       cashback,
+      welcomeBack,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );

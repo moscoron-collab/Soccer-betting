@@ -25,6 +25,7 @@ create table if not exists players (
   login_streak    integer not null default 0,        -- consecutive-day login streak (daily login bonus)
   last_login_day  date,                              -- last local day the login bonus was granted
   last_cashback_at timestamptz,                      -- last time daily loss-cashback was granted
+  last_seen_at    timestamptz,                       -- last load (powers the "we missed you" welcome-back gift)
   created_at      timestamptz not null default now()
 );
 
@@ -41,6 +42,7 @@ alter table players add column if not exists is_admin        boolean not null de
 alter table players add column if not exists login_streak     integer not null default 0;
 alter table players add column if not exists last_login_day   date;
 alter table players add column if not exists last_cashback_at timestamptz;
+alter table players add column if not exists last_seen_at     timestamptz;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (
@@ -194,6 +196,27 @@ create table if not exists app_meta (
 insert into app_meta (key, value)
   values ('last_results_fetch', '1970-01-01T00:00:00.000Z')
   on conflict (key) do nothing;
+
+-- ---------- "Road to the Final" event config (the admin control panel) ----------
+-- Stored as app_meta key/value rows. Defaults keep the event OFF and the banner
+-- admin-only (preview mode) until the admin flips them from the in-app panel.
+insert into app_meta (key, value) values
+  ('banner_public',    'false'),               -- false = only admins see the banner
+  ('event_on',         'false'),               -- false = no event lines / no featured multiplier
+  ('event_name',       'Road to the Final'),
+  ('featured_mult',    '2.5'),                  -- featured match Winner payout (total ×)
+  ('jackpot_amount',   '5000'),                -- displayed jackpot (admin bumps it)
+  ('featured_override','')                      -- a match id to force-feature, or '' for auto
+  on conflict (key) do nothing;
+
+-- ---------- jackpot_wins (log of jackpot payouts, for the Hall of Fame) ----------
+create table if not exists jackpot_wins (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  amount      integer not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists jackpot_wins_created_idx on jackpot_wins (created_at desc);
 
 -- Note: the app talks to the database only through server-side API routes using the
 -- service_role key, so Row Level Security is not required for V1. If you later expose
