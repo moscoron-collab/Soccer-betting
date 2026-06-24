@@ -2,12 +2,26 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.16";
+export const VERSION = "4.17";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.17",
+    date: "2026-06-24",
+    changes: [
+      {
+        en: "🏆 Fairer leaderboard: you're now ranked by your total worth — your coins PLUS the coins riding on your open bets — so placing a bet never drops your rank. Your balance now also shows how much you have 'in play'.",
+        he: "🏆 טבלה הוגנת יותר: מעכשיו מדורגים לפי השווי הכולל שלכם — המטבעות שלכם ועוד המטבעות שמונחים על הימורים פתוחים — כך שביצוע הימור אף פעם לא מוריד אתכם בדירוג. המאזן שלכם מציג עכשיו גם כמה יש לכם 'בהימור'.",
+      },
+      {
+        en: "💙 Welcome-back gift: been away a couple of days? We'll greet you with a 🪙250 bonus when you return.",
+        he: "💙 מתנת חזרה: לא הייתם כמה ימים? נקבל אתכם בחזרה עם בונוס של 🪙250.",
+      },
+    ],
+  },
   {
     version: "4.16",
     date: "2026-06-23",
