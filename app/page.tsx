@@ -832,12 +832,8 @@ function buildBannerMessages(
     if (line) msgs.push(line);
   }
 
-  // 3) Match of the Day — skipped if it's the same game as the event's featured
-  //    match (avoid two ⭐ lines about one match).
-  const featuredId = data.event?.featured?.id;
-  if (data.motd && !(data.event?.on && featuredId && data.motd.id === featuredId)) {
-    msgs.push(motdLine(t, data.motd));
-  }
+  // (Match of the Day is shown as its own gold "pop" bar below the ticker,
+  //  not as a scrolling line.)
 
   // 4) Event (Road to the Final).
   const ev = data.event;
@@ -1108,6 +1104,14 @@ function BannerMarquee({
           </button>
         )}
       </div>
+      {data.motd && (
+        <button
+          onClick={() => scrollToId("matches")}
+          className="motd-pop flex w-full items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 text-center text-sm font-extrabold text-gray-900"
+        >
+          <span dir="auto">{motdLine(t, data.motd)}</span>
+        </button>
+      )}
       {data.isAdmin && showAdmin && (
         <EventAdmin token={token} initial={data.config} matches={data.adminMatches ?? []} onSaved={load} />
       )}
@@ -1117,6 +1121,8 @@ function BannerMarquee({
         .marquee-seg { display:inline-flex; }
         .marquee-msg::after { content:"•"; margin:0 0.9rem; opacity:0.5; }
         @keyframes spg-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+        .motd-pop { animation: motd-pulse 1.8s ease-in-out infinite; }
+        @keyframes motd-pulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.12); } }
       `}</style>
     </div>
   );
@@ -1515,7 +1521,7 @@ function Game({
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div id="matches" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {shown.map((m) => (
                 <MatchCard
                   key={m.id}
