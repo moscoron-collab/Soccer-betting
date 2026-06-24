@@ -8,8 +8,16 @@ import {
   spinWhir,
   winFanfareShort,
   winFanfareTriumph,
+  winCoinCascade,
+  winArpeggio,
+  winSlotDing,
+  jackpotDrumroll,
+  jackpotBigWin,
   loseBuzzer,
   loseWomp,
+  loseDeflate,
+  loseAww,
+  loseBoing,
 } from "@/lib/sounds";
 import { useEffect, useState } from "react";
 import { previewSfx } from "@/lib/sfx";
@@ -51,6 +59,42 @@ const GROUPS: { title: string; emoji: string; items: Candidate[] }[] = [
         note: "Longer brass fanfare with a held chord (~2s).",
         play: () => winFanfareTriumph(),
       },
+      {
+        id: "win-c",
+        label: "Win C — Coin cascade",
+        note: "A bright shower of coins tumbling.",
+        play: () => winCoinCascade(),
+      },
+      {
+        id: "win-d",
+        label: "Win D — Rising arpeggio",
+        note: "A quick bright climb to a high sparkle.",
+        play: () => winArpeggio(),
+      },
+      {
+        id: "win-e",
+        label: "Win E — Slot ding-ding",
+        note: "Three bright slot-machine bell hits.",
+        play: () => winSlotDing(),
+      },
+    ],
+  },
+  {
+    title: "Jackpot (big win)",
+    emoji: "💰",
+    items: [
+      {
+        id: "jack-a",
+        label: "Jackpot A — Drumroll",
+        note: "Accelerating drumroll into a cymbal, bells + held chord.",
+        play: () => jackpotDrumroll(),
+      },
+      {
+        id: "jack-b",
+        label: "Jackpot B — Big-win run",
+        note: "An ascending run landing on a cymbal + bright bells.",
+        play: () => jackpotBigWin(),
+      },
     ],
   },
   {
@@ -68,6 +112,24 @@ const GROUPS: { title: string; emoji: string; items: Candidate[] }[] = [
         label: "Lose B — Sad womp",
         note: "Descending 'womp womp' sad trombone (~1.2s).",
         play: () => loseWomp(),
+      },
+      {
+        id: "lose-c",
+        label: "Lose C — Deflating balloon",
+        note: "A wobbly pitch sliding down as the air escapes.",
+        play: () => loseDeflate(),
+      },
+      {
+        id: "lose-d",
+        label: "Lose D — Gentle 'aww'",
+        note: "A soft, sympathetic descending sigh.",
+        play: () => loseAww(),
+      },
+      {
+        id: "lose-e",
+        label: "Lose E — Cartoon boing",
+        note: "A quick springy comedic boing.",
+        play: () => loseBoing(),
       },
     ],
   },
