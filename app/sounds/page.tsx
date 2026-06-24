@@ -11,6 +11,8 @@ import {
   loseBuzzer,
   loseWomp,
 } from "@/lib/sounds";
+import { useEffect, useState } from "react";
+import { previewSfx } from "@/lib/sfx";
 
 type Candidate = { id: string; label: string; note: string; play: () => void };
 
@@ -71,6 +73,52 @@ const GROUPS: { title: string; emoji: string; items: Candidate[] }[] = [
   },
 ];
 
+// Real recorded files that can be dropped into /public/sfx (see that folder's
+// README). Each row auditions /sfx/<name>.mp3 and shows whether the file is there.
+type FileSfx = { name: string; label: string; note: string; core: boolean };
+const FILE_SFX: FileSfx[] = [
+  { name: "spin", label: "Wheel spinning", note: "Plays while the wheel turns (~3–4s, or a short loop).", core: true },
+  { name: "win", label: "Win (small / medium)", note: "Any normal coin win on the wheel.", core: true },
+  { name: "jackpot", label: "Jackpot", note: "The big 💰 jackpot win.", core: true },
+  { name: "no-win", label: "No win", note: "Landed on the 😬 no-win slice.", core: true },
+  { name: "coin", label: "Coin cha-ching", note: "Coins landing — payouts / winning a bet.", core: true },
+  { name: "bet-placed", label: "Bet placed", note: "Confirmation when you place a bet.", core: false },
+  { name: "bet-won", label: "Bet won", note: "A prediction settles as a win.", core: false },
+  { name: "bet-lost", label: "Bet lost", note: "A prediction settles as a loss.", core: false },
+  { name: "level-up", label: "Level up", note: "Reaching a new level.", core: false },
+  { name: "penalty-goal", label: "Penalty goal", note: "Scoring in the Penalty Shootout.", core: false },
+];
+
+function FileSfxRow({ name, label, note }: { name: string; label: string; note: string }) {
+  const [present, setPresent] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/sfx/${name}.mp3`, { method: "HEAD" })
+      .then((r) => alive && setPresent(r.ok))
+      .catch(() => alive && setPresent(false));
+    return () => {
+      alive = false;
+    };
+  }, [name]);
+
+  const status = present === null ? "checking…" : present ? "✓ added" : "not added yet";
+  return (
+    <button
+      onClick={() => previewSfx(name)}
+      className="w-full rounded-xl bg-white/5 p-3 text-left transition hover:bg-white/10"
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">{label}</span>
+        <span className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold">▶ Play</span>
+      </div>
+      <p className="mt-1 text-xs text-blue-100/60">{note}</p>
+      <p className="mt-1 text-[11px] text-blue-100/40">
+        file: <code>/sfx/{name}.mp3</code> · {status}
+      </p>
+    </button>
+  );
+}
+
 export default function SoundLab() {
   return (
     <main className="mx-auto max-w-md px-5 py-10">
@@ -102,6 +150,33 @@ export default function SoundLab() {
           </div>
         </section>
       ))}
+
+      <section className="mt-9">
+        <h2 className="mb-1 text-lg font-bold">🎧 Real sound files (drop-ins)</h2>
+        <p className="mb-3 text-xs text-blue-100/60">
+          These play from <code>/sfx/</code>. Add an MP3 with the exact name shown (see the
+          <code> public/sfx</code> folder) and it lights up “✓ added”. Send me the files and I’ll
+          wire them into the game.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-blue-200/80">Core</h3>
+            <div className="space-y-2">
+              {FILE_SFX.filter((f) => f.core).map((f) => (
+                <FileSfxRow key={f.name} name={f.name} label={f.label} note={f.note} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-blue-200/80">Optional extras</h3>
+            <div className="space-y-2">
+              {FILE_SFX.filter((f) => !f.core).map((f) => (
+                <FileSfxRow key={f.name} name={f.name} label={f.label} note={f.note} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <p className="mt-8 text-center text-xs text-blue-100/40">
         Preview page · nothing here changes the game yet.
