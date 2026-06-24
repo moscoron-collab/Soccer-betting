@@ -400,6 +400,10 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "⭐ Match of the Day — winning bets get a bonus!",
     he: "⭐ משחק היום — הימורים מנצחים מקבלים בונוס!",
   },
+  "card.featured": {
+    en: "⭐ FEATURED — Winner pays {mult}×!",
+    he: "⭐ משחק נבחר — מנצח משלם {mult}×!",
+  },
   "card.tip": {
     en: "💡 Place a bet on each option — backing the unpopular pick pays an underdog bonus.",
     he: "💡 הימרו על כל אפשרות — תמיכה בניחוש הפחות פופולרי מזכה בבונוס מאנדרדוג.",
@@ -469,6 +473,7 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "🚀 Biggest climber: {name} jumped from #{from} to #{to}!",
     he: "🚀 הזינוק הגדול: {name} עלה ממקום #{from} למקום #{to}!",
   },
+  "banner.pays": { en: "Winner pays {mult}×!", he: "מנצח משלם {mult}×!" },
   "banner.biggestWin": {
     en: "🏆 Biggest win: {name} turned 🪙{stake} into 🪙{payout}!",
     he: "🏆 הזכייה הגדולה: {name} הפך 🪙{stake} ל-🪙{payout}!",

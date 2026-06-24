@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getMotdId } from "@/lib/motd";
+import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,9 +67,12 @@ export async function GET(req: Request) {
   }));
 
   const motdId = await getMotdId(tz);
+  // Featured matches (the gold "pop" set) so the list can highlight them too.
+  const cfg = await getEventConfig();
+  const featuredIds = cfg.eventOn ? await getFeaturedMatchIds(cfg) : [];
 
   return NextResponse.json(
-    { matches: withStats, motdId },
+    { matches: withStats, motdId, featuredIds, featuredMult: cfg.featuredMult },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );
 }

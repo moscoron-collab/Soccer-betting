@@ -1084,6 +1084,8 @@ function BannerMarquee({
         ? [data.motd]
         : [];
   const goldMatch = goldList.length ? goldList[featIdx % goldList.length] : null;
+  const goldFromFeatured = !!(data.event?.on && data.event.featuredMatches?.length);
+  const goldMult = goldFromFeatured ? fmtMult(data.event.mult) : "3";
 
   return (
     <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-700 text-white shadow-md">
@@ -1137,7 +1139,10 @@ function BannerMarquee({
           onClick={() => scrollToId("matches")}
           className="motd-pop flex w-full items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 text-center text-sm font-extrabold text-gray-900"
         >
-          <span dir="auto">{motdLine(t, goldMatch)}</span>
+          <span dir="auto">
+            {motdLine(t, goldMatch)}
+            {goldMatch.status !== "FINISHED" ? ` — ${t("banner.pays", { mult: goldMult })}` : ""}
+          </span>
         </button>
       )}
       {data.isAdmin && showAdmin && (
@@ -1186,6 +1191,8 @@ function Game({
   const { t } = useLang();
   const [matches, setMatches] = useState<Match[]>([]);
   const [motdId, setMotdId] = useState<number | null>(null);
+  const [featuredIds, setFeaturedIds] = useState<number[]>([]);
+  const [featuredMult, setFeaturedMult] = useState<number>(2.5);
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
@@ -1216,6 +1223,8 @@ function Game({
     const data = await res.json();
     setMatches(data.matches ?? []);
     setMotdId(data.motdId ?? null);
+    setFeaturedIds(data.featuredIds ?? []);
+    setFeaturedMult(data.featuredMult ?? 2.5);
   }, []);
 
   useEffect(() => {
@@ -1558,6 +1567,8 @@ function Game({
                   coins={player.coins}
                   myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
+                  isFeatured={featuredIds.includes(m.id)}
+                  featuredMult={featuredMult}
                   boost={player.boost_2x ?? 0}
                   freeBets={player.free_bets ?? 0}
                   onOpenPlayer={setViewPlayer}
@@ -3191,6 +3202,8 @@ function MatchCard({
   coins,
   myBets,
   isMotd,
+  isFeatured,
+  featuredMult,
   boost,
   freeBets,
   onOpenPlayer,
@@ -3201,6 +3214,8 @@ function MatchCard({
   coins: number;
   myBets: Prediction[];
   isMotd?: boolean;
+  isFeatured?: boolean;
+  featuredMult?: number;
   boost?: number;
   freeBets?: number;
   onOpenPlayer?: (username: string) => void;
@@ -3228,7 +3243,15 @@ function MatchCard({
   }
 
   return (
-    <div className={`rounded-xl bg-white/5 p-4 ${isMotd ? "ring-2 ring-yellow-400/70" : ""}`}>
+    <div
+      className={`rounded-xl bg-white/5 p-4 ${
+        isFeatured
+          ? "ring-2 ring-amber-400 shadow-lg shadow-amber-400/40"
+          : isMotd
+            ? "ring-2 ring-yellow-400/70"
+            : ""
+      }`}
+    >
       <div className="flex items-center justify-between text-xs text-blue-100/60">
         <span>{match.competition}</span>
         <span>
@@ -3236,9 +3259,13 @@ function MatchCard({
           {kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
-      {isMotd && (
+      {isFeatured ? (
+        <div className="mt-1 animate-pulse text-center text-sm font-extrabold text-amber-300">
+          {t("card.featured", { mult: fmtMult(featuredMult ?? 2.5) })}
+        </div>
+      ) : isMotd ? (
         <div className="mt-1 text-center text-xs font-bold text-yellow-300">{t("card.motd")}</div>
-      )}
+      ) : null}
       <TeamLine
         home={match.home_team}
         away={match.away_team}

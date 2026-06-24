@@ -112,7 +112,7 @@ export async function GET(req: Request) {
 
   // Live + upcoming (and just-finished) matches for the live lines.
   const fromIso = new Date(Date.now() - 6 * 3_600_000).toISOString();
-  const toIso = new Date(Date.now() + 24 * 3_600_000).toISOString(); // only 24h ahead
+  const toIso = new Date(Date.now() + 18 * 3_600_000).toISOString(); // only 18h ahead
   const { data: matches } = await supabase
     .from("matches")
     .select("id, home_team, away_team, competition, kickoff_at, status, home_score, away_score")
