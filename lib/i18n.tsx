@@ -426,6 +426,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Smart banner (scrolling marquee). Playful tone; EN→EN players, HE→HE players.
   "banner.dHM": { en: "{h}h {m}m", he: "{h} שע׳ {m} דק׳" },
   "banner.dM": { en: "{m}m", he: "{m} דק׳" },
+  "banner.dDH": { en: "{d}d {h}h", he: "{d} ימים {h} שע׳" },
   "banner.kickoffIn": {
     en: "⏰ {home} vs {away} — kicks off in {time}",
     he: "⏰ {home} נגד {away} — בעוד {time}",

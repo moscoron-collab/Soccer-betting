@@ -765,6 +765,18 @@ function predTeam(p: Prediction): string {
 
 type Tt = (k: string, p?: Record<string, string | number>) => string;
 
+// "2d 5h" / "3h 10m" / "12m" — a friendly countdown that handles multi-day waits.
+function fmtCountdown(t: Tt, mins: number): string {
+  if (mins >= 1440) {
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
+    return t("banner.dDH", { d, h });
+  }
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? t("banner.dHM", { h, m }) : t("banner.dM", { m });
+}
+
 // One live-games line for a match: full-time, live score, "locks in N min", or countdown.
 function matchLine(t: Tt, m: any): string | null {
   const home = m.home_team,
@@ -776,10 +788,7 @@ function matchLine(t: Tt, m: any): string | null {
   const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
   if (mins <= 0) return null;
   if (mins <= 15) return t("banner.locksIn", { home, away, n: mins });
-  const h = Math.floor(mins / 60),
-    mm = mins % 60;
-  const time = h > 0 ? t("banner.dHM", { h, m: mm }) : t("banner.dM", { m: mm });
-  return t("banner.kickoffIn", { home, away, time });
+  return t("banner.kickoffIn", { home, away, time: fmtCountdown(t, mins) });
 }
 
 // The Match of the Day line (its own ⭐ wording, with the same timing logic).
@@ -792,10 +801,7 @@ function motdLine(t: Tt, m: any): string {
   if (m.status === "IN_PLAY" || m.status === "PAUSED") return t("banner.motdLive", { home, away, hs, as });
   const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
   if (mins <= 0) return t("banner.motd", { home, away });
-  const h = Math.floor(mins / 60),
-    mm = mins % 60;
-  const time = h > 0 ? t("banner.dHM", { h, m: mm }) : t("banner.dM", { m: mm });
-  return t("banner.motdIn", { home, away, time });
+  return t("banner.motdIn", { home, away, time: fmtCountdown(t, mins) });
 }
 
 // Builds the localized marquee lines from the /api/banner feed + the player's own
