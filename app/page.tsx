@@ -782,6 +782,22 @@ function matchLine(t: Tt, m: any): string | null {
   return t("banner.kickoffIn", { home, away, time });
 }
 
+// The Match of the Day line (its own ⭐ wording, with the same timing logic).
+function motdLine(t: Tt, m: any): string {
+  const home = m.home_team,
+    away = m.away_team;
+  const hs = m.home_score ?? 0,
+    as = m.away_score ?? 0;
+  if (m.status === "FINISHED") return t("banner.motdFt", { home, away, hs, as });
+  if (m.status === "IN_PLAY" || m.status === "PAUSED") return t("banner.motdLive", { home, away, hs, as });
+  const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
+  if (mins <= 0) return t("banner.motd", { home, away });
+  const h = Math.floor(mins / 60),
+    mm = mins % 60;
+  const time = h > 0 ? t("banner.dHM", { h, m: mm }) : t("banner.dM", { m: mm });
+  return t("banner.motdIn", { home, away, time });
+}
+
 // Builds the localized marquee lines from the /api/banner feed + the player's own
 // state. Order = personal → event → live games → records → leaderboard.
 function buildBannerMessages(
@@ -794,21 +810,36 @@ function buildBannerMessages(
 ): string[] {
   const msgs: string[] = [];
   const n = (v: number) => v.toLocaleString();
+  const now = Date.now();
 
-  // — Personal (only this logged-in player sees these) —
+  // 1) Welcome-back greeting (special, brief) first.
   if (welcomeBack) {
     msgs.push(t("banner.missedYou", { name: player.username, gift: n(welcomeBack.giftAmount) }));
   }
-  const since = Date.now() - 48 * 3_600_000;
-  const recentWon = predictions.find(
-    (p) => p.status === "WON" && new Date(p.created_at ?? 0).getTime() >= since
-  );
-  if (recentWon) msgs.push(t("banner.youWon", { payout: n(recentWon.payout), team: predTeam(recentWon) }));
-  if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
-  if ((player.win_streak ?? 0) >= 2) msgs.push(t("banner.streak", { n: player.win_streak }));
-  if (myRank && myRank > 1) msgs.push(t("banner.yourRank", { rank: myRank }));
 
-  // — Event —
+  // 2) "What's coming" — matches in chronological order: soonest UPCOMING first
+  //    (the "next game in 30 min"), then anything LIVE, then just-FINISHED.
+  const all = (data.matches ?? []) as any[];
+  const isLive = (m: any) => m.status === "IN_PLAY" || m.status === "PAUSED";
+  const ms = (m: any) => new Date(m.kickoff_at).getTime();
+  const upcoming = all
+    .filter((m) => !isLive(m) && m.status !== "FINISHED" && ms(m) > now)
+    .sort((a, b) => ms(a) - ms(b));
+  const live = all.filter(isLive);
+  const finished = all.filter((m) => m.status === "FINISHED").sort((a, b) => ms(b) - ms(a));
+  for (const m of [...upcoming, ...live, ...finished]) {
+    const line = matchLine(t, m);
+    if (line) msgs.push(line);
+  }
+
+  // 3) Match of the Day — skipped if it's the same game as the event's featured
+  //    match (avoid two ⭐ lines about one match).
+  const featuredId = data.event?.featured?.id;
+  if (data.motd && !(data.event?.on && featuredId && data.motd.id === featuredId)) {
+    msgs.push(motdLine(t, data.motd));
+  }
+
+  // 4) Event (Road to the Final).
   const ev = data.event;
   if (ev?.on) {
     msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
@@ -820,13 +851,16 @@ function buildBannerMessages(
     if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
   }
 
-  // — Live games —
-  for (const m of (data.matches ?? []) as any[]) {
-    const line = matchLine(t, m);
-    if (line) msgs.push(line);
-  }
+  // 5) Personal extras (only this logged-in player sees these).
+  const recentWon = predictions.find(
+    (p) => p.status === "WON" && new Date(p.created_at ?? 0).getTime() >= now - 48 * 3_600_000
+  );
+  if (recentWon) msgs.push(t("banner.youWon", { payout: n(recentWon.payout), team: predTeam(recentWon) }));
+  if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
+  if ((player.win_streak ?? 0) >= 2) msgs.push(t("banner.streak", { n: player.win_streak }));
+  if (myRank && myRank > 1) msgs.push(t("banner.yourRank", { rank: myRank }));
 
-  // — Records (48h) —
+  // 6) Records (48h).
   const hof = data.hallOfFame ?? {};
   if (hof.biggestWin?.name) {
     msgs.push(
@@ -970,7 +1004,10 @@ function BannerMarquee({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/banner?_=${Date.now()}`, { headers: authHeaders(token), cache: "no-store" });
+      const res = await fetch(`/api/banner?tz=${encodeURIComponent(clientTz())}&_=${Date.now()}`, {
+        headers: authHeaders(token),
+        cache: "no-store",
+      });
       if (res.ok) setData(await res.json());
     } catch {
       /* network blip — keep last */

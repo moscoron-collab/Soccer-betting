@@ -432,6 +432,19 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "banner.live": { en: "🔴 LIVE: {home} {hs}–{as} {away}", he: "🔴 חי: {home} {hs}–{as} {away}" },
   "banner.fullTime": { en: "✅ Full time: {home} {hs}–{as} {away}", he: "✅ סיום: {home} {hs}–{as} {away}" },
+  "banner.motdIn": {
+    en: "⭐ Match of the Day: {home} vs {away} — kicks off in {time}",
+    he: "⭐ משחק היום: {home} נגד {away} — בעוד {time}",
+  },
+  "banner.motdLive": {
+    en: "⭐ Match of the Day LIVE: {home} {hs}–{as} {away}",
+    he: "⭐ משחק היום חי: {home} {hs}–{as} {away}",
+  },
+  "banner.motdFt": {
+    en: "⭐ Match of the Day: {home} {hs}–{as} {away} (full time)",
+    he: "⭐ משחק היום: {home} {hs}–{as} {away} (סיום)",
+  },
+  "banner.motd": { en: "⭐ Match of the Day: {home} vs {away}", he: "⭐ משחק היום: {home} נגד {away}" },
   "banner.eventOn": {
     en: "🔥 {name} is ON — featured match pays {mult}×!",
     he: "🔥 {name} פעיל — המשחק הנבחר משלם {mult}×!",

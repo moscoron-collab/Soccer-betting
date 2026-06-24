@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { getEventConfig, getFeaturedMatchId } from "@/lib/event";
+import { getMotdId } from "@/lib/motd";
 import { netWorthLeaderboard } from "@/lib/networth";
 
 export const runtime = "nodejs";
@@ -54,6 +55,19 @@ export async function GET(req: Request) {
         .maybeSingle();
       featured = data ?? null;
     }
+  }
+
+  // Match of the Day for this player (per their local day; the ⭐ bonus game).
+  let motd: any = null;
+  const tz = new URL(req.url).searchParams.get("tz");
+  const motdId = await getMotdId(tz);
+  if (motdId) {
+    const { data } = await supabase
+      .from("matches")
+      .select("id, home_team, away_team, kickoff_at, status, home_score, away_score")
+      .eq("id", motdId)
+      .maybeSingle();
+    motd = data ?? null;
   }
 
   // Live + upcoming (and just-finished) matches for the live lines.
@@ -115,6 +129,7 @@ export async function GET(req: Request) {
         jackpot: cfg.jackpot,
         featured,
       },
+      motd,
       matches: matches ?? [],
       hallOfFame: { biggestWin, biggestLoss },
       top,
