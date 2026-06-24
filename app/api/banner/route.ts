@@ -118,6 +118,20 @@ export async function GET(req: Request) {
   const gap = ranked[0] && ranked[1] ? ranked[0].netWorth - ranked[1].netWorth : null;
   const myRank = player ? ranked.findIndex((r) => r.id === player.id) + 1 || null : null;
 
+  // Admin-only: a list of upcoming matches (next ~4 days) so the admin panel can
+  // offer a "pick the featured match" dropdown instead of a raw match id.
+  let adminMatches: any[] = [];
+  if (isAdmin) {
+    const { data } = await supabase
+      .from("matches")
+      .select("id, home_team, away_team, kickoff_at")
+      .gte("kickoff_at", new Date(Date.now() - 3 * 3_600_000).toISOString())
+      .lte("kickoff_at", new Date(Date.now() + 4 * 86_400_000).toISOString())
+      .order("kickoff_at", { ascending: true })
+      .limit(60);
+    adminMatches = data ?? [];
+  }
+
   return NextResponse.json(
     {
       show: true,
@@ -135,8 +149,9 @@ export async function GET(req: Request) {
       top,
       gap,
       myRank,
-      // Admin-only: the live config so the admin panel can show current values.
+      // Admin-only: the live config + upcoming matches for the admin panel.
       config: isAdmin ? cfg : undefined,
+      adminMatches,
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );

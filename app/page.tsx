@@ -919,7 +919,17 @@ function TextField({ label, value, onSave }: { label: string; value: string; onS
 
 // Admin-only control panel: flip the banner public, toggle the event, set the
 // featured multiplier / jackpot / featured-match override / event name.
-function EventAdmin({ token, initial, onSaved }: { token: string; initial: any; onSaved: () => void }) {
+function EventAdmin({
+  token,
+  initial,
+  matches,
+  onSaved,
+}: {
+  token: string;
+  initial: any;
+  matches: any[];
+  onSaved: () => void;
+}) {
   const { t } = useLang();
   const [cfg, setCfg] = useState<any>(initial ?? {});
   const [saved, setSaved] = useState(false);
@@ -961,7 +971,21 @@ function EventAdmin({ token, initial, onSaved }: { token: string; initial: any; 
         <div className="grid grid-cols-2 gap-3">
           <NumField label={t("admin.mult")} value={cfg.featuredMult} step="0.5" onSave={(v) => save({ featuredMult: v })} />
           <NumField label={t("admin.jackpot")} value={cfg.jackpot} step="500" onSave={(v) => save({ jackpot: v })} />
-          <TextField label={t("admin.override")} value={cfg.featuredOverride ?? ""} onSave={(v) => save({ featuredOverride: v })} />
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-blue-100/80">{t("admin.override")}</span>
+            <select
+              value={cfg.featuredOverride ?? ""}
+              onChange={(e) => save({ featuredOverride: e.target.value })}
+              className="rounded bg-white/90 px-2 py-1 text-gray-900"
+            >
+              <option value="">{t("admin.autoPick")}</option>
+              {matches.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.home_team} vs {m.away_team} · {new Date(m.kickoff_at).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+          </label>
           <TextField label={t("admin.eventName")} value={cfg.eventName ?? ""} onSave={(v) => save({ eventName: v })} />
         </div>
         {saved && <div className="mt-2 text-xs text-green-300">{t("admin.saved")}</div>}
@@ -1078,7 +1102,9 @@ function BannerMarquee({
           </button>
         )}
       </div>
-      {data.isAdmin && showAdmin && <EventAdmin token={token} initial={data.config} onSaved={load} />}
+      {data.isAdmin && showAdmin && (
+        <EventAdmin token={token} initial={data.config} matches={data.adminMatches ?? []} onSaved={load} />
+      )}
       <style>{`
         .marquee-track { display:inline-flex; white-space:nowrap; will-change:transform; animation-name:spg-marquee; animation-timing-function:linear; animation-iteration-count:infinite; }
         .marquee-track:hover { animation-play-state:paused; }
