@@ -71,8 +71,16 @@ export async function GET(req: Request) {
   const cfg = await getEventConfig();
   const featuredIds = cfg.eventOn ? await getFeaturedMatchIds(cfg) : [];
 
+  // serverNow lets the client run its kickoff countdown/lock on OUR clock, so a
+  // wrong device clock can't make a kicked-off match look open (or vice-versa).
   return NextResponse.json(
-    { matches: withStats, motdId, featuredIds, featuredMult: cfg.featuredMult },
+    {
+      matches: withStats,
+      motdId,
+      featuredIds,
+      featuredMult: cfg.featuredMult,
+      serverNow: new Date().toISOString(),
+    },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
   );
 }

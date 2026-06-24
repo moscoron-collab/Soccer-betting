@@ -32,16 +32,46 @@ function parsePrediction(body: any): { ok: true; value: ParsedPrediction } | { o
   };
 }
 
+// A short kickoff time like "3:00 PM" in the player's timezone, for clear errors.
+function fmtKickoff(iso: string, tz?: string | null): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: tz || "UTC",
+    }).format(new Date(iso));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(new Date(iso));
+  }
+}
+
 // Confirms a match exists and is still open for predictions (not kicked off).
-async function getOpenMatch(matchId: number) {
+async function getOpenMatch(matchId: number, tz?: string | null) {
   const { data: match } = await supabase
     .from("matches")
     .select("id, status, kickoff_at")
     .eq("id", matchId)
     .maybeSingle();
   if (!match) return { error: "Match not found", status: 404 as const };
-  if (match.status !== "SCHEDULED" || new Date(match.kickoff_at) <= new Date()) {
-    return { error: "This match is closed for predictions.", status: 400 as const };
+
+  const now = new Date();
+  const kickedOff = new Date(match.kickoff_at) <= now;
+  if (match.status !== "SCHEDULED" || kickedOff) {
+    // Log the timing so a refusal that happens with a CORRECT clock (i.e. a real
+    // bug, not a player's slow device) is visible in the server logs.
+    console.warn(
+      `[predictions] bet refused for match ${matchId}: status=${match.status} ` +
+        `kickoff_at=${match.kickoff_at} now=${now.toISOString()} ` +
+        `reason=${kickedOff ? "kickoff-passed" : "not-scheduled"}`
+    );
+    const error = kickedOff
+      ? `This match kicked off at ${fmtKickoff(match.kickoff_at, tz)} — betting is closed.`
+      : "This match is already underway — betting is closed.";
+    return { error, status: 400 as const };
   }
   return { match };
 }
@@ -85,7 +115,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You have no 2× power-ups left." }, { status: 400 });
   }
 
-  const open = await getOpenMatch(matchId);
+  const open = await getOpenMatch(matchId, body?.tz);
   if ("error" in open) return NextResponse.json({ error: open.error }, { status: open.status });
 
   // One bet of each type per match per player.
@@ -184,7 +214,7 @@ export async function POST(req: Request) {
 }
 
 // Loads a pending prediction owned by the player whose match is still open. Shared by PUT/DELETE.
-async function getEditablePrediction(player: Player, predictionId: string) {
+async function getEditablePrediction(player: Player, predictionId: string, tz?: string | null) {
   const { data: pred } = await supabase
     .from("predictions")
     .select("id, player_id, match_id, stake, status")
@@ -196,7 +226,7 @@ async function getEditablePrediction(player: Player, predictionId: string) {
   if (pred.status !== "PENDING") {
     return { error: "This bet has already been settled.", status: 400 as const };
   }
-  const open = await getOpenMatch(pred.match_id);
+  const open = await getOpenMatch(pred.match_id, tz);
   if ("error" in open) return { error: open.error, status: open.status };
   return { pred };
 }
@@ -216,7 +246,7 @@ export async function PUT(req: Request) {
   const predictionId = String(body?.predictionId ?? "");
   if (!predictionId) return NextResponse.json({ error: "Missing prediction" }, { status: 400 });
 
-  const found = await getEditablePrediction(player, predictionId);
+  const found = await getEditablePrediction(player, predictionId, body?.tz);
   if ("error" in found) return NextResponse.json({ error: found.error }, { status: found.status });
   const old = found.pred;
 
@@ -276,7 +306,7 @@ export async function DELETE(req: Request) {
   const predictionId = String(body?.predictionId ?? "");
   if (!predictionId) return NextResponse.json({ error: "Missing prediction" }, { status: 400 });
 
-  const found = await getEditablePrediction(player, predictionId);
+  const found = await getEditablePrediction(player, predictionId, body?.tz);
   if ("error" in found) return NextResponse.json({ error: found.error }, { status: found.status });
   const old = found.pred;
 

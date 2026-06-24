@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.20";
+export const VERSION = "4.21";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.21",
+    date: "2026-06-24",
+    changes: [
+      {
+        en: "⏱️ Clearer bet timing: every match now shows exactly when betting closes (its kickoff time), and the countdown follows the game's official clock — so even if your phone or tablet clock is a few minutes off, you'll always know how long you really have to bet. Once a match kicks off we say so plainly instead of a generic 'closed'.",
+        he: "⏱️ תזמון הימורים ברור יותר: כל משחק מציג עכשיו בדיוק מתי ההימורים נסגרים (שעת תחילת המשחק), והספירה לאחור מתבססת על השעון הרשמי של המשחק — כך שגם אם השעון בטלפון או בטאבלט שלכם מאחר בכמה דקות, תמיד תדעו כמה זמן באמת נשאר להמר. ברגע שמשחק מתחיל נגיד את זה במפורש במקום הודעת 'סגור' כללית.",
+      },
+    ],
+  },
   {
     version: "4.20",
     date: "2026-06-24",

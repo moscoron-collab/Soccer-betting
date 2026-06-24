@@ -239,6 +239,31 @@ function clientTz(): string {
   }
 }
 
+// Device clocks can be wrong — a phone or tablet running ~10 minutes slow makes a
+// match look like it's still open when it has already kicked off and the SERVER
+// has locked betting. So we trust the server's clock: any API response carrying a
+// `serverNow` timestamp updates this offset, and the betting countdown/lock use
+// serverNow() instead of the raw device clock.
+let serverClockOffsetMs = 0; // (server now) − (device now), in ms
+function syncServerClock(serverNowIso: string | null | undefined) {
+  if (!serverNowIso) return;
+  const ms = new Date(serverNowIso).getTime();
+  if (Number.isFinite(ms)) serverClockOffsetMs = ms - Date.now();
+}
+function serverNow(): number {
+  return Date.now() + serverClockOffsetMs;
+}
+
+// Re-renders the calling component every `ms` so countdowns and the kickoff lock
+// (both driven by serverNow()) stay live without a manual refresh.
+function useTick(ms = 1000) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setN((n) => n + 1), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+}
+
 export default function Page() {
   return (
     <LangProvider>
@@ -786,7 +811,7 @@ function matchLine(t: Tt, m: any): string | null {
     as = m.away_score ?? 0;
   if (m.status === "FINISHED") return t("banner.fullTime", { home, away, hs, as });
   if (m.status === "IN_PLAY" || m.status === "PAUSED") return t("banner.live", { home, away, hs, as });
-  const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
+  const mins = Math.round((new Date(m.kickoff_at).getTime() - serverNow()) / 60000);
   if (mins <= 0) return null;
   if (mins <= 15) return t("banner.locksIn", { home, away, n: mins });
   return t("banner.kickoffIn", { home, away, time: fmtCountdown(t, mins) });
@@ -800,7 +825,7 @@ function motdLine(t: Tt, m: any): string {
     as = m.away_score ?? 0;
   if (m.status === "FINISHED") return t("banner.motdFt", { home, away, hs, as });
   if (m.status === "IN_PLAY" || m.status === "PAUSED") return t("banner.motdLive", { home, away, hs, as });
-  const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
+  const mins = Math.round((new Date(m.kickoff_at).getTime() - serverNow()) / 60000);
   if (mins <= 0) return t("banner.motd", { home, away });
   return t("banner.motdIn", { home, away, time: fmtCountdown(t, mins) });
 }
@@ -1267,6 +1292,7 @@ function Game({
       cache: "no-store",
     });
     const data = await res.json();
+    syncServerClock(data.serverNow);
     setMatches(data.matches ?? []);
     setMotdId(data.motdId ?? null);
     setFeaturedIds(data.featuredIds ?? []);
@@ -3283,7 +3309,13 @@ function MatchCard({
   onPlaced: () => void;
 }) {
   const { t } = useLang();
+  useTick(); // keep the close countdown + kickoff lock live (server clock)
   const kickoff = new Date(match.kickoff_at);
+  const kickoffTime = kickoff.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // Trust the SERVER's clock, not the device's — a slow phone clock must never
+  // make a kicked-off match look bettable (the server would reject it anyway).
+  const minsLeft = Math.max(0, Math.round((kickoff.getTime() - serverNow()) / 60000));
+  const closed = serverNow() >= kickoff.getTime();
   const [tab, setTab] = useState<BetType>("WINNER");
 
   // The player's bet of the currently selected type, if any.
@@ -3334,7 +3366,18 @@ function MatchCard({
         awayCrest={match.away_crest}
       />
 
-      <p className="mt-2 text-center text-xs text-blue-100/60">{t("card.tip")}</p>
+      <p
+        className={`mt-2 text-center text-xs font-semibold ${
+          closed ? "text-red-300" : minsLeft <= 15 ? "text-amber-300" : "text-blue-100/55"
+        }`}
+      >
+        {closed
+          ? t("card.closedAt", { time: kickoffTime })
+          : minsLeft <= 15
+            ? t("card.lastCall", { n: minsLeft, time: kickoffTime })
+            : t("card.closesAt", { time: kickoffTime })}
+      </p>
+      {!closed && <p className="mt-1 text-center text-xs text-blue-100/60">{t("card.tip")}</p>}
 
       {/* Bet-type tabs: ✓ marks ones you've already bet. */}
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -3370,7 +3413,7 @@ function MatchCard({
               {t("card.couldWin", { n: potentialWin(current), mult: effMult(current) })}
             </span>
           )}
-          {current.status === "PENDING" && (
+          {current.status === "PENDING" && !closed && (
             <BetEditor
               p={current}
               home={match.home_team}
@@ -3380,6 +3423,10 @@ function MatchCard({
               onChange={onPlaced}
             />
           )}
+        </div>
+      ) : closed ? (
+        <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-center text-sm text-blue-100/70">
+          {t("card.closedNotice")}
         </div>
       ) : (
         <div className="mt-3">

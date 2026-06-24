@@ -414,6 +414,19 @@ const DICT: Record<string, { en: string; he: string }> = {
   "card.errPlace": { en: "Could not place prediction.", he: "לא הצלחנו לבצע את התחזית." },
   "card.open": { en: "Open", he: "פתוח" },
   "card.started": { en: "Started", he: "התחיל" },
+  "card.closesAt": { en: "🔒 Betting closes at {time}", he: "🔒 ההימורים נסגרים ב-{time}" },
+  "card.lastCall": {
+    en: "🔒 Last call — closes in {n} min (at {time})",
+    he: "🔒 הזדמנות אחרונה — נסגר בעוד {n} דק׳ (ב-{time})",
+  },
+  "card.closedAt": {
+    en: "🔒 Betting closed — kicked off at {time}",
+    he: "🔒 ההימורים נסגרו — המשחק התחיל ב-{time}",
+  },
+  "card.closedNotice": {
+    en: "This match has kicked off — betting is closed.",
+    he: "המשחק התחיל — ההימורים סגורים.",
+  },
   "card.betLine": {
     en: "Stake {s} · could win 🪙{w} ({mult})",
     he: "הימור {s} · אפשר לזכות ב-🪙{w} ({mult})",
