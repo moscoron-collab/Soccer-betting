@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/admin/event -> update any subset of the event config (admins only).
-// Body: { bannerPublic?, eventOn?, eventName?, featuredMult?, jackpot?, featuredOverride? }
+// Body: { bannerPublic?, eventOn?, eventName?, featuredMult?, jackpot?, featuredOverrides? }
 export async function POST(req: Request) {
   const player = await getPlayerFromRequest(req);
   if (player?.is_admin !== true) {
@@ -45,13 +45,10 @@ export async function POST(req: Request) {
     const n = Number(body.jackpot);
     if (Number.isFinite(n) && n >= 0 && n <= 10_000_000) updates.jackpot = Math.round(n);
   }
-  if ("featuredOverride" in body) {
-    if (body.featuredOverride === null || body.featuredOverride === "") {
-      updates.featuredOverride = null;
-    } else {
-      const n = Number(body.featuredOverride);
-      if (Number.isFinite(n)) updates.featuredOverride = n;
-    }
+  if (Array.isArray(body.featuredOverrides)) {
+    updates.featuredOverrides = body.featuredOverrides
+      .map((x: any) => Number(x))
+      .filter((x: number) => Number.isFinite(x));
   }
 
   await setEventConfig(updates);

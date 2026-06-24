@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { getEventConfig, getFeaturedMatchId } from "@/lib/event";
+import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
 import { getMotdId } from "@/lib/motd";
 import { netWorthLeaderboard } from "@/lib/networth";
 
@@ -27,6 +27,47 @@ function teamOf(row: any): string | null {
   return `${m.home_team} v ${m.away_team}`;
 }
 
+// Biggest rank climber since the last snapshot. Compares current ranks to a stored
+// snapshot in app_meta and refreshes that snapshot when it's older than 12h, so the
+// line reflects "biggest jump in roughly the last few hours".
+async function biggestClimber(ranked: { id: string; username: string }[]) {
+  try {
+    const { data } = await supabase.from("app_meta").select("value").eq("key", "rank_snapshot").maybeSingle();
+    let snap: any = null;
+    try {
+      snap = (data as any)?.value ? JSON.parse((data as any).value) : null;
+    } catch {
+      /* corrupt snapshot — treat as none */
+    }
+    const currentRanks: Record<string, number> = {};
+    ranked.forEach((r, i) => (currentRanks[r.id] = i + 1));
+
+    let best: { name: string; from: number; to: number; jump: number } | null = null;
+    if (snap?.ranks) {
+      for (const r of ranked) {
+        const to = currentRanks[r.id];
+        const from = snap.ranks[r.id];
+        if (from && from > to) {
+          const jump = from - to;
+          if (!best || jump > best.jump) best = { name: r.username, from, to, jump };
+        }
+      }
+    }
+
+    const nowMs = Date.now();
+    const stale = !snap?.ts || nowMs - new Date(snap.ts).getTime() > 12 * 3_600_000;
+    if (stale) {
+      const iso = new Date(nowMs).toISOString();
+      await supabase
+        .from("app_meta")
+        .upsert({ key: "rank_snapshot", value: JSON.stringify({ ts: iso, ranks: currentRanks }), updated_at: iso }, { onConflict: "key" });
+    }
+    return best;
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/banner -> everything the scrolling marquee needs (world + event + records).
 // Personal "you" lines come from /api/me; this endpoint is the shared/world view.
 // Gating: non-admins only get data when the banner is public; admins always do, so
@@ -43,17 +84,16 @@ export async function GET(req: Request) {
     );
   }
 
-  // Featured match (only while the event is on).
-  let featured: any = null;
+  // Featured match(es) (only while the event is on) — admin can feature several.
+  let featuredMatches: any[] = [];
   if (cfg.eventOn) {
-    const fid = await getFeaturedMatchId(cfg);
-    if (fid) {
+    const fids = await getFeaturedMatchIds(cfg);
+    if (fids.length) {
       const { data } = await supabase
         .from("matches")
         .select("id, home_team, away_team, kickoff_at, status, home_score, away_score")
-        .eq("id", fid)
-        .maybeSingle();
-      featured = data ?? null;
+        .in("id", fids);
+      featuredMatches = data ?? [];
     }
   }
 
@@ -126,6 +166,7 @@ export async function GET(req: Request) {
     : null;
   const top3 = ranked.slice(0, 3).map((r) => ({ name: r.username, netWorth: r.netWorth }));
   const gap = ranked[0] && ranked[1] ? ranked[0].netWorth - ranked[1].netWorth : null;
+  const climber = await biggestClimber(ranked);
   const myRank = player ? ranked.findIndex((r) => r.id === player.id) + 1 || null : null;
 
   // Admin-only: a list of upcoming matches (next ~4 days) so the admin panel can
@@ -151,13 +192,14 @@ export async function GET(req: Request) {
         name: cfg.eventName,
         mult: cfg.featuredMult,
         jackpot: cfg.jackpot,
-        featured,
+        featuredMatches,
       },
       motd,
       matches: matches ?? [],
       hallOfFame: { biggestWin, biggestLoss, biggestBet },
       top,
       top3,
+      climber,
       gap,
       myRank,
       // Admin-only: the live config + upcoming matches for the admin panel.

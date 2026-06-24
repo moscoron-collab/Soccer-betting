@@ -12,7 +12,7 @@ export type EventConfig = {
   eventName: string;
   featuredMult: number; // total payout multiplier on the featured match's Winner market
   jackpot: number; // displayed jackpot amount (admin bumps it)
-  featuredOverride: number | null; // a specific match id, or null = auto-pick
+  featuredOverrides: number[]; // specific match ids to feature, or [] = auto-pick
 };
 
 export const EVENT_DEFAULTS: EventConfig = {
@@ -21,7 +21,7 @@ export const EVENT_DEFAULTS: EventConfig = {
   eventName: "Road to the Final",
   featuredMult: 2.5,
   jackpot: 5000,
-  featuredOverride: null,
+  featuredOverrides: [],
 };
 
 // app_meta keys backing each field.
@@ -46,13 +46,19 @@ export async function getEventConfig(): Promise<EventConfig> {
       return Number.isFinite(n) && v != null && v !== "" ? n : d;
     };
     const override = m.get(K.featuredOverride);
+    const featuredOverrides = override
+      ? String(override)
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((x) => Number.isFinite(x))
+      : [];
     return {
       bannerPublic: m.get(K.bannerPublic) === "true",
       eventOn: m.get(K.eventOn) === "true",
       eventName: (m.get(K.eventName) as string) || EVENT_DEFAULTS.eventName,
       featuredMult: num(m.get(K.featuredMult), EVENT_DEFAULTS.featuredMult),
       jackpot: num(m.get(K.jackpot), EVENT_DEFAULTS.jackpot),
-      featuredOverride: override ? Number(override) : null,
+      featuredOverrides,
     };
   } catch {
     return { ...EVENT_DEFAULTS };
@@ -70,17 +76,18 @@ export async function setEventConfig(updates: Partial<EventConfig>): Promise<voi
   if (updates.eventName !== undefined) push(K.eventName, updates.eventName);
   if (updates.featuredMult !== undefined) push(K.featuredMult, String(updates.featuredMult));
   if (updates.jackpot !== undefined) push(K.jackpot, String(updates.jackpot));
-  if (updates.featuredOverride !== undefined) {
-    push(K.featuredOverride, updates.featuredOverride == null ? "" : String(updates.featuredOverride));
+  if (updates.featuredOverrides !== undefined) {
+    push(K.featuredOverride, (updates.featuredOverrides ?? []).join(","));
   }
   if (rows.length === 0) return;
   await supabase.from("app_meta").upsert(rows, { onConflict: "key" });
 }
 
-// The current featured match id: the admin override if set, else the global auto-pick.
-export async function getFeaturedMatchId(cfg?: EventConfig): Promise<number | null> {
+// The current featured match ids: the admin's picks if any, else the single
+// global auto-pick (biggest upcoming). Returns [] if nothing's upcoming.
+export async function getFeaturedMatchIds(cfg?: EventConfig): Promise<number[]> {
   const c = cfg ?? (await getEventConfig());
-  if (c.featuredOverride) return c.featuredOverride;
+  if (c.featuredOverrides.length) return c.featuredOverrides;
   const since = new Date(Date.now() - 2 * 86_400_000).toISOString();
   const { data } = await supabase
     .from("matches")
@@ -88,5 +95,6 @@ export async function getFeaturedMatchId(cfg?: EventConfig): Promise<number | nu
     .gte("kickoff_at", since)
     .order("kickoff_at", { ascending: true })
     .limit(200);
-  return pickFeaturedGlobal((data ?? []) as any);
+  const id = pickFeaturedGlobal((data ?? []) as any);
+  return id ? [id] : [];
 }

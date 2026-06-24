@@ -465,6 +465,10 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "🏆 Top 3: 1) {a} · 2) {b} · 3) {c}",
     he: "🏆 שלושת המובילים: 1) {a} · 2) {b} · 3) {c}",
   },
+  "banner.climber": {
+    en: "🚀 Biggest climber: {name} jumped from #{from} to #{to}!",
+    he: "🚀 הזינוק הגדול: {name} עלה ממקום #{from} למקום #{to}!",
+  },
   "banner.biggestWin": {
     en: "🏆 Biggest win: {name} turned 🪙{stake} into 🪙{payout}!",
     he: "🏆 הזכייה הגדולה: {name} הפך 🪙{stake} ל-🪙{payout}!",

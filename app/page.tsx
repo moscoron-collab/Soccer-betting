@@ -839,10 +839,8 @@ function buildBannerMessages(
   const ev = data.event;
   if (ev?.on) {
     msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
-    if (ev.featured) {
-      msgs.push(
-        t("banner.featured", { home: ev.featured.home_team, away: ev.featured.away_team, mult: fmtMult(ev.mult) })
-      );
+    for (const fm of (ev.featuredMatches ?? []) as any[]) {
+      msgs.push(t("banner.featured", { home: fm.home_team, away: fm.away_team, mult: fmtMult(ev.mult) }));
     }
     if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
   }
@@ -874,6 +872,9 @@ function buildBannerMessages(
   if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
   if (Array.isArray(data.top3) && data.top3.length >= 3) {
     msgs.push(t("banner.top3", { a: data.top3[0].name, b: data.top3[1].name, c: data.top3[2].name }));
+  }
+  if (data.climber?.name) {
+    msgs.push(t("banner.climber", { name: data.climber.name, from: data.climber.from, to: data.climber.to }));
   }
   if (data.gap != null && data.gap >= 0 && data.gap <= 1000) msgs.push(t("banner.tight", { gap: n(data.gap) }));
 
@@ -973,22 +974,33 @@ function EventAdmin({
         <div className="grid grid-cols-2 gap-3">
           <NumField label={t("admin.mult")} value={cfg.featuredMult} step="0.5" onSave={(v) => save({ featuredMult: v })} />
           <NumField label={t("admin.jackpot")} value={cfg.jackpot} step="500" onSave={(v) => save({ jackpot: v })} />
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="text-blue-100/80">{t("admin.override")}</span>
-            <select
-              value={cfg.featuredOverride ?? ""}
-              onChange={(e) => save({ featuredOverride: e.target.value })}
-              className="rounded bg-white/90 px-2 py-1 text-gray-900"
-            >
-              <option value="">{t("admin.autoPick")}</option>
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.home_team} vs {m.away_team} · {new Date(m.kickoff_at).toLocaleDateString()}
-                </option>
-              ))}
-            </select>
-          </label>
           <TextField label={t("admin.eventName")} value={cfg.eventName ?? ""} onSave={(v) => save({ eventName: v })} />
+        </div>
+
+        <div className="mt-3 flex flex-col gap-1 text-xs">
+          <span className="text-blue-100/80">{t("admin.override")}</span>
+          <div className="flex flex-wrap gap-1">
+            {matches.length === 0 && <span className="text-blue-100/60">—</span>}
+            {matches.map((m) => {
+              const sel = (cfg.featuredOverrides ?? []).includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    const cur: number[] = cfg.featuredOverrides ?? [];
+                    const next = sel ? cur.filter((x) => x !== m.id) : [...cur, m.id];
+                    save({ featuredOverrides: next });
+                  }}
+                  className={`rounded-full px-2 py-1 ${sel ? "bg-green-500 text-white" : "bg-white/80 text-gray-900"}`}
+                >
+                  {sel ? "✓ " : ""}
+                  {m.home_team} v {m.away_team}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-blue-100/60">{t("admin.autoPick")}</span>
         </div>
         {saved && <div className="mt-2 text-xs text-green-300">{t("admin.saved")}</div>}
       </div>
@@ -1016,6 +1028,8 @@ function BannerMarquee({
   const [showAdmin, setShowAdmin] = useState(false);
   // Each player's own scroll speed, remembered in their browser (no DB).
   const [speed, setSpeed] = useState<"slow" | "normal" | "fast">("normal");
+  // Rotates the gold Match-of-the-Day bar when several matches are featured.
+  const [featIdx, setFeatIdx] = useState(0);
 
   useEffect(() => {
     const s = safeGet("spg_banner_speed");
@@ -1046,6 +1060,11 @@ function BannerMarquee({
     return () => clearInterval(id);
   }, [load]);
 
+  useEffect(() => {
+    const id = setInterval(() => setFeatIdx((i) => i + 1), 4500);
+    return () => clearInterval(id);
+  }, []);
+
   if (!data || !data.show) return null;
 
   const messages = buildBannerMessages(t, data, player, predictions, myRank, welcomeBack);
@@ -1056,6 +1075,15 @@ function BannerMarquee({
   const speedFactor = speed === "slow" ? 1.8 : speed === "fast" ? 0.55 : 1;
   const duration = `${Math.round(base * speedFactor)}s`;
   const speedIcon = speed === "slow" ? "🐢" : speed === "fast" ? "🐇" : "🚶";
+  // The gold "pop" bar shows the event's featured match(es) while the event is on
+  // (rotating if several), otherwise the auto Match of the Day.
+  const goldList: any[] =
+    data.event?.on && data.event.featuredMatches?.length
+      ? data.event.featuredMatches
+      : data.motd
+        ? [data.motd]
+        : [];
+  const goldMatch = goldList.length ? goldList[featIdx % goldList.length] : null;
 
   return (
     <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-700 text-white shadow-md">
@@ -1104,12 +1132,12 @@ function BannerMarquee({
           </button>
         )}
       </div>
-      {data.motd && (
+      {goldMatch && (
         <button
           onClick={() => scrollToId("matches")}
           className="motd-pop flex w-full items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 text-center text-sm font-extrabold text-gray-900"
         >
-          <span dir="auto">{motdLine(t, data.motd)}</span>
+          <span dir="auto">{motdLine(t, goldMatch)}</span>
         </button>
       )}
       {data.isAdmin && showAdmin && (
