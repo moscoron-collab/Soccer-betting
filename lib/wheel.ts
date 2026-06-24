@@ -84,3 +84,13 @@ export function describePrize(slice: WheelSlice): string {
 export function isWinningSlice(slice: WheelSlice): boolean {
   return !(slice.kind === "COINS" && slice.amount === 0);
 }
+
+// Celebration tier for a win, so big wins sound more special than small ones:
+//   "jackpot" — the 💰 jackpot (the biggest moment)
+//   "big"     — a large coin prize (250 or 500)
+//   null      — an ordinary win (normal cheer only, no extra fanfare)
+export function bigWinTier(slice: WheelSlice): "jackpot" | "big" | null {
+  if (slice.kind === "JACKPOT") return "jackpot";
+  if (slice.kind === "COINS" && slice.amount >= 250) return "big";
+  return null;
+}

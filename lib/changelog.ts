@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.19";
+export const VERSION = "4.20";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.20",
+    date: "2026-06-24",
+    changes: [
+      {
+        en: "🎺 Big-win fanfares on the wheel: the 💰 jackpot now lands with a triumphant brass fanfare, and 🪙500 / 🪙250 wins get a short fanfare too — layered over the usual cheer and confetti.",
+        he: "🎺 פנפרות לזכיות גדולות בגלגל: ה-💰 ג'קפוט נוחת עכשיו עם פנפרת נחושת מנצחת, וגם זכיות של 🪙500 / 🪙250 מקבלות פנפרת קצרה — מעל התרועה והקונפטי הרגילים.",
+      },
+    ],
+  },
   {
     version: "4.19",
     date: "2026-06-24",

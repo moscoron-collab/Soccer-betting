@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
-import { spinRatchet, loseWomp, isMuted } from "@/lib/sounds";
+import { spinRatchet, loseWomp, winFanfareShort, winFanfareTriumph, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
-import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, type WheelSlice } from "@/lib/wheel";
+import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
 import { FREE_BET_STAKE } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
@@ -2463,6 +2463,13 @@ function SpinWheel({
       setResult(slice);
       if (isWinningSlice(slice)) {
         celebrate(prizeText(t, slice));
+        // Layer a brass fanfare over the cheer for the biggest wins: a triumphant
+        // one for the jackpot, a short one for the big coin prizes (250 / 500).
+        if (!isMuted()) {
+          const tier = bigWinTier(slice);
+          if (tier === "jackpot") winFanfareTriumph();
+          else if (tier === "big") winFanfareShort();
+        }
       } else {
         // Landed on "No win" — don't celebrate: a sad womp + a plain toast, no confetti.
         if (!isMuted()) loseWomp();
