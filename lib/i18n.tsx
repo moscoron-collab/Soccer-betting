@@ -454,8 +454,16 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "⭐ המשחק הנבחר: {home} נגד {away} — מנצח משלם {mult}×",
   },
   "banner.jackpot": {
-    en: "💰 Jackpot: 🪙{amount} — nail the featured match to win it!",
-    he: "💰 ג׳קפוט: 🪙{amount} — קלעו במשחק הנבחר וזכו בו!",
+    en: "💰 Spin the Wheel and hit the 🪙{amount} jackpot!",
+    he: "💰 סובבו את הגלגל ותפסו את הג׳קפוט של 🪙{amount}!",
+  },
+  "banner.biggestBet": {
+    en: "💸 Highest bet: {name} staked 🪙{amount} on {team}!",
+    he: "💸 ההימור הגדול: {name} הימר 🪙{amount} על {team}!",
+  },
+  "banner.top3": {
+    en: "🏆 Top 3: 1) {a} · 2) {b} · 3) {c}",
+    he: "🏆 שלושת המובילים: 1) {a} · 2) {b} · 3) {c}",
   },
   "banner.biggestWin": {
     en: "🏆 Biggest win: {name} turned 🪙{stake} into 🪙{payout}!",

@@ -870,9 +870,15 @@ function buildBannerMessages(
   if (hof.biggestLoss?.name) {
     msgs.push(t("banner.biggestLoss", { name: hof.biggestLoss.name, amount: n(hof.biggestLoss.amount), team: hof.biggestLoss.team ?? "" }));
   }
+  if (hof.biggestBet?.name) {
+    msgs.push(t("banner.biggestBet", { name: hof.biggestBet.name, amount: n(hof.biggestBet.amount), team: hof.biggestBet.team ?? "" }));
+  }
 
-  // — Leaderboard —
+  // — Leaderboard / ranks —
   if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
+  if (Array.isArray(data.top3) && data.top3.length >= 3) {
+    msgs.push(t("banner.top3", { a: data.top3[0].name, b: data.top3[1].name, c: data.top3[2].name }));
+  }
   if (data.gap != null && data.gap >= 0 && data.gap <= 1000) msgs.push(t("banner.tight", { gap: n(data.gap) }));
 
   return msgs;

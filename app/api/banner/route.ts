@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 
   // Live + upcoming (and just-finished) matches for the live lines.
   const fromIso = new Date(Date.now() - 6 * 3_600_000).toISOString();
-  const toIso = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  const toIso = new Date(Date.now() + 24 * 3_600_000).toISOString(); // only 24h ahead
   const { data: matches } = await supabase
     .from("matches")
     .select("id, home_team, away_team, competition, kickoff_at, status, home_score, away_score")
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
 
   // Hall of Fame — biggest win & biggest loss in the last 48h (public).
   const since = new Date(Date.now() - HALL_OF_FAME_HOURS * 3_600_000).toISOString();
-  const [{ data: winRows }, { data: lossRows }] = await Promise.all([
+  const [{ data: winRows }, { data: lossRows }, { data: betRows }] = await Promise.all([
     supabase
       .from("predictions")
       .select("stake, payout, pick, type, players(username), matches(home_team, away_team)")
@@ -99,22 +99,32 @@ export async function GET(req: Request) {
       .gte("settled_at", since)
       .order("stake", { ascending: false })
       .limit(1),
+    supabase
+      .from("predictions")
+      .select("stake, pick, type, players(username), matches(home_team, away_team)")
+      .eq("free_bet", false)
+      .gte("created_at", since)
+      .order("stake", { ascending: false })
+      .limit(1),
   ]);
 
   const win = (winRows ?? [])[0];
   const loss = (lossRows ?? [])[0];
+  const bet = (betRows ?? [])[0];
   const biggestWin = win
     ? { name: nameOf(win), stake: win.stake, payout: win.payout, team: teamOf(win) }
     : null;
   const biggestLoss = loss
     ? { name: nameOf(loss), amount: loss.stake, team: teamOf(loss) }
     : null;
+  const biggestBet = bet ? { name: nameOf(bet), amount: bet.stake, team: teamOf(bet) } : null;
 
   // Leaderboard headline (Net Worth) + the viewer's own rank.
   const ranked = await netWorthLeaderboard(1000);
   const top = ranked[0]
     ? { name: ranked[0].username, netWorth: ranked[0].netWorth, avatar: ranked[0].avatar }
     : null;
+  const top3 = ranked.slice(0, 3).map((r) => ({ name: r.username, netWorth: r.netWorth }));
   const gap = ranked[0] && ranked[1] ? ranked[0].netWorth - ranked[1].netWorth : null;
   const myRank = player ? ranked.findIndex((r) => r.id === player.id) + 1 || null : null;
 
@@ -145,8 +155,9 @@ export async function GET(req: Request) {
       },
       motd,
       matches: matches ?? [],
-      hallOfFame: { biggestWin, biggestLoss },
+      hallOfFame: { biggestWin, biggestLoss, biggestBet },
       top,
+      top3,
       gap,
       myRank,
       // Admin-only: the live config + upcoming matches for the admin panel.
