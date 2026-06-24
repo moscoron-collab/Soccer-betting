@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
+import { spinWhir, loseWomp, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
-import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, type WheelSlice } from "@/lib/wheel";
+import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, type WheelSlice } from "@/lib/wheel";
 import { FREE_BET_STAKE } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
@@ -2450,6 +2451,8 @@ function SpinWheel({
     const index = data.sliceIndex as number;
     // Rotate forward (≥5 turns) so the middle of `index` ends under the top pointer.
     const landing = (360 - (index * seg + seg / 2) + 360) % 360;
+    // Whirring ratchet for the length of the spin (skipped if sound is muted).
+    if (!isMuted()) spinWhir(SPIN_MS);
     setRotation((cur) => {
       const curMod = ((cur % 360) + 360) % 360;
       return cur + 360 * 5 + ((landing - curMod + 360) % 360);
@@ -2458,7 +2461,13 @@ function SpinWheel({
     setTimeout(() => {
       const slice = data.slice as WheelSlice;
       setResult(slice);
-      celebrate(prizeText(t, slice));
+      if (isWinningSlice(slice)) {
+        celebrate(prizeText(t, slice));
+      } else {
+        // Landed on "No win" — don't celebrate: a sad womp + a plain toast, no confetti.
+        if (!isMuted()) loseWomp();
+        toast(prizeText(t, slice));
+      }
       setSpinning(false);
       onDone();
     }, SPIN_MS);

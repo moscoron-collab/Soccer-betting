@@ -78,3 +78,9 @@ export function describePrize(slice: WheelSlice): string {
         : `🪙 +${slice.amount.toLocaleString()} coins`;
   }
 }
+
+// Did the spin actually win something? Everything is a prize EXCEPT the 0-coin
+// "No win" slice — so the UI knows when NOT to celebrate (no confetti/cheer).
+export function isWinningSlice(slice: WheelSlice): boolean {
+  return !(slice.kind === "COINS" && slice.amount === 0);
+}
