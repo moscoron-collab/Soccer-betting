@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.17";
+export const VERSION = "4.18";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.18",
+    date: "2026-06-24",
+    changes: [
+      {
+        en: "📰 The scrolling banner is now a social feed about the game, not a list of upcoming matches. It leads with you and the leaderboard, then the sharpest predictor's win rate, the day's biggest coin movers, the tightest table rivalries and a hello to new players — with a few live/upcoming games moved to the end.",
+        he: "📰 הבאנר הנגלל הוא עכשיו פיד חברתי על המשחק, לא רשימה של משחקים קרובים. הוא פותח בכם ובטבלה, ואז באחוז ההצלחה של החזאי החד ביותר, במי שזינק או צנח הכי הרבה מטבעות היום, ביריבויות הצמודות על הטבלה ובברכת שלום לשחקנים חדשים — וכמה משחקים חיים/קרובים עברו לסוף.",
+      },
+    ],
+  },
   {
     version: "4.17",
     date: "2026-06-24",

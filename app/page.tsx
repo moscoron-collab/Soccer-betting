@@ -805,7 +805,10 @@ function motdLine(t: Tt, m: any): string {
 }
 
 // Builds the localized marquee lines from the /api/banner feed + the player's own
-// state. Order = personal → event → live games → records → leaderboard.
+// state. The feed is social-first: it leads with you and the table, then the
+// community stats (best win rate, biggest movers, rivalries, new players) and
+// records — and only THEN a few games, moved to the very end.
+// Order = you → table → form → rivalries → newcomers → records → event → games.
 function buildBannerMessages(
   t: Tt,
   data: any,
@@ -823,44 +826,59 @@ function buildBannerMessages(
     msgs.push(t("banner.missedYou", { name: player.username, gift: n(welcomeBack.giftAmount) }));
   }
 
-  // 2) "What's coming" — matches in chronological order: soonest UPCOMING first
-  //    (the "next game in 30 min"), then anything LIVE, then just-FINISHED.
-  const all = (data.matches ?? []) as any[];
-  const isLive = (m: any) => m.status === "IN_PLAY" || m.status === "PAUSED";
-  const ms = (m: any) => new Date(m.kickoff_at).getTime();
-  const upcoming = all
-    .filter((m) => !isLive(m) && m.status !== "FINISHED" && ms(m) > now)
-    .sort((a, b) => ms(a) - ms(b));
-  const live = all.filter(isLive);
-  const finished = all.filter((m) => m.status === "FINISHED").sort((a, b) => ms(b) - ms(a));
-  for (const m of [...upcoming, ...live, ...finished]) {
-    const line = matchLine(t, m);
-    if (line) msgs.push(line);
-  }
-
-  // (Match of the Day is shown as its own gold "pop" bar below the ticker,
-  //  not as a scrolling line.)
-
-  // 4) Event (Road to the Final).
-  const ev = data.event;
-  if (ev?.on) {
-    msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
-    for (const fm of (ev.featuredMatches ?? []) as any[]) {
-      msgs.push(t("banner.featured", { home: fm.home_team, away: fm.away_team, mult: fmtMult(ev.mult) }));
-    }
-    if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
-  }
-
-  // 5) Personal extras (only this logged-in player sees these).
+  // 2) Your own activity — the most personal hook leads the feed.
   const recentWon = predictions.find(
     (p) => p.status === "WON" && new Date(p.created_at ?? 0).getTime() >= now - 48 * 3_600_000
   );
   if (recentWon) msgs.push(t("banner.youWon", { payout: n(recentWon.payout), team: predTeam(recentWon) }));
-  if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
   if ((player.win_streak ?? 0) >= 2) msgs.push(t("banner.streak", { n: player.win_streak }));
   if (myRank && myRank > 1) msgs.push(t("banner.yourRank", { rank: myRank }));
+  if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
 
-  // 6) Records (48h).
+  // 3) The table — who's on top and how the ranking is moving.
+  if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
+  if (Array.isArray(data.top3) && data.top3.length >= 3) {
+    msgs.push(t("banner.top3", { a: data.top3[0].name, b: data.top3[1].name, c: data.top3[2].name }));
+  }
+  if (data.climber?.name) {
+    msgs.push(t("banner.climber", { name: data.climber.name, from: data.climber.from, to: data.climber.to }));
+  }
+
+  // 4) Recent form — the sharpest predictor (last 48h).
+  if (data.bestWinRate?.name) {
+    msgs.push(
+      t("banner.winRate", {
+        name: data.bestWinRate.name,
+        pct: data.bestWinRate.pct,
+        won: data.bestWinRate.won,
+        total: data.bestWinRate.total,
+      })
+    );
+  }
+
+  // 5) Biggest movers — who gained/lost the most coins (last 48h).
+  const mover = data.mover ?? {};
+  if (mover.gainer?.name) msgs.push(t("banner.mover", { name: mover.gainer.name, amount: n(mover.gainer.amount) }));
+  if (mover.faller?.name) msgs.push(t("banner.faller", { name: mover.faller.name, amount: n(mover.faller.amount) }));
+
+  // 6) Rivalry — the tightest race on the table.
+  if (data.rivalry?.chaser) {
+    msgs.push(
+      t("banner.rivalry", {
+        chaser: data.rivalry.chaser,
+        leader: data.rivalry.leader,
+        gap: n(data.rivalry.gap),
+        rank: data.rivalry.rank,
+      })
+    );
+  }
+
+  // 7) New players — say hi to whoever just joined.
+  for (const nc of (data.newcomers ?? []) as any[]) {
+    if (nc?.name) msgs.push(t("banner.newPlayer", { name: nc.name }));
+  }
+
+  // 8) Records (48h Hall of Fame).
   const hof = data.hallOfFame ?? {};
   if (hof.biggestWin?.name) {
     msgs.push(
@@ -874,15 +892,36 @@ function buildBannerMessages(
     msgs.push(t("banner.biggestBet", { name: hof.biggestBet.name, amount: n(hof.biggestBet.amount), team: hof.biggestBet.team ?? "" }));
   }
 
-  // — Leaderboard / ranks —
-  if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
-  if (Array.isArray(data.top3) && data.top3.length >= 3) {
-    msgs.push(t("banner.top3", { a: data.top3[0].name, b: data.top3[1].name, c: data.top3[2].name }));
+  // 9) Event (Road to the Final), when it's on.
+  const ev = data.event;
+  if (ev?.on) {
+    msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
+    for (const fm of (ev.featuredMatches ?? []) as any[]) {
+      msgs.push(t("banner.featured", { home: fm.home_team, away: fm.away_team, mult: fmtMult(ev.mult) }));
+    }
+    if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
   }
-  if (data.climber?.name) {
-    msgs.push(t("banner.climber", { name: data.climber.name, from: data.climber.from, to: data.climber.to }));
+
+  // 10) Games LAST and trimmed: live first (real-time action), then just a few of the
+  //     soonest upcoming, then a couple of just-finished — so the feed is about the app,
+  //     not a wall of "kicks off in…" countdowns. (Match of the Day still has its own
+  //     gold "pop" bar below the ticker.)
+  const all = (data.matches ?? []) as any[];
+  const isLive = (m: any) => m.status === "IN_PLAY" || m.status === "PAUSED";
+  const ms = (m: any) => new Date(m.kickoff_at).getTime();
+  const live = all.filter(isLive);
+  const upcoming = all
+    .filter((m) => !isLive(m) && m.status !== "FINISHED" && ms(m) > now)
+    .sort((a, b) => ms(a) - ms(b))
+    .slice(0, 3);
+  const finished = all
+    .filter((m) => m.status === "FINISHED")
+    .sort((a, b) => ms(b) - ms(a))
+    .slice(0, 2);
+  for (const m of [...live, ...upcoming, ...finished]) {
+    const line = matchLine(t, m);
+    if (line) msgs.push(line);
   }
-  if (data.gap != null && data.gap >= 0 && data.gap <= 1000) msgs.push(t("banner.tight", { gap: n(data.gap) }));
 
   return msgs;
 }

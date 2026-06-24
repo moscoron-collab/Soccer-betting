@@ -3,13 +3,22 @@ import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
 import { getMotdId } from "@/lib/motd";
-import { netWorthLeaderboard } from "@/lib/networth";
+import { netWorthLeaderboard, RankedPlayer } from "@/lib/networth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // How far back the Hall of Fame (biggest win/loss) looks. Matches the agreed window.
+// The social lines (win rate, biggest mover, new players) share this same window.
 const HALL_OF_FAME_HOURS = 48;
+
+// Minimum settled bets in the window to qualify for the "best win rate" line, so a
+// lone 1-for-1 doesn't get crowned at 100%.
+const MIN_RATED_BETS = 4;
+// A net coin swing must be at least this big to earn a "biggest mover" shout-out.
+const MOVER_MIN = 300;
+// Tightest adjacent net-worth gap near the top that counts as a "rivalry".
+const RIVALRY_MAX_GAP = 1000;
 
 // Pull the username/team out of a joined prediction row (Supabase returns the
 // to-one relations as nested objects; type them loosely).
@@ -66,6 +75,66 @@ async function biggestClimber(ranked: { id: string; username: string }[]) {
   } catch {
     return null;
   }
+}
+
+// Recent form over the `since` window, in one pass over settled predictions:
+//   • bestWinRate — the sharpest predictor (win rate, min sample), tie-break by volume.
+//   • mover — the biggest coin gainer and (separately) the biggest faller, by net of
+//     settled bets. Coin math mirrors settlement: a win returns `payout` (stake was
+//     already deducted, so profit = payout − stake), a loss costs the stake. Free bets
+//     risk no coins, so a free win is pure profit and a free loss costs nothing.
+async function playerForm(since: string) {
+  const { data } = await supabase
+    .from("predictions")
+    .select("player_id, status, stake, payout, free_bet, players(username)")
+    .in("status", ["WON", "LOST"])
+    .gte("settled_at", since);
+
+  const agg = new Map<string, { name: string; won: number; total: number; net: number }>();
+  for (const r of (data ?? []) as any[]) {
+    const name = r.players?.username;
+    if (!name) continue;
+    const e = agg.get(r.player_id) ?? { name, won: 0, total: 0, net: 0 };
+    e.total++;
+    if (r.status === "WON") {
+      e.won++;
+      e.net += r.free_bet ? (r.payout ?? 0) : (r.payout ?? 0) - (r.stake ?? 0);
+    } else if (!r.free_bet) {
+      e.net -= r.stake ?? 0;
+    }
+    agg.set(r.player_id, e);
+  }
+  const entries = [...agg.values()];
+
+  const rated = entries
+    .filter((e) => e.total >= MIN_RATED_BETS)
+    .sort((a, b) => b.won / b.total - a.won / a.total || b.total - a.total || b.net - a.net);
+  const r0 = rated[0];
+  const bestWinRate = r0
+    ? { name: r0.name, pct: Math.round((r0.won / r0.total) * 100), won: r0.won, total: r0.total }
+    : null;
+
+  const byNet = [...entries].sort((a, b) => b.net - a.net);
+  const up = byNet[0];
+  const down = byNet[byNet.length - 1];
+  const gainer = up && up.net >= MOVER_MIN ? { name: up.name, amount: Math.round(up.net) } : null;
+  const faller = down && down.net <= -MOVER_MIN ? { name: down.name, amount: Math.round(-down.net) } : null;
+
+  return { bestWinRate, mover: { gainer, faller } };
+}
+
+// The tightest race near the top: the smallest positive net-worth gap between adjacent
+// players in the top 8, if it's within RIVALRY_MAX_GAP. `rank` is the spot being chased.
+function findRivalry(ranked: RankedPlayer[]) {
+  let best: { leader: string; chaser: string; gap: number; rank: number } | null = null;
+  const top = ranked.slice(0, 8);
+  for (let i = 0; i + 1 < top.length; i++) {
+    const gap = top[i].netWorth - top[i + 1].netWorth;
+    if (gap > 0 && gap <= RIVALRY_MAX_GAP && (!best || gap < best.gap)) {
+      best = { leader: top[i].username, chaser: top[i + 1].username, gap, rank: i + 1 };
+    }
+  }
+  return best;
 }
 
 // GET /api/banner -> everything the scrolling marquee needs (world + event + records).
@@ -169,6 +238,16 @@ export async function GET(req: Request) {
   const climber = await biggestClimber(ranked);
   const myRank = player ? ranked.findIndex((r) => r.id === player.id) + 1 || null : null;
 
+  // Social lines: tightest table race, freshly-joined players (within the window),
+  // and recent form (best win rate + biggest coin movers).
+  const rivalry = findRivalry(ranked);
+  const newcomers = ranked
+    .filter((r) => r.created_at && r.created_at >= since)
+    .sort((a, b) => ((a.created_at ?? "") < (b.created_at ?? "") ? 1 : -1))
+    .slice(0, 2)
+    .map((r) => ({ name: r.username }));
+  const form = await playerForm(since);
+
   // Admin-only: a list of upcoming matches (next ~4 days) so the admin panel can
   // offer a "pick the featured match" dropdown instead of a raw match id.
   let adminMatches: any[] = [];
@@ -202,6 +281,10 @@ export async function GET(req: Request) {
       climber,
       gap,
       myRank,
+      rivalry,
+      newcomers,
+      bestWinRate: form.bestWinRate,
+      mover: form.mover,
       // Admin-only: the live config + upcoming matches for the admin panel.
       config: isAdmin ? cfg : undefined,
       adminMatches,

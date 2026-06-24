@@ -488,6 +488,26 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "🔥 Just 🪙{gap} between #1 and #2 — neck and neck!",
     he: "🔥 רק 🪙{gap} בין הראשון לשני — צמוד!",
   },
+  "banner.winRate": {
+    en: "🎯 {name} is on fire — {pct}% win rate ({won}/{total})!",
+    he: "🎯 {name} בכושר מעולה — {pct}% הצלחה ({won}/{total})!",
+  },
+  "banner.mover": {
+    en: "📈 {name} is surging — up 🪙{amount} in 2 days!",
+    he: "📈 {name} בזינוק — עלייה של 🪙{amount} ביומיים!",
+  },
+  "banner.faller": {
+    en: "📉 Rough patch for {name} — down 🪙{amount} in 2 days",
+    he: "📉 תקופה קשה ל-{name} — ירידה של 🪙{amount} ביומיים",
+  },
+  "banner.rivalry": {
+    en: "⚔️ {chaser} is just 🪙{gap} behind {leader} for #{rank}!",
+    he: "⚔️ {chaser} במרחק 🪙{gap} בלבד מ-{leader} על מקום #{rank}!",
+  },
+  "banner.newPlayer": {
+    en: "👋 Say hi to {name} — just joined the game!",
+    he: "👋 קבלו את {name} — הצטרף/ה עכשיו למשחק!",
+  },
   "banner.missedYou": {
     en: "💙 We missed you, {name}! Here's 🪙{gift} — welcome back!",
     he: "💙 התגעגענו, {name}! קבלו 🪙{gift} — ברוכים השובים!",
