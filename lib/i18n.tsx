@@ -114,6 +114,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Game header / shell
   "game.playingAs": { en: "Playing as", he: "משחק בתור" },
   "game.coins": { en: "Coins", he: "מטבעות" },
+  "game.inPlay": { en: "{n} in play", he: "{n} בהימור" },
   "game.whatsNew": { en: "What's new", he: "מה חדש" },
   "game.invite": { en: "🔗 Invite a friend", he: "🔗 הזמינו חבר" },
   "game.settings": { en: "⚙️ Profile & settings", he: "⚙️ פרופיל והגדרות" },
@@ -417,6 +418,71 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Who-wins split
   "who.titleOne": { en: "Who wins? ({n} bet)", he: "מי ינצח? (הימור {n})" },
   "who.titleMany": { en: "Who wins? ({n} bets)", he: "מי ינצח? ({n} הימורים)" },
+
+  // Smart banner (scrolling marquee). Playful tone; EN→EN players, HE→HE players.
+  "banner.dHM": { en: "{h}h {m}m", he: "{h} שע׳ {m} דק׳" },
+  "banner.dM": { en: "{m}m", he: "{m} דק׳" },
+  "banner.kickoffIn": {
+    en: "⏰ {home} vs {away} — kicks off in {time}",
+    he: "⏰ {home} נגד {away} — בעוד {time}",
+  },
+  "banner.locksIn": {
+    en: "🔒 Last call! {home} vs {away} locks in {n} min",
+    he: "🔒 הזדמנות אחרונה! {home} נגד {away} ננעל בעוד {n} דק׳",
+  },
+  "banner.live": { en: "🔴 LIVE: {home} {hs}–{as} {away}", he: "🔴 חי: {home} {hs}–{as} {away}" },
+  "banner.fullTime": { en: "✅ Full time: {home} {hs}–{as} {away}", he: "✅ סיום: {home} {hs}–{as} {away}" },
+  "banner.eventOn": {
+    en: "🔥 {name} is ON — featured match pays {mult}×!",
+    he: "🔥 {name} פעיל — המשחק הנבחר משלם {mult}×!",
+  },
+  "banner.featured": {
+    en: "⭐ Featured: {home} vs {away} — Winner pays {mult}×",
+    he: "⭐ המשחק הנבחר: {home} נגד {away} — מנצח משלם {mult}×",
+  },
+  "banner.jackpot": {
+    en: "💰 Jackpot: 🪙{amount} — nail the featured match to win it!",
+    he: "💰 ג׳קפוט: 🪙{amount} — קלעו במשחק הנבחר וזכו בו!",
+  },
+  "banner.biggestWin": {
+    en: "🏆 Biggest win: {name} turned 🪙{stake} into 🪙{payout}!",
+    he: "🏆 הזכייה הגדולה: {name} הפך 🪙{stake} ל-🪙{payout}!",
+  },
+  "banner.biggestLoss": {
+    en: "💥 Ouch of the day: {name} dropped 🪙{amount} on {team}! 😅",
+    he: "💥 האאוץ׳ של היום: {name} הפסיד 🪙{amount} על {team}! 😅",
+  },
+  "banner.top": { en: "👑 Top of the table: {name} — 🪙{networth}", he: "👑 בראש הטבלה: {name} — 🪙{networth}" },
+  "banner.tight": {
+    en: "🔥 Just 🪙{gap} between #1 and #2 — neck and neck!",
+    he: "🔥 רק 🪙{gap} בין הראשון לשני — צמוד!",
+  },
+  "banner.missedYou": {
+    en: "💙 We missed you, {name}! Here's 🪙{gift} — welcome back!",
+    he: "💙 התגעגענו, {name}! קבלו 🪙{gift} — ברוכים השובים!",
+  },
+  "banner.youWon": { en: "✅ You won 🪙{payout} on {team}!", he: "✅ זכית ב-🪙{payout} על {team}!" },
+  "banner.yourRank": { en: "📊 You're #{rank} — keep climbing!", he: "📊 אתה במקום #{rank} — תמשיך לטפס!" },
+  "banner.freeBet": {
+    en: "🎟️ Your free bet is ready — don't waste it!",
+    he: "🎟️ הימור החינם שלך מוכן — אל תפספס!",
+  },
+  "banner.streak": { en: "🔥 {n}-win streak — keep it rolling!", he: "🔥 רצף {n} נצחונות — תמשיך ככה!" },
+
+  // Event admin panel (admins only)
+  "admin.title": { en: "⚙️ Event admin", he: "⚙️ ניהול אירוע" },
+  "admin.bannerPublic": { en: "Banner visible to everyone", he: "באנר גלוי לכולם" },
+  "admin.previewNote": {
+    en: "Off = only you (admin) see the banner — preview mode.",
+    he: "כבוי = רק אתם (מנהל) רואים את הבאנר — מצב תצוגה.",
+  },
+  "admin.eventOn": { en: "Road to the Final event ON", he: "אירוע הדרך לגמר פעיל" },
+  "admin.mult": { en: "Featured Winner multiplier (×)", he: "מכפיל מנצח במשחק הנבחר (×)" },
+  "admin.jackpot": { en: "Jackpot amount (🪙)", he: "סכום הג׳קפוט (🪙)" },
+  "admin.override": { en: "Force featured match id (blank = auto)", he: "מזהה משחק נבחר (ריק = אוטומטי)" },
+  "admin.eventName": { en: "Event name", he: "שם האירוע" },
+  "admin.saved": { en: "Saved ✓", he: "נשמר ✓" },
+  "admin.save": { en: "Save", he: "שמירה" },
 };
 
 // Look up a key and fill in {token} placeholders.

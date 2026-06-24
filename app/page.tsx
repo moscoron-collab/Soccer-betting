@@ -192,7 +192,14 @@ function levelInfo(xp: number) {
   return { level, tierKey, intoLevel: (xp || 0) % 100 };
 }
 
-type LeaderRow = { username: string; coins: number; avatar?: string | null; created_at?: string | null };
+type LeaderRow = {
+  username: string;
+  coins: number;
+  netWorth?: number; // coins + coins locked in pending bets (the ranking value)
+  inPlay?: number;
+  avatar?: string | null;
+  created_at?: string | null;
+};
 
 function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
@@ -250,6 +257,8 @@ function Home() {
   const [nextSpinFree, setNextSpinFree] = useState(false);
   const [canPenalty, setCanPenalty] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [myRank, setMyRank] = useState<number | null>(null);
+  const [welcomeBack, setWelcomeBack] = useState<{ giftAmount: number; awayHours: number } | null>(null);
   const firstLoad = useRef(true);
   const [recap, setRecap] = useState<{ won: number; lost: number; net: number; gained: number } | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -340,6 +349,12 @@ function Home() {
     setNextSpinFree(!!data.nextSpinFree);
     setCanPenalty(!!data.canPenalty);
     setLeaderboard(data.leaderboard ?? []);
+    setMyRank(data.myRank ?? null);
+    if (data.welcomeBack) {
+      setWelcomeBack(data.welcomeBack);
+      confettiBurst();
+      playCheer();
+    }
   }, [t]);
 
   useEffect(() => {
@@ -397,6 +412,8 @@ function Home() {
           nextSpinFree={nextSpinFree}
           canPenalty={canPenalty}
           leaderboard={leaderboard}
+          myRank={myRank}
+          welcomeBack={welcomeBack}
           onRefresh={() => loadMe(token)}
           onSignOut={signOut}
         />
@@ -729,6 +746,278 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
 
 /* --------------------------------- Game ----------------------------------- */
 
+/* ----------------------------- Smart banner ------------------------------ */
+
+function fmtMult(m: number): string {
+  return Number.isInteger(m) ? `${m}` : (Math.round(m * 100) / 100).toString();
+}
+
+// The team a bet was backing (for "… on England"), else the fixture name.
+function predTeam(p: Prediction): string {
+  const m = p.matches;
+  if (!m) return "";
+  if (p.type === "WINNER" || p.type === "HALFTIME") {
+    if (p.pick === "HOME") return m.home_team;
+    if (p.pick === "AWAY") return m.away_team;
+  }
+  return `${m.home_team} v ${m.away_team}`;
+}
+
+type Tt = (k: string, p?: Record<string, string | number>) => string;
+
+// One live-games line for a match: full-time, live score, "locks in N min", or countdown.
+function matchLine(t: Tt, m: any): string | null {
+  const home = m.home_team,
+    away = m.away_team;
+  const hs = m.home_score ?? 0,
+    as = m.away_score ?? 0;
+  if (m.status === "FINISHED") return t("banner.fullTime", { home, away, hs, as });
+  if (m.status === "IN_PLAY" || m.status === "PAUSED") return t("banner.live", { home, away, hs, as });
+  const mins = Math.round((new Date(m.kickoff_at).getTime() - Date.now()) / 60000);
+  if (mins <= 0) return null;
+  if (mins <= 15) return t("banner.locksIn", { home, away, n: mins });
+  const h = Math.floor(mins / 60),
+    mm = mins % 60;
+  const time = h > 0 ? t("banner.dHM", { h, m: mm }) : t("banner.dM", { m: mm });
+  return t("banner.kickoffIn", { home, away, time });
+}
+
+// Builds the localized marquee lines from the /api/banner feed + the player's own
+// state. Order = personal → event → live games → records → leaderboard.
+function buildBannerMessages(
+  t: Tt,
+  data: any,
+  player: Player,
+  predictions: Prediction[],
+  myRank: number | null,
+  welcomeBack: { giftAmount: number; awayHours: number } | null
+): string[] {
+  const msgs: string[] = [];
+  const n = (v: number) => v.toLocaleString();
+
+  // — Personal (only this logged-in player sees these) —
+  if (welcomeBack) {
+    msgs.push(t("banner.missedYou", { name: player.username, gift: n(welcomeBack.giftAmount) }));
+  }
+  const since = Date.now() - 48 * 3_600_000;
+  const recentWon = predictions.find(
+    (p) => p.status === "WON" && new Date(p.created_at ?? 0).getTime() >= since
+  );
+  if (recentWon) msgs.push(t("banner.youWon", { payout: n(recentWon.payout), team: predTeam(recentWon) }));
+  if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
+  if ((player.win_streak ?? 0) >= 2) msgs.push(t("banner.streak", { n: player.win_streak }));
+  if (myRank && myRank > 1) msgs.push(t("banner.yourRank", { rank: myRank }));
+
+  // — Event —
+  const ev = data.event;
+  if (ev?.on) {
+    msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
+    if (ev.featured) {
+      msgs.push(
+        t("banner.featured", { home: ev.featured.home_team, away: ev.featured.away_team, mult: fmtMult(ev.mult) })
+      );
+    }
+    if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
+  }
+
+  // — Live games —
+  for (const m of (data.matches ?? []) as any[]) {
+    const line = matchLine(t, m);
+    if (line) msgs.push(line);
+  }
+
+  // — Records (48h) —
+  const hof = data.hallOfFame ?? {};
+  if (hof.biggestWin?.name) {
+    msgs.push(
+      t("banner.biggestWin", { name: hof.biggestWin.name, stake: n(hof.biggestWin.stake), payout: n(hof.biggestWin.payout) })
+    );
+  }
+  if (hof.biggestLoss?.name) {
+    msgs.push(t("banner.biggestLoss", { name: hof.biggestLoss.name, amount: n(hof.biggestLoss.amount), team: hof.biggestLoss.team ?? "" }));
+  }
+
+  // — Leaderboard —
+  if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
+  if (data.gap != null && data.gap >= 0 && data.gap <= 1000) msgs.push(t("banner.tight", { gap: n(data.gap) }));
+
+  return msgs;
+}
+
+// Number input that saves on blur (used by the event admin panel).
+function NumField({ label, value, step, onSave }: { label: string; value: number; step?: string; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value ?? ""));
+  useEffect(() => setV(String(value ?? "")), [value]);
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="text-blue-100/80">{label}</span>
+      <input
+        type="number"
+        step={step}
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => {
+          const num = Number(v);
+          if (Number.isFinite(num)) onSave(num);
+        }}
+        className="rounded bg-white/90 px-2 py-1 text-gray-900"
+      />
+    </label>
+  );
+}
+
+function TextField({ label, value, onSave }: { label: string; value: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value ?? "");
+  useEffect(() => setV(value ?? ""), [value]);
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="text-blue-100/80">{label}</span>
+      <input
+        type="text"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => onSave(v)}
+        className="rounded bg-white/90 px-2 py-1 text-gray-900"
+      />
+    </label>
+  );
+}
+
+// Admin-only control panel: flip the banner public, toggle the event, set the
+// featured multiplier / jackpot / featured-match override / event name.
+function EventAdmin({ token, initial, onSaved }: { token: string; initial: any; onSaved: () => void }) {
+  const { t } = useLang();
+  const [cfg, setCfg] = useState<any>(initial ?? {});
+  const [saved, setSaved] = useState(false);
+
+  const save = useCallback(
+    async (patch: Record<string, any>) => {
+      setCfg((c: any) => ({ ...c, ...patch })); // optimistic
+      try {
+        const res = await fetch("/api/admin/event", {
+          method: "POST",
+          headers: authHeaders(token),
+          body: JSON.stringify(patch),
+        });
+        if (res.ok) {
+          setCfg((await res.json()).config);
+          setSaved(true);
+          onSaved();
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [token, onSaved]
+  );
+
+  return (
+    <div className="mx-auto max-w-5xl px-3 pb-2 text-white">
+      <div className="rounded-lg bg-black/30 p-3 text-sm">
+        <div className="mb-2 font-bold">{t("admin.title")}</div>
+        <label className="mb-1 flex items-center gap-2">
+          <input type="checkbox" checked={!!cfg.bannerPublic} onChange={(e) => save({ bannerPublic: e.target.checked })} />
+          <span>{t("admin.bannerPublic")}</span>
+        </label>
+        <p className="mb-2 text-xs text-blue-100/70">{t("admin.previewNote")}</p>
+        <label className="mb-3 flex items-center gap-2">
+          <input type="checkbox" checked={!!cfg.eventOn} onChange={(e) => save({ eventOn: e.target.checked })} />
+          <span>{t("admin.eventOn")}</span>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <NumField label={t("admin.mult")} value={cfg.featuredMult} step="0.5" onSave={(v) => save({ featuredMult: v })} />
+          <NumField label={t("admin.jackpot")} value={cfg.jackpot} step="500" onSave={(v) => save({ jackpot: v })} />
+          <TextField label={t("admin.override")} value={cfg.featuredOverride ?? ""} onSave={(v) => save({ featuredOverride: v })} />
+          <TextField label={t("admin.eventName")} value={cfg.eventName ?? ""} onSave={(v) => save({ eventName: v })} />
+        </div>
+        {saved && <div className="mt-2 text-xs text-green-300">{t("admin.saved")}</div>}
+      </div>
+    </div>
+  );
+}
+
+// The scrolling marquee pinned to the very top. Reads /api/banner (world + event +
+// records); personal lines come from the player props. Admin-only until made public.
+function BannerMarquee({
+  token,
+  player,
+  predictions,
+  myRank,
+  welcomeBack,
+}: {
+  token: string;
+  player: Player;
+  predictions: Prediction[];
+  myRank: number | null;
+  welcomeBack: { giftAmount: number; awayHours: number } | null;
+}) {
+  const { t, lang } = useLang();
+  const [data, setData] = useState<any | null>(null);
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/banner?_=${Date.now()}`, { headers: authHeaders(token), cache: "no-store" });
+      if (res.ok) setData(await res.json());
+    } catch {
+      /* network blip — keep last */
+    }
+  }, [token]);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (!data || !data.show) return null;
+
+  const messages = buildBannerMessages(t, data, player, predictions, myRank, welcomeBack);
+  if (messages.length === 0 && !data.isAdmin) return null;
+
+  const joined = messages.join(" • ");
+  const duration = `${Math.max(24, Math.round(joined.length * 0.28))}s`;
+  const isHe = lang === "he";
+
+  return (
+    <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-700 text-white shadow-md">
+      <div className="mx-auto flex max-w-5xl items-center gap-2 px-3">
+        {messages.length > 0 ? (
+          <div className="flex-1 overflow-hidden py-1.5">
+            <div
+              className="marquee-track text-sm font-semibold"
+              style={{ animationDuration: duration, animationDirection: isHe ? "reverse" : "normal" }}
+            >
+              <span className="marquee-seg">{joined}</span>
+              <span className="marquee-seg" aria-hidden="true">
+                {joined}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 py-1.5 text-sm font-semibold text-blue-100">{t("admin.previewNote")}</div>
+        )}
+        {data.isAdmin && (
+          <button
+            onClick={() => setShowAdmin((s) => !s)}
+            title={t("admin.title")}
+            className="shrink-0 rounded-md bg-white/15 px-2 py-0.5 text-xs font-bold"
+          >
+            ⚙️
+          </button>
+        )}
+      </div>
+      {data.isAdmin && showAdmin && <EventAdmin token={token} initial={data.config} onSaved={load} />}
+      <style>{`
+        .marquee-track { display:inline-flex; white-space:nowrap; will-change:transform; animation-name:spg-marquee; animation-timing-function:linear; animation-iteration-count:infinite; }
+        .marquee-track:hover { animation-play-state:paused; }
+        .marquee-seg { padding-inline-end:3rem; }
+        @keyframes spg-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+      `}</style>
+    </div>
+  );
+}
+
 function Game({
   token,
   player,
@@ -738,6 +1027,8 @@ function Game({
   nextSpinFree,
   canPenalty,
   leaderboard,
+  myRank,
+  welcomeBack,
   onRefresh,
   onSignOut,
 }: {
@@ -749,6 +1040,8 @@ function Game({
   nextSpinFree: boolean;
   canPenalty: boolean;
   leaderboard: LeaderRow[];
+  myRank: number | null;
+  welcomeBack: { giftAmount: number; awayHours: number } | null;
   onRefresh: () => void | Promise<void>;
   onSignOut: () => void;
 }) {
@@ -916,7 +1209,19 @@ function Game({
   const playBadge = claimCounts.challenges + miniGamesReady + bailoutReady;
   const logBadge = claimCounts.badges;
 
+  // Coins locked in pending bets — shown under the balance so "9,000" reads as
+  // "9,000 + 1,000 in play" rather than looking like you lost coins by betting.
+  const inPlay = predictions.reduce((s, p) => (p.status === "PENDING" ? s + p.stake : s), 0);
+
   return (
+    <>
+      <BannerMarquee
+        token={token}
+        player={player}
+        predictions={predictions}
+        myRank={myRank}
+        welcomeBack={welcomeBack}
+      />
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-6">
       {/* Always-visible coin balance while scrolling */}
       <CoinChip coins={player.coins} />
@@ -936,6 +1241,9 @@ function Game({
           <p className="text-2xl font-extrabold text-yellow-300">
             🪙 <CountUp value={player.coins} />
           </p>
+          {inPlay > 0 && (
+            <p className="text-[11px] text-blue-100/60">{t("game.inPlay", { n: inPlay.toLocaleString() })}</p>
+          )}
           <button
             onClick={openChanges}
             className="mt-1 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-blue-100"
@@ -1024,8 +1332,13 @@ function Game({
                   <span title={t("badge.new")} className="shrink-0">🌱</span>
                 )}
               </span>
-              <span className="shrink-0 font-semibold text-yellow-300">
-                🪙 {(row.coins ?? 0).toLocaleString()}
+              <span className="shrink-0 text-right font-semibold text-yellow-300">
+                🪙 {(row.netWorth ?? row.coins ?? 0).toLocaleString()}
+                {(row.inPlay ?? 0) > 0 && (
+                  <span className="block text-[10px] font-normal text-blue-100/60">
+                    {t("game.inPlay", { n: (row.inPlay ?? 0).toLocaleString() })}
+                  </span>
+                )}
               </span>
             </button>
           ))}
@@ -1155,6 +1468,7 @@ function Game({
         <PlayerLogModal username={viewPlayer} onClose={() => setViewPlayer(null)} />
       )}
     </main>
+    </>
   );
 }
 
