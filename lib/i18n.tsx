@@ -468,6 +468,10 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "🎟️ הימור החינם שלך מוכן — אל תפספס!",
   },
   "banner.streak": { en: "🔥 {n}-win streak — keep it rolling!", he: "🔥 רצף {n} נצחונות — תמשיך ככה!" },
+  "banner.speed": { en: "Scroll speed: {s} (tap to change)", he: "מהירות גלילה: {s} (לחצו לשינוי)" },
+  "banner.spd.slow": { en: "Slow", he: "איטי" },
+  "banner.spd.normal": { en: "Normal", he: "רגיל" },
+  "banner.spd.fast": { en: "Fast", he: "מהיר" },
 
   // Event admin panel (admins only)
   "admin.title": { en: "⚙️ Event admin", he: "⚙️ ניהול אירוע" },

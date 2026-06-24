@@ -954,6 +954,19 @@ function BannerMarquee({
   const { t, lang } = useLang();
   const [data, setData] = useState<any | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
+  // Each player's own scroll speed, remembered in their browser (no DB).
+  const [speed, setSpeed] = useState<"slow" | "normal" | "fast">("normal");
+
+  useEffect(() => {
+    const s = safeGet("spg_banner_speed");
+    if (s === "slow" || s === "normal" || s === "fast") setSpeed(s);
+  }, []);
+  function cycleSpeed() {
+    const order = ["slow", "normal", "fast"] as const;
+    const next = order[(order.indexOf(speed) + 1) % order.length];
+    setSpeed(next);
+    safeSet("spg_banner_speed", next);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -976,7 +989,10 @@ function BannerMarquee({
   if (messages.length === 0 && !data.isAdmin) return null;
 
   const joined = messages.join(" • ");
-  const duration = `${Math.max(24, Math.round(joined.length * 0.28))}s`;
+  const base = Math.max(24, Math.round(joined.length * 0.28));
+  const speedFactor = speed === "slow" ? 1.8 : speed === "fast" ? 0.55 : 1;
+  const duration = `${Math.round(base * speedFactor)}s`;
+  const speedIcon = speed === "slow" ? "🐢" : speed === "fast" ? "🐇" : "🚶";
   const isHe = lang === "he";
 
   return (
@@ -996,6 +1012,16 @@ function BannerMarquee({
           </div>
         ) : (
           <div className="flex-1 py-1.5 text-sm font-semibold text-blue-100">{t("admin.previewNote")}</div>
+        )}
+        {messages.length > 0 && (
+          <button
+            onClick={cycleSpeed}
+            title={t("banner.speed", { s: t("banner.spd." + speed) })}
+            aria-label={t("banner.speed", { s: t("banner.spd." + speed) })}
+            className="shrink-0 rounded-md bg-white/15 px-2 py-0.5 text-sm"
+          >
+            {speedIcon}
+          </button>
         )}
         {data.isAdmin && (
           <button
