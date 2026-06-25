@@ -290,6 +290,11 @@ const DICT: Record<string, { en: string; he: string }> = {
   "spin.leftOne": { en: "{n} spin left today", he: "נשאר {n} סיבוב היום" },
   "spin.leftMany": { en: "{n} spins left today", he: "נשארו {n} סיבובים היום" },
   "spin.comeback": { en: "Come back tomorrow", he: "חזרו מחר" },
+  "spin.comebackTitle": { en: "🌱 Comeback Wheel", he: "🌱 גלגל החזרה" },
+  "spin.comebackDesc": {
+    en: "You're near the bottom — here's a FREE daily catch-up spin with bigger prizes and no 'no win'. Climb back in!",
+    he: "אתם קרובים לתחתית — הנה סיבוב חזרה יומי חינם עם פרסים גדולים יותר ובלי 'אין זכייה'. טפסו בחזרה!",
+  },
   "spin.boosts": { en: "⚡ 2× boosts:", he: "⚡ הכפלות 2×:" },
   "spin.shields": { en: "🛡️ shields:", he: "🛡️ מגנים:" },
   "spin.freeBets": { en: "🎟️ free bets:", he: "🎟️ הימורי חינם:" },
@@ -543,6 +548,11 @@ const DICT: Record<string, { en: string; he: string }> = {
   "admin.previewNote": {
     en: "Off = only you (admin) see the banner — preview mode.",
     he: "כבוי = רק אתם (מנהל) רואים את הבאנר — מצב תצוגה.",
+  },
+  "admin.comebackLive": { en: "🌱 Comeback Wheel live for everyone", he: "🌱 גלגל החזרה פעיל לכולם" },
+  "admin.comebackNote": {
+    en: "Off = only you (admin) can preview the Comeback Wheel; bottom-30% players still use the regular wheel.",
+    he: "כבוי = רק אתם (מנהל) רואים תצוגה מקדימה של גלגל החזרה; שחקני 30% התחתונים עדיין משתמשים בגלגל הרגיל.",
   },
   "admin.eventOn": { en: "Road to the Final event ON", he: "אירוע הדרך לגמר פעיל" },
   "admin.mult": { en: "Default Winner multiplier (×)", he: "מכפיל ברירת מחדל למנצח (×)" },

@@ -8,6 +8,7 @@ import { pickFeaturedGlobal } from "./motd";
 
 export type EventConfig = {
   bannerPublic: boolean; // false = only admins see the banner (preview mode)
+  comebackLive: boolean; // false = the Comeback Wheel is admin-preview only (not live yet)
   eventOn: boolean; // false = no Road-to-the-Final lines / no featured multiplier
   eventName: string;
   featuredMult: number; // DEFAULT Winner multiplier — used by the auto-pick and any
@@ -20,6 +21,7 @@ export type EventConfig = {
 
 export const EVENT_DEFAULTS: EventConfig = {
   bannerPublic: false,
+  comebackLive: false,
   eventOn: false,
   eventName: "Road to the Final",
   featuredMult: 2.5,
@@ -31,6 +33,7 @@ export const EVENT_DEFAULTS: EventConfig = {
 // app_meta keys backing each field.
 const K = {
   bannerPublic: "banner_public",
+  comebackLive: "comeback_live",
   eventOn: "event_on",
   eventName: "event_name",
   featuredMult: "featured_mult",
@@ -81,6 +84,7 @@ export async function getEventConfig(): Promise<EventConfig> {
 
     return {
       bannerPublic: m.get(K.bannerPublic) === "true",
+      comebackLive: m.get(K.comebackLive) === "true",
       eventOn: m.get(K.eventOn) === "true",
       eventName: (m.get(K.eventName) as string) || EVENT_DEFAULTS.eventName,
       featuredMult: num(m.get(K.featuredMult), EVENT_DEFAULTS.featuredMult),
@@ -100,6 +104,7 @@ export async function setEventConfig(updates: Partial<EventConfig>): Promise<voi
   const push = (key: string, value: string) => rows.push({ key, value, updated_at: now });
 
   if (updates.bannerPublic !== undefined) push(K.bannerPublic, String(updates.bannerPublic));
+  if (updates.comebackLive !== undefined) push(K.comebackLive, String(updates.comebackLive));
   if (updates.eventOn !== undefined) push(K.eventOn, String(updates.eventOn));
   if (updates.eventName !== undefined) push(K.eventName, updates.eventName);
   if (updates.featuredMult !== undefined) push(K.featuredMult, String(updates.featuredMult));

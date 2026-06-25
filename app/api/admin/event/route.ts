@@ -35,6 +35,7 @@ export async function POST(req: Request) {
 
   const updates: Partial<EventConfig> = {};
   if ("bannerPublic" in body) updates.bannerPublic = body.bannerPublic === true;
+  if ("comebackLive" in body) updates.comebackLive = body.comebackLive === true;
   if ("eventOn" in body) updates.eventOn = body.eventOn === true;
   if (typeof body.eventName === "string" && body.eventName.trim()) {
     updates.eventName = body.eventName.trim().slice(0, 60);

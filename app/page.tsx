@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { spinRatchet, loseWomp, winFanfareShort, winFanfareTriumph, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
-import { WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
+import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
 import { FREE_BET_STAKE } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
@@ -281,6 +281,9 @@ function Home() {
   const [canBailout, setCanBailout] = useState(false);
   const [spinsLeft, setSpinsLeft] = useState(0);
   const [nextSpinFree, setNextSpinFree] = useState(false);
+  const [showComeback, setShowComeback] = useState(false);
+  const [showRegularWheel, setShowRegularWheel] = useState(true);
+  const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
@@ -373,6 +376,9 @@ function Home() {
     setCanBailout(!!data.canBailout);
     setSpinsLeft(data.spinsLeft ?? 0);
     setNextSpinFree(!!data.nextSpinFree);
+    setShowComeback(!!data.showComeback);
+    setShowRegularWheel(data.showRegular !== false);
+    setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
     setLeaderboard(data.leaderboard ?? []);
     setMyRank(data.myRank ?? null);
@@ -436,6 +442,9 @@ function Home() {
           canBailout={canBailout}
           spinsLeft={spinsLeft}
           nextSpinFree={nextSpinFree}
+          showComeback={showComeback}
+          showRegularWheel={showRegularWheel}
+          comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
           leaderboard={leaderboard}
           myRank={myRank}
@@ -1062,6 +1071,11 @@ function EventAdmin({
           <span>{t("admin.bannerPublic")}</span>
         </label>
         <p className="mb-2 text-xs text-blue-100/70">{t("admin.previewNote")}</p>
+        <label className="mb-1 flex items-center gap-2">
+          <input type="checkbox" checked={!!cfg.comebackLive} onChange={(e) => save({ comebackLive: e.target.checked })} />
+          <span>{t("admin.comebackLive")}</span>
+        </label>
+        <p className="mb-2 text-xs text-blue-100/70">{t("admin.comebackNote")}</p>
         <label className="mb-3 flex items-center gap-2">
           <input type="checkbox" checked={!!cfg.eventOn} onChange={(e) => save({ eventOn: e.target.checked })} />
           <span>{t("admin.eventOn")}</span>
@@ -1280,6 +1294,9 @@ function Game({
   canBailout,
   spinsLeft,
   nextSpinFree,
+  showComeback,
+  showRegularWheel,
+  comebackSpinsLeft,
   canPenalty,
   leaderboard,
   myRank,
@@ -1293,6 +1310,9 @@ function Game({
   canBailout: boolean;
   spinsLeft: number;
   nextSpinFree: boolean;
+  showComeback: boolean;
+  showRegularWheel: boolean;
+  comebackSpinsLeft: number;
   canPenalty: boolean;
   leaderboard: LeaderRow[];
   myRank: number | null;
@@ -1639,16 +1659,37 @@ function Game({
       {/* Mini-games */}
       <Section id="minigames" title={t("game.miniGames")} badge={miniGamesReady}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <SpinWheel
-            token={token}
-            spinsLeft={spinsLeft}
-            nextSpinFree={nextSpinFree}
-            coins={player.coins}
-            boost={player.boost_2x ?? 0}
-            shields={player.streak_shield ?? 0}
-            freeBets={player.free_bets ?? 0}
-            onDone={refreshAll}
-          />
+          {/* Real players see exactly one wheel: the bottom slice gets the Comeback
+              Wheel (once it's live), everyone else the regular wheel. Admins see BOTH,
+              so they can preview the comeback wheel before flipping it live. */}
+          {showComeback && (
+            <SpinWheel
+              token={token}
+              wheel={COMEBACK_WHEEL}
+              endpoint="/api/comeback-spin"
+              title={t("spin.comebackTitle")}
+              desc={t("spin.comebackDesc")}
+              spinsLeft={comebackSpinsLeft}
+              nextSpinFree={comebackSpinsLeft > 0}
+              coins={player.coins}
+              boost={player.boost_2x ?? 0}
+              shields={player.streak_shield ?? 0}
+              freeBets={player.free_bets ?? 0}
+              onDone={refreshAll}
+            />
+          )}
+          {showRegularWheel && (
+            <SpinWheel
+              token={token}
+              spinsLeft={spinsLeft}
+              nextSpinFree={nextSpinFree}
+              coins={player.coins}
+              boost={player.boost_2x ?? 0}
+              shields={player.streak_shield ?? 0}
+              freeBets={player.free_bets ?? 0}
+              onDone={refreshAll}
+            />
+          )}
           <PenaltyShootout token={token} canPlay={canPenalty} onDone={refreshAll} />
         </div>
       </Section>
@@ -2478,6 +2519,10 @@ function SpinWheel({
   shields,
   freeBets,
   onDone,
+  wheel = WHEEL,
+  endpoint = "/api/spin",
+  title,
+  desc,
 }: {
   token: string;
   spinsLeft: number;
@@ -2487,14 +2532,19 @@ function SpinWheel({
   shields: number;
   freeBets: number;
   onDone: () => void;
+  wheel?: WheelSlice[];
+  endpoint?: string;
+  title?: string;
+  desc?: string;
 }) {
   const { t } = useLang();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
+  const [spinMs, setSpinMs] = useState(SPIN_MS); // varies per spin so none look alike
   const [result, setResult] = useState<WheelSlice | null>(null);
 
-  const seg = 360 / WHEEL.length;
-  const gradient = `conic-gradient(${WHEEL.map(
+  const seg = 360 / wheel.length;
+  const gradient = `conic-gradient(${wheel.map(
     (w, i) => `${w.color} ${i * seg}deg ${(i + 1) * seg}deg`
   ).join(", ")})`;
 
@@ -2505,7 +2555,7 @@ function SpinWheel({
     if (!canSpin) return;
     setSpinning(true);
     setResult(null);
-    const res = await fetch("/api/spin", {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: authHeaders(token),
       body: JSON.stringify({ tz: clientTz() }),
@@ -2518,13 +2568,18 @@ function SpinWheel({
     }
 
     const index = data.sliceIndex as number;
-    // Rotate forward (≥5 turns) so the middle of `index` ends under the top pointer.
+    // Rotate forward so the middle of `index` ends under the top pointer. Vary BOTH
+    // the number of whole turns and the duration each spin, so no two spins look or
+    // feel identical (the landing still always matches the server's real result).
     const landing = (360 - (index * seg + seg / 2) + 360) % 360;
+    const turns = 4 + Math.floor(Math.random() * 4); // 4–7 full turns
+    const dur = Math.round(SPIN_MS * (turns / 5) * (0.9 + Math.random() * 0.25));
+    setSpinMs(dur);
     // Ratchet clicks for the length of the spin (skipped if sound is muted).
-    if (!isMuted()) spinRatchet(SPIN_MS);
+    if (!isMuted()) spinRatchet(dur);
     setRotation((cur) => {
       const curMod = ((cur % 360) + 360) % 360;
-      return cur + 360 * 5 + ((landing - curMod + 360) % 360);
+      return cur + 360 * turns + ((landing - curMod + 360) % 360);
     });
 
     setTimeout(() => {
@@ -2546,14 +2601,14 @@ function SpinWheel({
       }
       setSpinning(false);
       onDone();
-    }, SPIN_MS);
+    }, dur);
   }
 
   return (
     <div className="rounded-xl bg-white/5 p-4">
-      <p className="font-bold">{t("spin.title")}</p>
+      <p className="font-bold">{title ?? t("spin.title")}</p>
       <p className="mt-1 text-xs text-blue-100/70">
-        {t("spin.desc", { cost: EXTRA_SPIN_COST, max: MAX_SPINS_PER_DAY })}
+        {desc ?? t("spin.desc", { cost: EXTRA_SPIN_COST, max: MAX_SPINS_PER_DAY })}
       </p>
 
       {/* The wheel + pointer */}
@@ -2567,10 +2622,10 @@ function SpinWheel({
           style={{
             background: gradient,
             transform: `rotate(${rotation}deg)`,
-            transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.17,0.67,0.12,0.99)` : "none",
+            transition: spinning ? `transform ${spinMs}ms cubic-bezier(0.17,0.67,0.12,0.99)` : "none",
           }}
         >
-          {WHEEL.map((w, i) => {
+          {wheel.map((w, i) => {
             // Place each label along its slice's centre line and rotate it so the
             // word runs radially (hub → rim). This keeps long labels like
             // "Free bet" / "up to 2K" inside their wedge instead of spilling over.

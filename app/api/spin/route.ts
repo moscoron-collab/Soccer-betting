@@ -10,6 +10,8 @@ import {
   rollJackpot,
 } from "@/lib/wheel";
 import { localDate } from "@/lib/time";
+import { comebackStatus, comebackAccess } from "@/lib/comeback";
+import { getEventConfig } from "@/lib/event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +30,19 @@ export async function POST(req: Request) {
     /* tz is optional; default to UTC */
   }
   const today = localDate(body?.tz);
+
+  // Bottom-of-the-table players use the Comeback Wheel instead — the two groups are kept
+  // strictly separate, so the regular wheel is off-limits to them once it's live. Admins
+  // keep the regular wheel (they get the comeback wheel too, as a preview).
+  const { eligible: bottomSlice } = await comebackStatus(player.id);
+  const { comebackLive } = await getEventConfig();
+  const { showRegular } = comebackAccess(player.is_admin === true, bottomSlice, comebackLive);
+  if (!showRegular) {
+    return NextResponse.json(
+      { error: "You're in the comeback group — use the 🌱 Comeback Wheel instead." },
+      { status: 403 }
+    );
+  }
 
   const used = spinsUsedToday(player.spin_day, player.spins_today, today);
   if (used >= MAX_SPINS_PER_DAY) {

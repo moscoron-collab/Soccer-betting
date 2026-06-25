@@ -11,7 +11,9 @@ import {
   WELCOMEBACK_AWAY_HOURS,
 } from "@/lib/payout";
 import type { Player } from "@/lib/auth";
-import { MAX_SPINS_PER_DAY, spinsUsedToday } from "@/lib/wheel";
+import { MAX_SPINS_PER_DAY, spinsUsedToday, isComebackEligible } from "@/lib/wheel";
+import { comebackSpinsLeft, comebackAccess } from "@/lib/comeback";
+import { getEventConfig } from "@/lib/event";
 import { quickRefresh } from "@/lib/settle";
 import { localDate, isNewLocalDay } from "@/lib/time";
 import { netWorthLeaderboard, toPublic } from "@/lib/networth";
@@ -215,6 +217,14 @@ export async function GET(req: Request) {
   const myInPlay = myIndex >= 0 ? rankedAll[myIndex].inPlay : 0;
   const myNetWorth = myIndex >= 0 ? rankedAll[myIndex].netWorth : player.coins;
 
+  // Comeback wheel: offered only to the bottom slice of the table, and only once it's
+  // switched live (admins always see it as a preview). Reuses the rank we just computed;
+  // the daily counter lives in app_meta (no schema change).
+  const bottomSlice = isComebackEligible(myRank, rankedAll.length);
+  const { comebackLive } = await getEventConfig();
+  const { showComeback, showRegular } = comebackAccess(player.is_admin === true, bottomSlice, comebackLive);
+  const comebackLeft = showComeback ? await comebackSpinsLeft(player.id, today) : 0;
+
   return NextResponse.json(
     {
       player,
@@ -222,6 +232,9 @@ export async function GET(req: Request) {
       canBailout,
       spinsLeft,
       nextSpinFree,
+      showComeback,
+      showRegular,
+      comebackSpinsLeft: comebackLeft,
       canPenalty,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
       myRank,

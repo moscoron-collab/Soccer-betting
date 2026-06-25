@@ -35,8 +35,39 @@ export const WHEEL: WheelSlice[] = [
   { kind: "JACKPOT", amount: JACKPOT_MAX, label: "up to 2K", emoji: "💰", color: "#eab308", weight: 1 },
   { kind: "COINS", amount: 150, label: "150", emoji: "🪙", color: "#1e40af", weight: 3 },
   { kind: "COINS", amount: 500, label: "500", emoji: "🪙", color: "#1e3a8a", weight: 1 },
-  { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#334155", weight: 3 },
+  { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#334155", weight: 1 },
 ];
+
+// The "comeback" wheel — offered only to trailing players (the bottom slice of the
+// leaderboard). It's the REGULAR wheel with every coin/jackpot amount DOUBLED, and the
+// "No win" slice swapped for a small consolation, so a player near the bottom always
+// gets a meaningful boost to climb back in. Same slice order/weights as WHEEL.
+export const COMEBACK_WHEEL: WheelSlice[] = [
+  { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#2563eb", weight: 5 },
+  { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
+  { kind: "COINS", amount: 50, label: "50", emoji: "🪙", color: "#475569", weight: 5 },
+  { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#3b82f6", weight: 4 },
+  { kind: "SHIELD", amount: 1, label: "Shield", emoji: "🛡️", color: "#14b8a6", weight: 2 },
+  { kind: "FREEBET", amount: 1, label: "Free bet", emoji: "🎟️", color: "#a855f7", weight: 2 },
+  { kind: "COINS", amount: 150, label: "150", emoji: "🪙", color: "#1d4ed8", weight: 4 },
+  { kind: "COINS", amount: 500, label: "500", emoji: "🪙", color: "#60a5fa", weight: 2 },
+  { kind: "JACKPOT", amount: JACKPOT_MAX * 2, label: "up to 4K", emoji: "💰", color: "#eab308", weight: 1 },
+  { kind: "COINS", amount: 300, label: "300", emoji: "🪙", color: "#1e40af", weight: 3 },
+  { kind: "COINS", amount: 1000, label: "1K", emoji: "🪙", color: "#1e3a8a", weight: 1 },
+  { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#334155", weight: 1 },
+];
+
+// Comeback-wheel access: only the lowest slice of the table, so you must genuinely be
+// behind to use it (a top player can't farm it without first throwing away their rank).
+export const COMEBACK_BOTTOM_PCT = 0.3; // the bottom 30% by leaderboard rank
+export const MIN_PLAYERS_FOR_COMEBACK = 5; // needs a real field for "bottom 30%" to mean anything
+export const MAX_COMEBACK_SPINS_PER_DAY = 1; // one free catch-up spin per local day
+
+// Is this player (1-based rank out of `total`) in the comeback-eligible bottom slice?
+export function isComebackEligible(rank: number | null | undefined, total: number): boolean {
+  if (!rank || total < MIN_PLAYERS_FOR_COMEBACK) return false;
+  return rank > total * (1 - COMEBACK_BOTTOM_PCT);
+}
 
 // Cost (in coins) of a paid spin once the free daily spin has been used.
 export const EXTRA_SPIN_COST = 100;
@@ -50,15 +81,16 @@ export function spinsUsedToday(spinDay: string | null, spinsToday: number, today
   return spinDay === today ? spinsToday : 0;
 }
 
-// Picks a winning slice index, weighted by each slice's `weight`.
-export function pickSliceIndex(): number {
-  const total = WHEEL.reduce((s, w) => s + w.weight, 0);
+// Picks a winning slice index, weighted by each slice's `weight`. Defaults to the
+// regular wheel; pass COMEBACK_WHEEL (or any wheel) to roll on a different prize set.
+export function pickSliceIndex(wheel: WheelSlice[] = WHEEL): number {
+  const total = wheel.reduce((s, w) => s + w.weight, 0);
   let r = Math.random() * total;
-  for (let i = 0; i < WHEEL.length; i++) {
-    r -= WHEEL[i].weight;
+  for (let i = 0; i < wheel.length; i++) {
+    r -= wheel[i].weight;
     if (r < 0) return i;
   }
-  return WHEEL.length - 1;
+  return wheel.length - 1;
 }
 
 // A friendly one-line summary of a prize (for toasts/celebrations).

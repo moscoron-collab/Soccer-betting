@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.25";
+export const VERSION = "4.26";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.26",
+    date: "2026-06-25",
+    changes: [
+      {
+        en: "🎡 The wheel now spins a different length each time (so it never feels 'stuck'), and 'No win' is far rarer.",
+        he: "🎡 הגלגל מסתובב עכשיו באורך שונה בכל פעם (כך שזה אף פעם לא מרגיש 'תקוע'), ו'אין זכייה' נדיר הרבה יותר.",
+      },
+    ],
+  },
   {
     version: "4.25",
     date: "2026-06-25",
