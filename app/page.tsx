@@ -923,7 +923,7 @@ function buildBannerMessages(
   if (ev?.on) {
     msgs.push(t("banner.eventOn", { name: ev.name, mult: fmtMult(ev.mult) }));
     for (const fm of (ev.featuredMatches ?? []) as any[]) {
-      msgs.push(t("banner.featured", { home: fm.home_team, away: fm.away_team, mult: fmtMult(ev.mult) }));
+      msgs.push(t("banner.featured", { home: fm.home_team, away: fm.away_team, mult: fmtMult(fm.mult ?? ev.mult) }));
     }
     if (ev.jackpot > 0) msgs.push(t("banner.jackpot", { amount: n(ev.jackpot) }));
   }
@@ -991,6 +991,30 @@ function TextField({ label, value, onSave }: { label: string; value: string; onS
   );
 }
 
+// Compact per-game "× multiplier" box shown next to a selected featured match.
+// Saves on blur; clamps to the same 1–10 range the server validates.
+function FeaturedMultInput({ value, onSave }: { value: number; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value ?? ""));
+  useEffect(() => setV(String(value ?? "")), [value]);
+  return (
+    <input
+      type="number"
+      step="0.5"
+      min="1"
+      max="10"
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={() => {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 1 && n <= 10) onSave(Math.round(n * 100) / 100);
+      }}
+      aria-label="Winner multiplier"
+      className="w-12 rounded bg-white px-1 py-1 text-center text-gray-900"
+    />
+  );
+}
+
 // Admin-only control panel: flip the banner public, toggle the event, set the
 // featured multiplier / jackpot / featured-match override / event name.
 function EventAdmin({
@@ -1054,20 +1078,34 @@ function EventAdmin({
             {matches.length === 0 && <span className="text-blue-100/60">—</span>}
             {matches.map((m) => {
               const sel = (cfg.featuredOverrides ?? []).includes(m.id);
+              const mult = cfg.featuredMults?.[m.id] ?? cfg.featuredMult ?? 2.5;
               return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    const cur: number[] = cfg.featuredOverrides ?? [];
-                    const next = sel ? cur.filter((x) => x !== m.id) : [...cur, m.id];
-                    save({ featuredOverrides: next });
-                  }}
-                  className={`rounded-full px-2 py-1 ${sel ? "bg-green-500 text-white" : "bg-white/80 text-gray-900"}`}
-                >
-                  {sel ? "✓ " : ""}
-                  {m.home_team} v {m.away_team}
-                </button>
+                <div key={m.id} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur: number[] = cfg.featuredOverrides ?? [];
+                      const nextIds = sel ? cur.filter((x) => x !== m.id) : [...cur, m.id];
+                      const nextMults = { ...(cfg.featuredMults ?? {}) };
+                      if (sel) delete nextMults[m.id]; // drop its × when unfeatured
+                      else nextMults[m.id] = mult; // seed with the current default ×
+                      save({ featuredOverrides: nextIds, featuredMults: nextMults });
+                    }}
+                    className={`rounded-full px-2 py-1 ${sel ? "bg-green-500 text-white" : "bg-white/80 text-gray-900"}`}
+                  >
+                    {sel ? "✓ " : ""}
+                    {m.home_team} v {m.away_team}
+                  </button>
+                  {sel && (
+                    <span className="flex items-center gap-0.5 text-white">
+                      <FeaturedMultInput
+                        value={mult}
+                        onSave={(v) => save({ featuredMults: { ...(cfg.featuredMults ?? {}), [m.id]: v } })}
+                      />
+                      <span>×</span>
+                    </span>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -1159,7 +1197,7 @@ function BannerMarquee({
   const goldList = goldRaw.filter((m) => m && m.status !== "FINISHED" && m.status !== "AWARDED");
   const goldMatch = goldList.length ? goldList[featIdx % goldList.length] : null;
   const goldFromFeatured = !!(data.event?.on && data.event.featuredMatches?.length);
-  const goldMult = goldFromFeatured ? fmtMult(data.event.mult) : "3";
+  const goldMult = goldFromFeatured ? fmtMult(goldMatch?.mult ?? data.event.mult) : "3";
 
   return (
     <div className="sticky top-0 z-40 w-full border-b border-white/10 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-700 text-white shadow-md">
@@ -1267,6 +1305,7 @@ function Game({
   const [motdId, setMotdId] = useState<number | null>(null);
   const [featuredIds, setFeaturedIds] = useState<number[]>([]);
   const [featuredMult, setFeaturedMult] = useState<number>(2.5);
+  const [featuredMults, setFeaturedMults] = useState<Record<number, number>>({});
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
   const [view, setView] = useState<"play" | "log">("play");
@@ -1300,6 +1339,7 @@ function Game({
     setMotdId(data.motdId ?? null);
     setFeaturedIds(data.featuredIds ?? []);
     setFeaturedMult(data.featuredMult ?? 2.5);
+    setFeaturedMults(data.featuredMults ?? {});
   }, []);
 
   useEffect(() => {
@@ -1643,7 +1683,7 @@ function Game({
                   myBets={predByMatch.get(m.id) ?? []}
                   isMotd={m.id === motdId}
                   isFeatured={featuredIds.includes(m.id)}
-                  featuredMult={featuredMult}
+                  featuredMult={featuredMults[m.id] ?? featuredMult}
                   boost={player.boost_2x ?? 0}
                   freeBets={player.free_bets ?? 0}
                   onOpenPlayer={setViewPlayer}

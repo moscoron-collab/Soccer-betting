@@ -78,7 +78,8 @@ export async function GET(req: Request) {
       matches: withStats,
       motdId,
       featuredIds,
-      featuredMult: cfg.featuredMult,
+      featuredMult: cfg.featuredMult, // default ×; per-game overrides in featuredMults
+      featuredMults: cfg.featuredMults,
       serverNow: new Date().toISOString(),
     },
     { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }

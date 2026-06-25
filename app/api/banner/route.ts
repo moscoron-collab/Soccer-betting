@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
+import { getEventConfig, getFeaturedMatchIds, featuredMultFor } from "@/lib/event";
 import { getMotdId } from "@/lib/motd";
 import { netWorthLeaderboard, RankedPlayer } from "@/lib/networth";
 
@@ -164,9 +164,10 @@ export async function GET(req: Request) {
         .in("id", fids);
       // Drop games that have already ended: a finished featured match shouldn't keep
       // sitting in the gold bar — once it's over the bar moves on to the next one.
-      featuredMatches = (data ?? []).filter(
-        (m: any) => m.status !== "FINISHED" && m.status !== "AWARDED"
-      );
+      // Tag each with its own multiplier so the bar/marquee show per-game rates.
+      featuredMatches = (data ?? [])
+        .filter((m: any) => m.status !== "FINISHED" && m.status !== "AWARDED")
+        .map((m: any) => ({ ...m, mult: featuredMultFor(cfg, m.id) }));
     }
   }
 

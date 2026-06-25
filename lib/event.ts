@@ -10,9 +10,12 @@ export type EventConfig = {
   bannerPublic: boolean; // false = only admins see the banner (preview mode)
   eventOn: boolean; // false = no Road-to-the-Final lines / no featured multiplier
   eventName: string;
-  featuredMult: number; // total payout multiplier on the featured match's Winner market
+  featuredMult: number; // DEFAULT Winner multiplier — used by the auto-pick and any
+  //                       featured game that doesn't set its own (see featuredMults)
   jackpot: number; // displayed jackpot amount (admin bumps it)
   featuredOverrides: number[]; // specific match ids to feature, or [] = auto-pick
+  featuredMults: Record<number, number>; // per-match Winner × overrides (match id -> ×);
+  //                                         a game not listed here uses featuredMult
 };
 
 export const EVENT_DEFAULTS: EventConfig = {
@@ -22,6 +25,7 @@ export const EVENT_DEFAULTS: EventConfig = {
   featuredMult: 2.5,
   jackpot: 5000,
   featuredOverrides: [],
+  featuredMults: {},
 };
 
 // app_meta keys backing each field.
@@ -32,6 +36,7 @@ const K = {
   featuredMult: "featured_mult",
   jackpot: "jackpot_amount",
   featuredOverride: "featured_override",
+  featuredMults: "featured_mults",
 } as const;
 
 export async function getEventConfig(): Promise<EventConfig> {
@@ -52,6 +57,28 @@ export async function getEventConfig(): Promise<EventConfig> {
           .map((s) => Number(s.trim()))
           .filter((x) => Number.isFinite(x))
       : [];
+
+    // Per-match multipliers (JSON map of match id -> ×). Corrupt or out-of-range
+    // entries are dropped so a bad value can never poison the payout math.
+    const featuredMults: Record<number, number> = {};
+    const rawMults = m.get(K.featuredMults);
+    if (rawMults) {
+      try {
+        const obj = JSON.parse(String(rawMults));
+        if (obj && typeof obj === "object") {
+          for (const [k, v] of Object.entries(obj)) {
+            const id = Number(k);
+            const mv = Number(v);
+            if (Number.isInteger(id) && Number.isFinite(mv) && mv >= 1 && mv <= 10) {
+              featuredMults[id] = Math.round(mv * 100) / 100;
+            }
+          }
+        }
+      } catch {
+        /* corrupt map -> treat as none */
+      }
+    }
+
     return {
       bannerPublic: m.get(K.bannerPublic) === "true",
       eventOn: m.get(K.eventOn) === "true",
@@ -59,6 +86,7 @@ export async function getEventConfig(): Promise<EventConfig> {
       featuredMult: num(m.get(K.featuredMult), EVENT_DEFAULTS.featuredMult),
       jackpot: num(m.get(K.jackpot), EVENT_DEFAULTS.jackpot),
       featuredOverrides,
+      featuredMults,
     };
   } catch {
     return { ...EVENT_DEFAULTS };
@@ -79,8 +107,19 @@ export async function setEventConfig(updates: Partial<EventConfig>): Promise<voi
   if (updates.featuredOverrides !== undefined) {
     push(K.featuredOverride, (updates.featuredOverrides ?? []).join(","));
   }
+  if (updates.featuredMults !== undefined) {
+    push(K.featuredMults, JSON.stringify(updates.featuredMults ?? {}));
+  }
   if (rows.length === 0) return;
   await supabase.from("app_meta").upsert(rows, { onConflict: "key" });
+}
+
+// The effective Winner multiplier for one featured match: its own per-match override
+// if the admin set one, otherwise the event's default featuredMult. Shared by the
+// bonus math and the banner/card display so a featured game always pays its shown ×.
+export function featuredMultFor(cfg: EventConfig, matchId: number): number {
+  const m = cfg.featuredMults?.[matchId];
+  return typeof m === "number" && Number.isFinite(m) && m >= 1 ? m : cfg.featuredMult;
 }
 
 // The current featured match ids: the admin's picks if any, else the single

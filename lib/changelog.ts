@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.24";
+export const VERSION = "4.25";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.25",
+    date: "2026-06-25",
+    changes: [
+      {
+        en: "🎚️ Each featured game can now have its OWN Winner multiplier instead of one rate for all. Admins set a × per game right on its chip; the default × still applies to any game (or the auto-pick) that doesn't set its own. The banner and match cards show each game's real rate.",
+        he: "🎚️ לכל משחק נבחר יכול להיות עכשיו מכפיל מנצח משלו במקום שיעור אחיד לכולם. מנהלים קובעים מכפיל לכל משחק ישירות על הצ'יפ שלו; מכפיל ברירת המחדל עדיין חל על כל משחק (או על הבחירה האוטומטית) שלא קבע לעצמו. הבאנר וכרטיסי המשחקים מציגים את השיעור האמיתי של כל משחק.",
+      },
+    ],
+  },
   {
     version: "4.24",
     date: "2026-06-25",

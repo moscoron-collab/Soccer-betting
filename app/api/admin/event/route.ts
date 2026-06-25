@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { getEventConfig, setEventConfig, getFeaturedMatchIds, type EventConfig } from "@/lib/event";
+import { getEventConfig, setEventConfig, getFeaturedMatchIds, featuredMultFor, type EventConfig } from "@/lib/event";
 import { supabase } from "@/lib/supabase";
 import { baseMultiplier, MAX_BONUS } from "@/lib/payout";
 
@@ -52,6 +52,17 @@ export async function POST(req: Request) {
       .map((x: any) => Number(x))
       .filter((x: number) => Number.isFinite(x));
   }
+  if (body.featuredMults && typeof body.featuredMults === "object" && !Array.isArray(body.featuredMults)) {
+    const cleaned: Record<number, number> = {};
+    for (const [k, v] of Object.entries(body.featuredMults as Record<string, any>)) {
+      const id = Number(k);
+      const n = Number(v);
+      if (Number.isInteger(id) && Number.isFinite(n) && n >= 1 && n <= 10) {
+        cleaned[id] = Math.round(n * 100) / 100;
+      }
+    }
+    updates.featuredMults = cleaned;
+  }
 
   await setEventConfig(updates);
 
@@ -62,15 +73,17 @@ export async function POST(req: Request) {
   const cfg = await getEventConfig();
   if (cfg.eventOn) {
     const fids = await getFeaturedMatchIds(cfg);
-    if (fids.length) {
+    // Each featured game may carry its own ×, so re-stamp per match (not one blanket
+    // value). Still raise-only via the `.lt` guard, so no existing bet loses value.
+    for (const id of fids) {
       const featuredBonus = Math.min(
         MAX_BONUS,
-        Math.round((cfg.featuredMult / baseMultiplier("WINNER")) * 100) / 100
+        Math.round((featuredMultFor(cfg, id) / baseMultiplier("WINNER")) * 100) / 100
       );
       await supabase
         .from("predictions")
         .update({ bonus_mult: featuredBonus })
-        .in("match_id", fids)
+        .eq("match_id", id)
         .eq("type", "WINNER")
         .eq("status", "PENDING")
         .lt("bonus_mult", featuredBonus);
