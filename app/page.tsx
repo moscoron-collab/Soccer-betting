@@ -1668,7 +1668,9 @@ function Game({
               wheel={COMEBACK_WHEEL}
               endpoint="/api/comeback-spin"
               title={t("spin.comebackTitle")}
-              desc={t("spin.comebackDesc")}
+              // Seeing BOTH wheels = admin preview (spins are a no-op demo); a real
+              // eligible player only ever sees the comeback wheel.
+              desc={showRegularWheel ? t("spin.comebackPreviewDesc") : t("spin.comebackDesc")}
               spinsLeft={comebackSpinsLeft}
               nextSpinFree={comebackSpinsLeft > 0}
               coins={player.coins}

@@ -36,6 +36,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // Admins see this wheel as a PREVIEW only: roll a real-looking result for the
+  // animation, but DON'T touch coins/inventory or the daily counter — so testing it
+  // never changes anything. (Real eligible players fall through to the live spin below.)
+  if (player.is_admin === true) {
+    const sliceIndex = pickSliceIndex(COMEBACK_WHEEL);
+    const slice = COMEBACK_WHEEL[sliceIndex];
+    let awarded = slice.amount;
+    if (slice.kind === "JACKPOT") awarded = rollJackpot() * 2;
+    return NextResponse.json({
+      sliceIndex,
+      slice: { ...slice, amount: awarded },
+      preview: true,
+      coins: player.coins, // unchanged
+      comebackSpinsLeft: 1, // never used up while previewing
+      boost_2x: player.boost_2x,
+      streak_shield: player.streak_shield,
+      free_bets: player.free_bets ?? 0,
+    });
+  }
+
   const left = await comebackSpinsLeft(player.id, today);
   if (left <= 0) {
     return NextResponse.json(

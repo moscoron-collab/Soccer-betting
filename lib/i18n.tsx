@@ -295,6 +295,10 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "You're near the bottom — here's a FREE daily catch-up spin with bigger prizes and no 'no win'. Climb back in!",
     he: "אתם קרובים לתחתית — הנה סיבוב חזרה יומי חינם עם פרסים גדולים יותר ובלי 'אין זכייה'. טפסו בחזרה!",
   },
+  "spin.comebackPreviewDesc": {
+    en: "👀 Admin preview — these spins are a demo and WON'T change your coins or use a spin. Tick 'Comeback Wheel live' in ⚙️ to launch it for players.",
+    he: "👀 תצוגה מקדימה למנהל — הסיבובים האלה הם הדגמה ולא ישנו את המטבעות שלכם ולא ינצלו סיבוב. סמנו 'גלגל החזרה פעיל' ב-⚙️ כדי להפעיל לשחקנים.",
+  },
   "spin.boosts": { en: "⚡ 2× boosts:", he: "⚡ הכפלות 2×:" },
   "spin.shields": { en: "🛡️ shields:", he: "🛡️ מגנים:" },
   "spin.freeBets": { en: "🎟️ free bets:", he: "🎟️ הימורי חינם:" },
