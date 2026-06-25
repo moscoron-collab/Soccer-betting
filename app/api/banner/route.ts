@@ -162,7 +162,11 @@ export async function GET(req: Request) {
         .from("matches")
         .select("id, home_team, away_team, kickoff_at, status, home_score, away_score")
         .in("id", fids);
-      featuredMatches = data ?? [];
+      // Drop games that have already ended: a finished featured match shouldn't keep
+      // sitting in the gold bar — once it's over the bar moves on to the next one.
+      featuredMatches = (data ?? []).filter(
+        (m: any) => m.status !== "FINISHED" && m.status !== "AWARDED"
+      );
     }
   }
 

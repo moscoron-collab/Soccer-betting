@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.22";
+export const VERSION = "4.23";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.23",
+    date: "2026-06-25",
+    changes: [
+      {
+        en: "⭐ Follow-up fix: a finished game can no longer linger in the gold Match-of-the-Day bar at all — including when it was pinned there as a featured event match. The moment it ends, the bar moves on to the next live or upcoming game.",
+        he: "⭐ תיקון המשך: משחק שהסתיים כבר לא יכול להישאר בפס הזהוב של 'משחק היום' — כולל כשהוצמד שם כמשחק אירוע מוצג. ברגע שהוא נגמר, הפס ממשיך הלאה למשחק החי או הקרוב הבא.",
+      },
+    ],
+  },
   {
     version: "4.22",
     date: "2026-06-25",
