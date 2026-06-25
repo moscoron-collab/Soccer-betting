@@ -1148,12 +1148,15 @@ function BannerMarquee({
   const speedIcon = speed === "slow" ? "🐢" : speed === "fast" ? "🐇" : "🚶";
   // The gold "pop" bar shows the event's featured match(es) while the event is on
   // (rotating if several), otherwise the auto Match of the Day.
-  const goldList: any[] =
+  const goldRaw: any[] =
     data.event?.on && data.event.featuredMatches?.length
       ? data.event.featuredMatches
       : data.motd
         ? [data.motd]
         : [];
+  // Never leave a finished game sitting in the gold bar: once a match ends, drop it
+  // so the bar advances to the next live/upcoming featured game (or hides if none).
+  const goldList = goldRaw.filter((m) => m && m.status !== "FINISHED" && m.status !== "AWARDED");
   const goldMatch = goldList.length ? goldList[featIdx % goldList.length] : null;
   const goldFromFeatured = !!(data.event?.on && data.event.featuredMatches?.length);
   const goldMult = goldFromFeatured ? fmtMult(data.event.mult) : "3";
