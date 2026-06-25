@@ -32,7 +32,13 @@ function leagueScore(competition: string): number {
   return i === -1 ? LEAGUE_RANK.length : i; // lower is bigger; unknown = last
 }
 
-export type MotdMatch = { id: number; competition: string; kickoff_at: string };
+export type MotdMatch = { id: number; competition: string; kickoff_at: string; status?: string | null };
+
+// A match is "over" once it's finished (or had a result awarded). Such games are
+// never the Match of the Day — once the game ends we move on to the next one.
+function hasEnded(status: string | null | undefined): boolean {
+  return status === "FINISHED" || status === "AWARDED";
+}
 
 // Pick the Match of the Day from a set of matches, for the given timezone.
 export function pickMotd(
@@ -40,8 +46,13 @@ export function pickMotd(
   tz: string | null | undefined,
   now: Date = new Date()
 ): number | null {
+  // Never feature a game that's already over: the ⭐ should point at something you
+  // can still watch or bet on. Once today's pick ends we advance to the next live
+  // or upcoming game (the gold banner, the card badge and the bonus all follow).
+  const open = matches.filter((m) => !hasEnded(m.status));
+
   const today = localDate(tz, now);
-  const todays = matches.filter((m) => localDate(tz, new Date(m.kickoff_at)) === today);
+  const todays = open.filter((m) => localDate(tz, new Date(m.kickoff_at)) === today);
 
   if (todays.length > 0) {
     const best = [...todays].sort((a, b) => {
@@ -52,8 +63,9 @@ export function pickMotd(
     return best[0].id;
   }
 
-  // No fixtures on the player's day -> fall back to the soonest upcoming match.
-  const upcoming = matches
+  // Nothing left on the player's day -> fall back to the soonest upcoming match
+  // (which may be on a later day), so a future game is always highlighted next.
+  const upcoming = open
     .filter((m) => new Date(m.kickoff_at).getTime() > now.getTime())
     .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());
   return upcoming[0]?.id ?? null;
@@ -75,13 +87,13 @@ export function pickFeaturedGlobal(matches: MotdMatch[], now: Date = new Date())
 }
 
 // Server-side: load a small window of matches and pick the MOTD for a timezone.
-// Includes already-started/finished matches from today so the pick stays fixed
-// for the whole day instead of sliding to the next game.
+// Loads each match's status so finished games can be skipped — the pick stays on
+// the biggest game of the player's day until it ends, then advances to the next.
 export async function getMotdId(tz: string | null | undefined): Promise<number | null> {
   const since = new Date(Date.now() - 2 * 86_400_000).toISOString();
   const { data } = await supabase
     .from("matches")
-    .select("id, competition, kickoff_at")
+    .select("id, competition, kickoff_at, status")
     .gte("kickoff_at", since)
     .order("kickoff_at", { ascending: true })
     .limit(200);

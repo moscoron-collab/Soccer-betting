@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.21";
+export const VERSION = "4.22";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.22",
+    date: "2026-06-25",
+    changes: [
+      {
+        en: "⭐ Match of the Day now moves on once the game ends. The moment your featured game finishes, the gold bar (and its bonus ⭐) jump to the next live or upcoming match — no more a finished score from earlier sitting at the top all day.",
+        he: "⭐ משחק היום ממשיך הלאה ברגע שהמשחק נגמר. ברגע שהמשחק המוצג שלכם מסתיים, הפס הזהוב (והבונוס ⭐ שלו) קופצים למשחק החי או הקרוב הבא — אין יותר תוצאה סופית מקודם שנשארת תקועה למעלה כל היום.",
+      },
+    ],
+  },
   {
     version: "4.21",
     date: "2026-06-24",
