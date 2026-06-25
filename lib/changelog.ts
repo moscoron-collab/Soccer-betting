@@ -2,12 +2,22 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.23";
+export const VERSION = "4.24";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.24",
+    date: "2026-06-25",
+    changes: [
+      {
+        en: "💥 The featured-match boost now lifts bets you ALREADY placed — not just new ones. When a game becomes the featured match (or its multiplier goes up), your existing Winner bet on it is bumped up to the new rate. It only ever goes up, never down.",
+        he: "💥 הבוסט של המשחק הנבחר חל עכשיו גם על הימורים שכבר ביצעתם — לא רק על חדשים. כשמשחק הופך למשחק הנבחר (או שהמכפיל שלו עולה), הימור המנצח הקיים שלכם עליו מוקפץ לשיעור החדש. זה רק עולה, אף פעם לא יורד.",
+      },
+    ],
+  },
   {
     version: "4.23",
     date: "2026-06-25",

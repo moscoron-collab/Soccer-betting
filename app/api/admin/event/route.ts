@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { getEventConfig, setEventConfig, type EventConfig } from "@/lib/event";
+import { getEventConfig, setEventConfig, getFeaturedMatchIds, type EventConfig } from "@/lib/event";
+import { supabase } from "@/lib/supabase";
+import { baseMultiplier, MAX_BONUS } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,5 +54,28 @@ export async function POST(req: Request) {
   }
 
   await setEventConfig(updates);
-  return NextResponse.json({ config: await getEventConfig() }, { headers: noStore });
+
+  // Apply the featured boost to bets ALREADY placed on the featured match(es), so a
+  // promo lifts everyone — not just people who bet after it was switched on. We only
+  // ever RAISE a bet's locked-in multiplier (the `.lt` guard below), so no existing
+  // bet ever loses value, and settlement keeps reading the same bonus_mult column.
+  const cfg = await getEventConfig();
+  if (cfg.eventOn) {
+    const fids = await getFeaturedMatchIds(cfg);
+    if (fids.length) {
+      const featuredBonus = Math.min(
+        MAX_BONUS,
+        Math.round((cfg.featuredMult / baseMultiplier("WINNER")) * 100) / 100
+      );
+      await supabase
+        .from("predictions")
+        .update({ bonus_mult: featuredBonus })
+        .in("match_id", fids)
+        .eq("type", "WINNER")
+        .eq("status", "PENDING")
+        .lt("bonus_mult", featuredBonus);
+    }
+  }
+
+  return NextResponse.json({ config: cfg }, { headers: noStore });
 }
