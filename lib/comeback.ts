@@ -36,20 +36,35 @@ export async function comebackStatus(
   return { eligible: isComebackEligible(rank, total), rank, total };
 }
 
-// Comeback spins still available to this player today (0 once they've used today's).
+// How many comeback spins this player has used today. The app_meta value is stored as
+// "YYYY-MM-DD:count"; a stored date that isn't today means none used yet today.
+function usedToday(value: string | null | undefined, today: string): number {
+  if (!value) return 0;
+  const [day, n] = String(value).split(":");
+  if (day !== today) return 0;
+  const c = Number(n);
+  return Number.isFinite(c) && c > 0 ? c : 0;
+}
+
+// Comeback spins still available to this player today (0 once they've used today's quota).
 export async function comebackSpinsLeft(playerId: string, today: string): Promise<number> {
   const { data } = await supabase
     .from("app_meta")
     .select("value")
     .eq("key", keyFor(playerId))
     .maybeSingle();
-  const used = (data as any)?.value === today ? 1 : 0;
-  return Math.max(0, MAX_COMEBACK_SPINS_PER_DAY - used);
+  return Math.max(0, MAX_COMEBACK_SPINS_PER_DAY - usedToday((data as any)?.value, today));
 }
 
-// Record that the player has taken today's comeback spin.
+// Record that the player has taken a comeback spin today (increments today's counter).
 export async function markComebackSpin(playerId: string, today: string): Promise<void> {
+  const { data } = await supabase
+    .from("app_meta")
+    .select("value")
+    .eq("key", keyFor(playerId))
+    .maybeSingle();
+  const next = usedToday((data as any)?.value, today) + 1;
   await supabase
     .from("app_meta")
-    .upsert({ key: keyFor(playerId), value: today, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    .upsert({ key: keyFor(playerId), value: `${today}:${next}`, updated_at: new Date().toISOString() }, { onConflict: "key" });
 }

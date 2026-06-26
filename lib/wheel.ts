@@ -61,7 +61,7 @@ export const COMEBACK_WHEEL: WheelSlice[] = [
 // behind to use it (a top player can't farm it without first throwing away their rank).
 export const COMEBACK_BOTTOM_PCT = 0.3; // the bottom 30% by leaderboard rank
 export const MIN_PLAYERS_FOR_COMEBACK = 5; // needs a real field for "bottom 30%" to mean anything
-export const MAX_COMEBACK_SPINS_PER_DAY = 1; // one free catch-up spin per local day
+export const MAX_COMEBACK_SPINS_PER_DAY = 5; // free catch-up spins per local day
 
 // Is this player (1-based rank out of `total`) in the comeback-eligible bottom slice?
 export function isComebackEligible(rank: number | null | undefined, total: number): boolean {

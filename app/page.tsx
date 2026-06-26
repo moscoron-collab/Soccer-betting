@@ -1287,6 +1287,91 @@ function BannerMarquee({
   );
 }
 
+// Flashing "you can use the Comeback Wheel" notice, pinned under the ticker. It sits in
+// normal flow (pushes content down, hides nothing). The player can collapse it to a small
+// pill and reopen it; rising back out of the bottom 30% (show=false) removes it entirely
+// and resets it, so a later drop shows the full banner again. Admins see it as a preview.
+function ComebackAlert({ show, isPreview }: { show: boolean; isPreview: boolean }) {
+  const { t } = useLang();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(safeGet("spg_comeback_collapsed") === "1");
+  }, []);
+  useEffect(() => {
+    if (!show) safeSet("spg_comeback_collapsed", "0"); // reset when no longer eligible
+  }, [show]);
+
+  if (!show) return null;
+
+  const collapse = () => {
+    setCollapsed(true);
+    safeSet("spg_comeback_collapsed", "1");
+  };
+  const expand = () => {
+    setCollapsed(false);
+    safeSet("spg_comeback_collapsed", "0");
+  };
+
+  const css = `
+    .cb-flash { animation: cb-flash 1.15s ease-in-out infinite; }
+    @keyframes cb-flash {
+      0%,100% { background-color:#15803d; box-shadow:0 0 0 0 rgba(34,197,94,0); }
+      50% { background-color:#22c55e; box-shadow:0 0 22px 5px rgba(34,197,94,0.6); }
+    }
+    .cb-pulse { animation: cb-pulse 1.3s ease-in-out infinite; }
+    @keyframes cb-pulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.28); } }
+  `;
+
+  if (collapsed) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 pt-2">
+        <button
+          onClick={expand}
+          className="cb-pulse inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-sm font-bold text-white shadow"
+        >
+          {t("comebackAlert.pill")} ▸
+        </button>
+        <style>{css}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 pt-2">
+      <div className="cb-flash relative overflow-hidden rounded-xl border border-green-200/40 px-4 py-3 text-white shadow-lg" dir="auto">
+        <button
+          onClick={collapse}
+          aria-label={t("comebackAlert.close")}
+          className="absolute right-2 top-2 rounded-full bg-black/20 px-2 py-0.5 text-xs font-bold hover:bg-black/30"
+        >
+          ✕
+        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="pr-6">
+            <p className="text-base font-extrabold">
+              {t("comebackAlert.title")}
+              {isPreview && (
+                <span className="ml-2 rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  {t("comebackAlert.preview")}
+                </span>
+              )}
+            </p>
+            <p className="text-sm text-white/95">{t("comebackAlert.body")}</p>
+          </div>
+          <button
+            onClick={() => scrollToId("minigames")}
+            className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-sm font-extrabold text-green-700 shadow hover:bg-green-50"
+          >
+            {t("comebackAlert.cta")}
+          </button>
+        </div>
+        <style>{css}</style>
+      </div>
+    </div>
+  );
+}
+
 function Game({
   token,
   player,
@@ -1504,6 +1589,7 @@ function Game({
         myRank={myRank}
         welcomeBack={welcomeBack}
       />
+      <ComebackAlert show={showComeback} isPreview={showComeback && showRegularWheel} />
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-6">
       {/* Always-visible coin balance while scrolling */}
       <CoinChip coins={player.coins} />

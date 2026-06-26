@@ -2,7 +2,7 @@
 // Every change has both English (en) and Hebrew (he) text; the "What's new"
 // modal shows the one matching the player's chosen language.
 
-export const VERSION = "4.26";
+export const VERSION = "4.27";
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
