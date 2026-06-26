@@ -33,7 +33,8 @@ export async function comebackStatus(
   const idx = ranked.findIndex((r) => r.id === playerId);
   const rank = idx >= 0 ? idx + 1 : null;
   const total = ranked.length;
-  return { eligible: isComebackEligible(rank, total), rank, total };
+  const netWorth = idx >= 0 ? ranked[idx].netWorth : 0;
+  return { eligible: isComebackEligible(netWorth), rank, total };
 }
 
 // How many comeback spins this player has used today. The app_meta value is stored as

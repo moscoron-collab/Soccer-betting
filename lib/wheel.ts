@@ -57,16 +57,15 @@ export const COMEBACK_WHEEL: WheelSlice[] = [
   { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#334155", weight: 2 },
 ];
 
-// Comeback-wheel access: only the lowest slice of the table, so you must genuinely be
-// behind to use it (a top player can't farm it without first throwing away their rank).
-export const COMEBACK_BOTTOM_PCT = 0.3; // the bottom 30% by leaderboard rank
-export const MIN_PLAYERS_FOR_COMEBACK = 5; // needs a real field for "bottom 30%" to mean anything
+// Comeback-wheel access: anyone whose net worth is below this gets the wheel, so it's
+// strictly for players who are genuinely low on coins (a top player can't reach it
+// without first throwing away most of what they have).
+export const COMEBACK_MAX_NETWORTH = 3000; // under 🪙3,000 net worth -> comeback wheel
 export const MAX_COMEBACK_SPINS_PER_DAY = 5; // free catch-up spins per local day
 
-// Is this player (1-based rank out of `total`) in the comeback-eligible bottom slice?
-export function isComebackEligible(rank: number | null | undefined, total: number): boolean {
-  if (!rank || total < MIN_PLAYERS_FOR_COMEBACK) return false;
-  return rank > total * (1 - COMEBACK_BOTTOM_PCT);
+// Is this player low enough (by net worth = coins + in-play) for the comeback wheel?
+export function isComebackEligible(netWorth: number | null | undefined): boolean {
+  return typeof netWorth === "number" && netWorth < COMEBACK_MAX_NETWORTH;
 }
 
 // Cost (in coins) of a paid spin once the free daily spin has been used.

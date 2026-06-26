@@ -112,8 +112,9 @@ async function playerStories(ranked: RankedPlayer[], since24: string) {
     .limit(300);
   const rows = (settled ?? []) as any[];
 
-  // 24h window: biggest single (non-free) loss + each player's net coin swing.
+  // 24h window: biggest single (non-free) loss, biggest single win, + each player's net.
   let bigLoss: { name: string; amount: number; team: string | null } | null = null;
+  let bigWin: { name: string; payout: number; team: string | null } | null = null;
   const net = new Map<string, number>();
   for (const r of rows) {
     if (!r.settled_at || r.settled_at < since24) continue;
@@ -123,6 +124,7 @@ async function playerStories(ranked: RankedPlayer[], since24: string) {
         net.set(r.player_id, (net.get(r.player_id) ?? 0) - (r.stake ?? 0));
       }
     } else {
+      if (!bigWin || (r.payout ?? 0) > bigWin.payout) bigWin = { name: nameOf(r) ?? "Player", payout: r.payout ?? 0, team: teamOf(r) };
       const gain = r.free_bet ? (r.payout ?? 0) : (r.payout ?? 0) - (r.stake ?? 0);
       net.set(r.player_id, (net.get(r.player_id) ?? 0) + gain);
     }
@@ -137,6 +139,13 @@ async function playerStories(ranked: RankedPlayer[], since24: string) {
     const nw = worthById.get(worstId) ?? 0;
     if (nw < 1000) onRopes = { name: nameById.get(worstId) ?? "Player", coins: Math.round(nw), lost: Math.round(-worstNet) };
   }
+
+  // Biggest gainer: the largest 24h net positive swing (min 🪙300 to be worth a shout).
+  let gainer: { name: string; amount: number } | null = null;
+  let bestId: string | null = null;
+  let bestNet = 0;
+  for (const [id, v] of net) if (v > bestNet) ((bestNet = v), (bestId = id));
+  if (bestId && bestNet >= 300) gainer = { name: nameById.get(bestId) ?? "Player", amount: Math.round(bestNet) };
 
   // Streaks: per player, count the leading same-result run from their newest bet.
   const byPlayer = new Map<string, string[]>();
@@ -160,7 +169,7 @@ async function playerStories(ranked: RankedPlayer[], since24: string) {
     if (first === "LOST" && (!coldStreak || run > coldStreak.n)) coldStreak = { name, n: run };
   }
 
-  return { mostActive, bigLoss, onRopes, hotStreak, coldStreak };
+  return { mostActive, bigWin, bigLoss, gainer, onRopes, hotStreak, coldStreak };
 }
 
 // Recent form over the `since` window, in one pass over settled predictions:

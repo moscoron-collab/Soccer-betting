@@ -220,7 +220,7 @@ export async function GET(req: Request) {
   // Comeback wheel: offered only to the bottom slice of the table, and only once it's
   // switched live (admins always see it as a preview). Reuses the rank we just computed;
   // the daily counter lives in app_meta (no schema change).
-  const bottomSlice = isComebackEligible(myRank, rankedAll.length);
+  const bottomSlice = isComebackEligible(myNetWorth);
   const { comebackLive } = await getEventConfig();
   const { showComeback, showRegular } = comebackAccess(player.is_admin === true, bottomSlice, comebackLive);
   const comebackLeft = showComeback ? await comebackSpinsLeft(player.id, today) : 0;

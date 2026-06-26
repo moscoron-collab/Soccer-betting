@@ -861,9 +861,27 @@ function buildBannerMessages(
     msgs.push(t("banner.missedYou", { name: player.username, gift: n(welcomeBack.giftAmount) }));
   }
 
-  // 1.5) Player drama LEADS the feed (last 24h): big rank tumbles, the day's biggest
-  //      loss, who's on the ropes, the most active bettor, and hot/cold streaks.
+  // 1.5) Player headlines LEAD the feed (last 24h): the HIGHS first — biggest wins, hot
+  //      climbers, gainers and streaks — then the drama (rank tumbles, big losses, on the
+  //      ropes, cold streaks). Keeps the lead exciting, not all doom.
   const st = data.stories ?? {};
+  // Highs
+  if (data.climber?.name) {
+    msgs.push(t("banner.climber", { name: data.climber.name, from: data.climber.from, to: data.climber.to }));
+  }
+  if (st.bigWin?.name) {
+    msgs.push(t("banner.bigWin", { name: st.bigWin.name, payout: n(st.bigWin.payout), team: st.bigWin.team ?? "" }));
+  }
+  if (st.gainer?.name) {
+    msgs.push(t("banner.gainer", { name: st.gainer.name, amount: n(st.gainer.amount) }));
+  }
+  if (st.hotStreak?.name) {
+    msgs.push(t("banner.hotStreak", { name: st.hotStreak.name, n: st.hotStreak.n }));
+  }
+  if (st.mostActive?.name) {
+    msgs.push(t("banner.mostActive", { name: st.mostActive.name, count: st.mostActive.count }));
+  }
+  // Lows / drama
   if (data.faller?.name) {
     msgs.push(t("banner.rankDrop", { name: data.faller.name, from: data.faller.from, to: data.faller.to }));
   }
@@ -873,14 +891,8 @@ function buildBannerMessages(
   if (st.bigLoss?.name) {
     msgs.push(t("banner.bigLoss", { name: st.bigLoss.name, amount: n(st.bigLoss.amount), team: st.bigLoss.team ?? "" }));
   }
-  if (st.hotStreak?.name) {
-    msgs.push(t("banner.hotStreak", { name: st.hotStreak.name, n: st.hotStreak.n }));
-  }
   if (st.coldStreak?.name) {
     msgs.push(t("banner.coldStreak", { name: st.coldStreak.name, n: st.coldStreak.n }));
-  }
-  if (st.mostActive?.name) {
-    msgs.push(t("banner.mostActive", { name: st.mostActive.name, count: st.mostActive.count }));
   }
 
   // 2) Your own activity — the most personal hook leads the feed.
@@ -892,13 +904,10 @@ function buildBannerMessages(
   if (myRank && myRank > 1) msgs.push(t("banner.yourRank", { rank: myRank }));
   if ((player.free_bets ?? 0) > 0) msgs.push(t("banner.freeBet"));
 
-  // 3) The table — who's on top and how the ranking is moving.
+  // 3) The table — who's on top (the climber/rank-rise now leads the feed above).
   if (data.top?.name) msgs.push(t("banner.top", { name: data.top.name, networth: n(data.top.netWorth) }));
   if (Array.isArray(data.top3) && data.top3.length >= 3) {
     msgs.push(t("banner.top3", { a: data.top3[0].name, b: data.top3[1].name, c: data.top3[2].name }));
-  }
-  if (data.climber?.name) {
-    msgs.push(t("banner.climber", { name: data.climber.name, from: data.climber.from, to: data.climber.to }));
   }
 
   // 4) Recent form — the sharpest predictor (last 48h).

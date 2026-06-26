@@ -7,12 +7,12 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
-    version: "4.29",
+    version: "4.30",
     date: "2026-06-26",
     changes: [
       {
-        en: "📰 The live feed now follows the drama: big rank tumbles, who lost the most, players on the ropes, who's betting the most, and hot/cold streaks — leading the ticker so you always know what's happening across the table.",
-        he: "📰 הפיד החי עוקב עכשיו אחרי הדרמה: צניחות גדולות בטבלה, מי הפסיד הכי הרבה, שחקנים על הקרשים, מי מהמר הכי הרבה, ורצפים חמים/קרים — בראש הסרגל כדי שתמיד תדעו מה קורה בטבלה.",
+        en: "📰 The live feed now leads with the day's headlines — the highs up front (biggest wins, hot climbers, top gainers, win streaks), then the drama (rank tumbles, biggest losses, players on the ropes, cold streaks, busiest bettors) — so you always know what's happening across the table.",
+        he: "📰 הפיד החי פותח עכשיו בכותרות של היום — קודם השיאים (זכיות גדולות, מטפסים חמים, מרוויחים, רצפי ניצחונות), ואז הדרמה (צניחות בטבלה, ההפסדים הגדולים, שחקנים על הקרשים, רצפים קרים, המהמרים הפעילים) — כדי שתמיד תדעו מה קורה בטבלה.",
       },
     ],
   },

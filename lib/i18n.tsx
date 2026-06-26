@@ -531,6 +531,14 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "📉 Rough patch for {name} — down 🪙{amount} in 2 days",
     he: "📉 תקופה קשה ל-{name} — ירידה של 🪙{amount} ביומיים",
   },
+  "banner.bigWin": {
+    en: "💰 Cha-ching! {name} won 🪙{payout} on {team}!",
+    he: "💰 קצ'ינג! {name} זכה ב-🪙{payout} על {team}!",
+  },
+  "banner.gainer": {
+    en: "📈 {name} is on a heater — up 🪙{amount} today!",
+    he: "📈 {name} לוהט — עלייה של 🪙{amount} היום!",
+  },
   "banner.rankDrop": {
     en: "📉 {name} is in free-fall — crashed from #{from} to #{to}!",
     he: "📉 {name} בנפילה חופשית — צנח מ-#{from} ל-#{to}!",
