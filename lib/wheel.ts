@@ -39,22 +39,22 @@ export const WHEEL: WheelSlice[] = [
 ];
 
 // The "comeback" wheel — offered only to trailing players (the bottom slice of the
-// leaderboard). It's the REGULAR wheel with every coin/jackpot amount DOUBLED, and the
-// "No win" slice swapped for a small consolation, so a player near the bottom always
-// gets a meaningful boost to climb back in. Same slice order/weights as WHEEL.
+// leaderboard). A friendlier wheel than the regular one: every prize is at least 🪙200,
+// a smooth ladder up to 🪙1,000, a 💰 jackpot up to 4K, and NO "no win". The only
+// power-up here is a 🎟️ free bet (no boosts/shields), so it's coins-first.
 export const COMEBACK_WHEEL: WheelSlice[] = [
-  { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#2563eb", weight: 5 },
-  { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
-  { kind: "COINS", amount: 50, label: "50", emoji: "🪙", color: "#475569", weight: 5 },
-  { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#3b82f6", weight: 4 },
-  { kind: "SHIELD", amount: 1, label: "Shield", emoji: "🛡️", color: "#14b8a6", weight: 2 },
+  { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#2563eb", weight: 5 },
+  { kind: "COINS", amount: 250, label: "250", emoji: "🪙", color: "#f59e0b", weight: 4 },
+  { kind: "COINS", amount: 300, label: "300", emoji: "🪙", color: "#475569", weight: 5 },
+  { kind: "COINS", amount: 350, label: "350", emoji: "🪙", color: "#3b82f6", weight: 3 },
+  { kind: "COINS", amount: 400, label: "400", emoji: "🪙", color: "#14b8a6", weight: 3 },
   { kind: "FREEBET", amount: 1, label: "Free bet", emoji: "🎟️", color: "#a855f7", weight: 2 },
-  { kind: "COINS", amount: 150, label: "150", emoji: "🪙", color: "#1d4ed8", weight: 4 },
+  { kind: "COINS", amount: 450, label: "450", emoji: "🪙", color: "#1d4ed8", weight: 3 },
   { kind: "COINS", amount: 500, label: "500", emoji: "🪙", color: "#60a5fa", weight: 2 },
   { kind: "JACKPOT", amount: JACKPOT_MAX * 2, label: "up to 4K", emoji: "💰", color: "#eab308", weight: 1 },
-  { kind: "COINS", amount: 300, label: "300", emoji: "🪙", color: "#1e40af", weight: 3 },
+  { kind: "COINS", amount: 750, label: "750", emoji: "🪙", color: "#1e40af", weight: 2 },
   { kind: "COINS", amount: 1000, label: "1K", emoji: "🪙", color: "#1e3a8a", weight: 1 },
-  { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#334155", weight: 1 },
+  { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#334155", weight: 2 },
 ];
 
 // Comeback-wheel access: only the lowest slice of the table, so you must genuinely be
