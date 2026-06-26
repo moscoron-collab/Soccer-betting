@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.33",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "🎁 The 🎮 Play dot now spells out when it's a reward waiting — a 'Go claim your reward!' nudge taps you straight to your finished challenges, so it no longer looks like there are more mini-games to play.",
+        he: "🎁 הנקודה ב-🎮 משחק מבהירה עכשיו מתי מדובר בפרס שמחכה — כפתור 'לכו לאסוף את הפרס!' לוקח אתכם ישר לאתגרים שסיימתם, כך שזה כבר לא נראה כאילו יש עוד מיני-משחקים לשחק.",
+      },
+    ],
+  },
+  {
     version: "4.32",
     date: "2026-06-26",
     changes: [

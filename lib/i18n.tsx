@@ -157,6 +157,9 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "game.tabPlay": { en: "🎮 Play", he: "🎮 משחק" },
   "game.tabLog": { en: "📊 My Log", he: "📊 היומן שלי" },
+  // Hint under the tabs explaining the Play dot when it's lit by unclaimed challenge
+  // rewards (so it doesn't read as "more games to play"). Taps through to the challenges.
+  "game.goClaim": { en: "🎁 Go claim your reward! →", he: "🎁 לכו לאסוף את הפרס! ←" },
   "game.leaderboard": { en: "🏆 Leaderboard", he: "🏆 טבלת מובילים" },
   "game.refresh": { en: "↻ Refresh", he: "↻ רענון" },
   "game.refreshing": { en: "↻ Refreshing…", he: "↻ מרענן…" },

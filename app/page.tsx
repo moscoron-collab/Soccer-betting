@@ -1697,6 +1697,23 @@ function Game({
         </button>
       </div>
 
+      {/* When the Play dot is lit by unclaimed challenge rewards (not games left to
+          play), spell that out so it doesn't read as "more mini-games". Taps through to
+          the Daily Challenges section to claim. */}
+      {claimCounts.challenges > 0 && (
+        <button
+          onClick={() => {
+            setView("play");
+            // Let the Play view mount (if coming from the Log tab) before scrolling.
+            setTimeout(() => scrollToId("challenges"), 50);
+          }}
+          dir="auto"
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-amber-400/15 px-3 py-1.5 text-sm font-bold text-amber-200 ring-1 ring-amber-300/30 hover:bg-amber-400/25"
+        >
+          {t("game.goClaim")}
+        </button>
+      )}
+
       {view === "log" && (
         <MyLog
           predictions={predictions}
