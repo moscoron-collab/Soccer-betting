@@ -57,15 +57,15 @@ export const COMEBACK_WHEEL: WheelSlice[] = [
   { kind: "COINS", amount: 200, label: "200", emoji: "🪙", color: "#334155", weight: 2 },
 ];
 
-// Comeback-wheel access: anyone whose net worth is below this gets the wheel, so it's
-// strictly for players who are genuinely low on coins (a top player can't reach it
+// Comeback-wheel access: anyone whose net worth is at or below this gets the wheel, so
+// it's strictly for players who are genuinely low on coins (a top player can't reach it
 // without first throwing away most of what they have).
-export const COMEBACK_MAX_NETWORTH = 3000; // under 🪙3,000 net worth -> comeback wheel
+export const COMEBACK_MAX_NETWORTH = 3000; // 🪙3,000 net worth or below -> comeback wheel
 export const MAX_COMEBACK_SPINS_PER_DAY = 5; // free catch-up spins per local day
 
 // Is this player low enough (by net worth = coins + in-play) for the comeback wheel?
 export function isComebackEligible(netWorth: number | null | undefined): boolean {
-  return typeof netWorth === "number" && netWorth < COMEBACK_MAX_NETWORTH;
+  return typeof netWorth === "number" && netWorth <= COMEBACK_MAX_NETWORTH;
 }
 
 // Cost (in coins) of a paid spin once the free daily spin has been used.
