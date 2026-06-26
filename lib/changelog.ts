@@ -21,9 +21,33 @@ export const CHANGELOG: Release[] = [
     date: "2026-06-26",
     changes: [
       {
-        en: "📰 The live feed now leads with the day's headlines — the highs up front (biggest wins, hot climbers, top gainers, win streaks), then the drama (rank tumbles, biggest losses, players on the ropes, cold streaks, busiest bettors) — so you always know what's happening across the table.",
-        he: "📰 הפיד החי פותח עכשיו בכותרות של היום — קודם השיאים (זכיות גדולות, מטפסים חמים, מרוויחים, רצפי ניצחונות), ואז הדרמה (צניחות בטבלה, ההפסדים הגדולים, שחקנים על הקרשים, רצפים קרים, המהמרים הפעילים) — כדי שתמיד תדעו מה קורה בטבלה.",
+        en: "📰 The feed now opens with the HIGHS too — biggest wins, hot climbers and top gainers lead the ticker, ahead of the drama.",
+        he: "📰 הפיד פותח עכשיו גם בשיאים — זכיות גדולות, מטפסים חמים ומרוויחים מובילים בסרגל, לפני הדרמה.",
       },
+    ],
+  },
+  {
+    version: "4.29",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "📰 The live feed now follows the day's drama — rank tumbles, the biggest losses, players on the ropes, the busiest bettors and hot/cold streaks.",
+        he: "📰 הפיד החי עוקב עכשיו אחרי הדרמה של היום — צניחות בטבלה, ההפסדים הגדולים, שחקנים על הקרשים, המהמרים הפעילים ורצפים חמים/קרים.",
+      },
+    ],
+  },
+  {
+    version: "4.28",
+    date: "2026-06-26",
+    changes: [
+      { en: "🔧 Behind-the-scenes polish and fixes.", he: "🔧 שיפורים ותיקונים מאחורי הקלעים." },
+    ],
+  },
+  {
+    version: "4.27",
+    date: "2026-06-25",
+    changes: [
+      { en: "🔧 Under-the-hood improvements and groundwork for features coming soon.", he: "🔧 שיפורים פנימיים והכנות לתכונות שבדרך." },
     ],
   },
   {
