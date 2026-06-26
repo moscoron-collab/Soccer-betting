@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.31",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "⚽ Penalty Shootout now pays DOUBLE — 🪙100 per goal (up to 🪙500 a day) instead of 🪙50.",
+        he: "⚽ דו-קרב הפנדלים משלם עכשיו פי שניים — 🪙100 לכל גול (עד 🪙500 ביום) במקום 🪙50.",
+      },
+    ],
+  },
+  {
     version: "4.30",
     date: "2026-06-26",
     changes: [

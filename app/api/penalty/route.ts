@@ -6,7 +6,7 @@ import { isNewLocalDay } from "@/lib/time";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const COINS_PER_GOAL = 50; // 5 goals = 250 coins max per day
+const COINS_PER_GOAL = 100; // 5 goals = 500 coins max per day
 
 // POST /api/penalty { goals, tz } -> award coins for the daily shootout
 // (once per local day; the player's timezone is sent as { tz }).
