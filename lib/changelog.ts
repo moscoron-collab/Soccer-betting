@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.36",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "🏅 The top of the leaderboard now stands out: #1 gets 👑, #2 🥈, #3 🥉. Everyone below keeps their XP tier emoji — so the leaders no longer look identical to the pack.",
+        he: "🏅 ראש טבלת המובילים בולט עכשיו: מקום 1 מקבל 👑, מקום 2 🥈, מקום 3 🥉. כל השאר שומרים על אימוג'י הדרגה שלהם — כך שהמובילים כבר לא נראים זהים לכולם.",
+      },
+    ],
+  },
+  {
     version: "4.35",
     date: "2026-06-26",
     changes: [

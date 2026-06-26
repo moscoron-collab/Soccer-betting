@@ -223,6 +223,14 @@ function tierEmoji(xp: number | null | undefined): string {
   return TIER_EMOJI[levelInfo(xp ?? 0).tierKey] ?? "";
 }
 
+// Medals for the very top of the table, by rank, so the leaders stand out instead of
+// sharing the same XP-tier emoji as the pack. Shown INSTEAD of the tier emoji for the
+// top 3; everyone below keeps their tier emoji.
+const RANK_MEDAL = ["👑", "🥈", "🥉"];
+function rankMedal(rank: number): string {
+  return RANK_MEDAL[rank - 1] ?? "";
+}
+
 type LeaderRow = {
   username: string;
   coins: number;
@@ -1780,13 +1788,19 @@ function Game({
                 <span className="w-6 shrink-0 text-blue-100/60">{i + 1}.</span>
                 <Avatar avatar={row.avatar} size={24} />
                 <span className="truncate">{row.username}</span>
-                {tierEmoji(row.xp) && (
-                  <span
-                    title={`${t("tier." + levelInfo(row.xp ?? 0).tierKey)} · ${t("mylog.level", { n: levelInfo(row.xp ?? 0).level })}`}
-                    className="shrink-0"
-                  >
-                    {tierEmoji(row.xp)}
+                {i < 3 ? (
+                  <span title={`#${i + 1}`} className="shrink-0">
+                    {rankMedal(i + 1)}
                   </span>
+                ) : (
+                  tierEmoji(row.xp) && (
+                    <span
+                      title={`${t("tier." + levelInfo(row.xp ?? 0).tierKey)} · ${t("mylog.level", { n: levelInfo(row.xp ?? 0).level })}`}
+                      className="shrink-0"
+                    >
+                      {tierEmoji(row.xp)}
+                    </span>
+                  )
                 )}
                 {isNewPlayer(row.created_at) && (
                   <span title={t("badge.new")} className="shrink-0">🌱</span>
