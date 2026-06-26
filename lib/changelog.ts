@@ -1,13 +1,21 @@
-// Bump VERSION and add an entry at the top whenever you ship something.
-// Every change has both English (en) and Hebrew (he) text; the "What's new"
-// modal shows the one matching the player's chosen language.
-
-export const VERSION = "4.28";
+// Add an entry at the top whenever you ship something player-facing. VERSION is derived
+// from the newest entry below (see the bottom of this file), so the "v{VERSION}" label
+// and the "What's new" list can never drift apart. Each change has English + Hebrew text.
 
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "4.29",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "📰 The live feed now follows the drama: big rank tumbles, who lost the most, players on the ropes, who's betting the most, and hot/cold streaks — leading the ticker so you always know what's happening across the table.",
+        he: "📰 הפיד החי עוקב עכשיו אחרי הדרמה: צניחות גדולות בטבלה, מי הפסיד הכי הרבה, שחקנים על הקרשים, מי מהמר הכי הרבה, ורצפים חמים/קרים — בראש הסרגל כדי שתמיד תדעו מה קורה בטבלה.",
+      },
+    ],
+  },
   {
     version: "4.26",
     date: "2026-06-25",
@@ -688,3 +696,7 @@ export const CHANGELOG: Release[] = [
     ],
   },
 ];
+
+// The app's current version IS the newest changelog entry — single source of truth, so
+// the "v{VERSION}" label and the "What's new" list can never disagree again.
+export const VERSION = CHANGELOG[0].version;

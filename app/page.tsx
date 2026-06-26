@@ -861,6 +861,28 @@ function buildBannerMessages(
     msgs.push(t("banner.missedYou", { name: player.username, gift: n(welcomeBack.giftAmount) }));
   }
 
+  // 1.5) Player drama LEADS the feed (last 24h): big rank tumbles, the day's biggest
+  //      loss, who's on the ropes, the most active bettor, and hot/cold streaks.
+  const st = data.stories ?? {};
+  if (data.faller?.name) {
+    msgs.push(t("banner.rankDrop", { name: data.faller.name, from: data.faller.from, to: data.faller.to }));
+  }
+  if (st.onRopes?.name) {
+    msgs.push(t("banner.onRopes", { name: st.onRopes.name, coins: n(st.onRopes.coins), lost: n(st.onRopes.lost) }));
+  }
+  if (st.bigLoss?.name) {
+    msgs.push(t("banner.bigLoss", { name: st.bigLoss.name, amount: n(st.bigLoss.amount), team: st.bigLoss.team ?? "" }));
+  }
+  if (st.hotStreak?.name) {
+    msgs.push(t("banner.hotStreak", { name: st.hotStreak.name, n: st.hotStreak.n }));
+  }
+  if (st.coldStreak?.name) {
+    msgs.push(t("banner.coldStreak", { name: st.coldStreak.name, n: st.coldStreak.n }));
+  }
+  if (st.mostActive?.name) {
+    msgs.push(t("banner.mostActive", { name: st.mostActive.name, count: st.mostActive.count }));
+  }
+
   // 2) Your own activity — the most personal hook leads the feed.
   const recentWon = predictions.find(
     (p) => p.status === "WON" && new Date(p.created_at ?? 0).getTime() >= now - 48 * 3_600_000

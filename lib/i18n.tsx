@@ -531,6 +531,30 @@ const DICT: Record<string, { en: string; he: string }> = {
     en: "📉 Rough patch for {name} — down 🪙{amount} in 2 days",
     he: "📉 תקופה קשה ל-{name} — ירידה של 🪙{amount} ביומיים",
   },
+  "banner.rankDrop": {
+    en: "📉 {name} is in free-fall — crashed from #{from} to #{to}!",
+    he: "📉 {name} בנפילה חופשית — צנח מ-#{from} ל-#{to}!",
+  },
+  "banner.onRopes": {
+    en: "😱 {name} is on the ropes — down to just 🪙{coins} after dropping 🪙{lost}!",
+    he: "😱 {name} על הקרשים — נשארו רק 🪙{coins} אחרי הפסד של 🪙{lost}!",
+  },
+  "banner.bigLoss": {
+    en: "💸 Ouch! {name} blew 🪙{amount} on {team}!",
+    he: "💸 אאוץ'! {name} שרף 🪙{amount} על {team}!",
+  },
+  "banner.hotStreak": {
+    en: "🔥 {name} is on fire — {n} wins in a row!",
+    he: "🔥 {name} בוער — {n} ניצחונות ברצף!",
+  },
+  "banner.coldStreak": {
+    en: "❄️ {name} is ice cold — {n} losses straight!",
+    he: "❄️ {name} קפוא — {n} הפסדים ברצף!",
+  },
+  "banner.mostActive": {
+    en: "🎯 {name} can't stop betting — {count} bets in 24h!",
+    he: "🎯 {name} לא מפסיק להמר — {count} הימורים ב-24 שעות!",
+  },
   "banner.rivalry": {
     en: "⚔️ {chaser} is just 🪙{gap} behind {leader} for #{rank}!",
     he: "⚔️ {chaser} במרחק 🪙{gap} בלבד מ-{leader} על מקום #{rank}!",

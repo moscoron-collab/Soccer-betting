@@ -39,7 +39,8 @@ function teamOf(row: any): string | null {
 // Biggest rank climber since the last snapshot. Compares current ranks to a stored
 // snapshot in app_meta and refreshes that snapshot when it's older than 12h, so the
 // line reflects "biggest jump in roughly the last few hours".
-async function biggestClimber(ranked: { id: string; username: string }[]) {
+type RankMove = { name: string; from: number; to: number; jump: number };
+async function rankMovers(ranked: { id: string; username: string }[]): Promise<{ climber: RankMove | null; faller: RankMove | null }> {
   try {
     const { data } = await supabase.from("app_meta").select("value").eq("key", "rank_snapshot").maybeSingle();
     let snap: any = null;
@@ -51,14 +52,19 @@ async function biggestClimber(ranked: { id: string; username: string }[]) {
     const currentRanks: Record<string, number> = {};
     ranked.forEach((r, i) => (currentRanks[r.id] = i + 1));
 
-    let best: { name: string; from: number; to: number; jump: number } | null = null;
+    let climber: RankMove | null = null; // moved UP (from > to)
+    let faller: RankMove | null = null; // moved DOWN (to > from)
     if (snap?.ranks) {
       for (const r of ranked) {
         const to = currentRanks[r.id];
         const from = snap.ranks[r.id];
-        if (from && from > to) {
+        if (!from) continue;
+        if (from > to) {
           const jump = from - to;
-          if (!best || jump > best.jump) best = { name: r.username, from, to, jump };
+          if (!climber || jump > climber.jump) climber = { name: r.username, from, to, jump };
+        } else if (to > from) {
+          const jump = to - from;
+          if (!faller || jump > faller.jump) faller = { name: r.username, from, to, jump };
         }
       }
     }
@@ -71,10 +77,90 @@ async function biggestClimber(ranked: { id: string; username: string }[]) {
         .from("app_meta")
         .upsert({ key: "rank_snapshot", value: JSON.stringify({ ts: iso, ranks: currentRanks }), updated_at: iso }, { onConflict: "key" });
     }
-    return best;
+    return { climber, faller };
   } catch {
-    return null;
+    return { climber: null, faller: null };
   }
+}
+
+// The day's player drama (last 24h): the biggest single loss, who's on the ropes (lost a
+// lot and is now genuinely low), the most active bettor, and the hottest/coldest streaks.
+// Names/net-worth come from the already-computed leaderboard; returns nulls when nothing
+// qualifies.
+async function playerStories(ranked: RankedPlayer[], since24: string) {
+  const nameById = new Map(ranked.map((r) => [r.id, r.username]));
+  const worthById = new Map(ranked.map((r) => [r.id, r.netWorth]));
+
+  // Most active: who placed the most bets in the last 24h (min 3 to be worth a shout).
+  const { data: recent } = await supabase.from("predictions").select("player_id").gte("created_at", since24);
+  const activity = new Map<string, number>();
+  for (const b of recent ?? []) {
+    const id = (b as any).player_id as string;
+    activity.set(id, (activity.get(id) ?? 0) + 1);
+  }
+  let mostActive: { name: string; count: number } | null = null;
+  for (const [id, c] of activity) {
+    if (c >= 3 && (!mostActive || c > mostActive.count)) mostActive = { name: nameById.get(id) ?? "Player", count: c };
+  }
+
+  // Recent settled bets (newest first) — powers big-loss, on-the-ropes and streaks.
+  const { data: settled } = await supabase
+    .from("predictions")
+    .select("player_id, status, stake, payout, free_bet, settled_at, pick, type, players(username), matches(home_team, away_team)")
+    .in("status", ["WON", "LOST"])
+    .order("settled_at", { ascending: false })
+    .limit(300);
+  const rows = (settled ?? []) as any[];
+
+  // 24h window: biggest single (non-free) loss + each player's net coin swing.
+  let bigLoss: { name: string; amount: number; team: string | null } | null = null;
+  const net = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.settled_at || r.settled_at < since24) continue;
+    if (r.status === "LOST") {
+      if (!r.free_bet) {
+        if (!bigLoss || (r.stake ?? 0) > bigLoss.amount) bigLoss = { name: nameOf(r) ?? "Player", amount: r.stake ?? 0, team: teamOf(r) };
+        net.set(r.player_id, (net.get(r.player_id) ?? 0) - (r.stake ?? 0));
+      }
+    } else {
+      const gain = r.free_bet ? (r.payout ?? 0) : (r.payout ?? 0) - (r.stake ?? 0);
+      net.set(r.player_id, (net.get(r.player_id) ?? 0) + gain);
+    }
+  }
+
+  // On the ropes: the biggest 24h net loser who's now genuinely low (< 🪙1,000 net worth).
+  let onRopes: { name: string; coins: number; lost: number } | null = null;
+  let worstId: string | null = null;
+  let worstNet = 0;
+  for (const [id, v] of net) if (v < worstNet) ((worstNet = v), (worstId = id));
+  if (worstId && worstNet <= -300) {
+    const nw = worthById.get(worstId) ?? 0;
+    if (nw < 1000) onRopes = { name: nameById.get(worstId) ?? "Player", coins: Math.round(nw), lost: Math.round(-worstNet) };
+  }
+
+  // Streaks: per player, count the leading same-result run from their newest bet.
+  const byPlayer = new Map<string, string[]>();
+  for (const r of rows) {
+    const arr = byPlayer.get(r.player_id) ?? [];
+    arr.push(r.status);
+    byPlayer.set(r.player_id, arr);
+  }
+  let hotStreak: { name: string; n: number } | null = null;
+  let coldStreak: { name: string; n: number } | null = null;
+  for (const [id, statuses] of byPlayer) {
+    const first = statuses[0];
+    let run = 0;
+    for (const s of statuses) {
+      if (s === first) run++;
+      else break;
+    }
+    if (run < 3) continue;
+    const name = nameById.get(id) ?? "Player";
+    if (first === "WON" && (!hotStreak || run > hotStreak.n)) hotStreak = { name, n: run };
+    if (first === "LOST" && (!coldStreak || run > coldStreak.n)) coldStreak = { name, n: run };
+  }
+
+  return { mostActive, bigLoss, onRopes, hotStreak, coldStreak };
 }
 
 // Recent form over the `since` window, in one pass over settled predictions:
@@ -240,7 +326,7 @@ export async function GET(req: Request) {
     : null;
   const top3 = ranked.slice(0, 3).map((r) => ({ name: r.username, netWorth: r.netWorth }));
   const gap = ranked[0] && ranked[1] ? ranked[0].netWorth - ranked[1].netWorth : null;
-  const climber = await biggestClimber(ranked);
+  const { climber, faller } = await rankMovers(ranked);
   const myRank = player ? ranked.findIndex((r) => r.id === player.id) + 1 || null : null;
 
   // Social lines: tightest table race, freshly-joined players (within the window),
@@ -252,6 +338,9 @@ export async function GET(req: Request) {
     .slice(0, 2)
     .map((r) => ({ name: r.username }));
   const form = await playerForm(since);
+  // The day's player drama (last 24h) — leads the feed.
+  const since24 = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const stories = await playerStories(ranked, since24);
 
   // Admin-only: a list of upcoming matches (next ~4 days) so the admin panel can
   // offer a "pick the featured match" dropdown instead of a raw match id.
@@ -284,12 +373,14 @@ export async function GET(req: Request) {
       top,
       top3,
       climber,
+      faller,
       gap,
       myRank,
       rivalry,
       newcomers,
       bestWinRate: form.bestWinRate,
       mover: form.mover,
+      stories,
       // Admin-only: the live config + upcoming matches for the admin panel.
       config: isAdmin ? cfg : undefined,
       adminMatches,
