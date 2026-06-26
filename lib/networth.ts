@@ -16,6 +16,7 @@ export type RankedPlayer = {
   netWorth: number; // coins + inPlay (the ranking value)
   avatar: string | null;
   created_at: string | null;
+  xp: number; // drives the leaderboard tier emoji
 };
 
 // All players ranked by Net Worth, biggest first (tie-break: more liquid coins).
@@ -23,7 +24,7 @@ export type RankedPlayer = {
 export async function netWorthLeaderboard(limit = 50): Promise<RankedPlayer[]> {
   const { data: players } = await supabase
     .from("players")
-    .select("id, username, coins, avatar, created_at")
+    .select("id, username, coins, avatar, created_at, xp")
     .limit(1000);
 
   const { data: pending } = await supabase
@@ -46,6 +47,7 @@ export async function netWorthLeaderboard(limit = 50): Promise<RankedPlayer[]> {
       netWorth: p.coins + inPlay,
       avatar: p.avatar ?? null,
       created_at: p.created_at ?? null,
+      xp: p.xp ?? 0,
     };
   });
 

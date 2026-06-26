@@ -193,6 +193,19 @@ function levelInfo(xp: number) {
   return { level, tierKey, intoLevel: (xp || 0) % 100 };
 }
 
+// Emoji shown next to a name on the leaderboard for each XP tier (low → high), so
+// established players aren't bare once their 🌱 "new player" badge expires.
+const TIER_EMOJI: Record<string, string> = {
+  rookie: "🐣",
+  analyst: "📊",
+  scout: "🔭",
+  expert: "🎯",
+  legend: "👑",
+};
+function tierEmoji(xp: number | null | undefined): string {
+  return TIER_EMOJI[levelInfo(xp ?? 0).tierKey] ?? "";
+}
+
 type LeaderRow = {
   username: string;
   coins: number;
@@ -200,6 +213,7 @@ type LeaderRow = {
   inPlay?: number;
   avatar?: string | null;
   created_at?: string | null;
+  xp?: number; // drives the tier emoji shown next to the name
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -1749,6 +1763,14 @@ function Game({
                 <span className="w-6 shrink-0 text-blue-100/60">{i + 1}.</span>
                 <Avatar avatar={row.avatar} size={24} />
                 <span className="truncate">{row.username}</span>
+                {tierEmoji(row.xp) && (
+                  <span
+                    title={`${t("tier." + levelInfo(row.xp ?? 0).tierKey)} · ${t("mylog.level", { n: levelInfo(row.xp ?? 0).level })}`}
+                    className="shrink-0"
+                  >
+                    {tierEmoji(row.xp)}
+                  </span>
+                )}
                 {isNewPlayer(row.created_at) && (
                   <span title={t("badge.new")} className="shrink-0">🌱</span>
                 )}

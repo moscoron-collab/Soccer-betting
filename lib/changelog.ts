@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.34",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "🏅 The leaderboard now shows a tier emoji next to every player by their level — 🐣 Rookie · 📊 Analyst · 🔭 Scout · 🎯 Expert · 👑 Legend — so veterans aren't bare once the 🌱 'new player' badge wears off. (Hover/tap it to see the tier and level.)",
+        he: "🏅 בטבלת המובילים מופיע עכשיו אימוג'י דרגה ליד כל שחקן לפי הרמה — 🐣 מתחיל · 📊 אנליסט · 🔭 סייר · 🎯 מומחה · 👑 אגדה — כך שלוותיקים יש סמל גם אחרי שתג ה-🌱 'שחקן חדש' נעלם. (העבירו עכבר/הקישו כדי לראות דרגה ורמה.)",
+      },
+    ],
+  },
+  {
     version: "4.33",
     date: "2026-06-26",
     changes: [
