@@ -12,7 +12,7 @@ import {
 } from "@/lib/payout";
 import type { Player } from "@/lib/auth";
 import { MAX_SPINS_PER_DAY, spinsUsedToday, isComebackEligible } from "@/lib/wheel";
-import { comebackSpinsLeft, comebackAccess } from "@/lib/comeback";
+import { comebackSpinsLeft, comebackAccess, isComebackArmed, armComeback } from "@/lib/comeback";
 import { getEventConfig } from "@/lib/event";
 import { quickRefresh } from "@/lib/settle";
 import { localDate, isNewLocalDay } from "@/lib/time";
@@ -225,6 +225,15 @@ export async function GET(req: Request) {
   const { showComeback, showRegular } = comebackAccess(player.is_admin === true, bottomSlice, comebackLive);
   const comebackLeft = showComeback ? await comebackSpinsLeft(player.id, today) : 0;
 
+  // The "you've slipped" comeback alert should only nag players who genuinely DROPPED —
+  // i.e. who climbed above the threshold and fell back (or are grandfathered pre-launch
+  // accounts). A brand-new player starts in the bottom slice but hasn't dropped, so they
+  // still get the comeback wheel above but NOT the alert. Arm the player the moment they
+  // rise above the threshold so a future fall is recognised as a real comeback.
+  const armed = await isComebackArmed(player.id, player.created_at);
+  if (!bottomSlice && !armed) await armComeback(player.id);
+  const showComebackAlert = player.is_admin === true ? showComeback : showComeback && armed;
+
   return NextResponse.json(
     {
       player,
@@ -234,6 +243,7 @@ export async function GET(req: Request) {
       nextSpinFree,
       showComeback,
       showRegular,
+      showComebackAlert,
       comebackSpinsLeft: comebackLeft,
       canPenalty,
       leaderboard: toPublic(rankedAll.slice(0, 50)),

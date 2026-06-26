@@ -282,6 +282,7 @@ function Home() {
   const [spinsLeft, setSpinsLeft] = useState(0);
   const [nextSpinFree, setNextSpinFree] = useState(false);
   const [showComeback, setShowComeback] = useState(false);
+  const [showComebackAlert, setShowComebackAlert] = useState(false);
   const [showRegularWheel, setShowRegularWheel] = useState(true);
   const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
@@ -377,6 +378,7 @@ function Home() {
     setSpinsLeft(data.spinsLeft ?? 0);
     setNextSpinFree(!!data.nextSpinFree);
     setShowComeback(!!data.showComeback);
+    setShowComebackAlert(!!data.showComebackAlert);
     setShowRegularWheel(data.showRegular !== false);
     setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
@@ -443,6 +445,7 @@ function Home() {
           spinsLeft={spinsLeft}
           nextSpinFree={nextSpinFree}
           showComeback={showComeback}
+          showComebackAlert={showComebackAlert}
           showRegularWheel={showRegularWheel}
           comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
@@ -1411,6 +1414,7 @@ function Game({
   spinsLeft,
   nextSpinFree,
   showComeback,
+  showComebackAlert,
   showRegularWheel,
   comebackSpinsLeft,
   canPenalty,
@@ -1427,6 +1431,7 @@ function Game({
   spinsLeft: number;
   nextSpinFree: boolean;
   showComeback: boolean;
+  showComebackAlert: boolean;
   showRegularWheel: boolean;
   comebackSpinsLeft: number;
   canPenalty: boolean;
@@ -1620,7 +1625,7 @@ function Game({
         myRank={myRank}
         welcomeBack={welcomeBack}
       />
-      <ComebackAlert show={showComeback} isPreview={showComeback && showRegularWheel} />
+      <ComebackAlert show={showComebackAlert} isPreview={showComebackAlert && showRegularWheel} />
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-6">
       {/* Always-visible coin balance while scrolling */}
       <CoinChip coins={player.coins} />

@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.32",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "🌱 New players no longer get the \"you've slipped\" Comeback alert — you still get the Comeback Wheel, but the alert now only appears if you climb above 🪙3,000 and then fall back.",
+        he: "🌱 שחקנים חדשים כבר לא מקבלים את התראת \"צנחתם\" של הקאמבאק — עדיין מקבלים את גלגל הקאמבאק, אבל ההתראה מופיעה רק אם עליתם מעל 🪙3,000 ואז ירדתם בחזרה.",
+      },
+    ],
+  },
+  {
     version: "4.31",
     date: "2026-06-26",
     changes: [

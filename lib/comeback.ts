@@ -9,6 +9,46 @@ import { netWorthLeaderboard } from "./networth";
 import { isComebackEligible, MAX_COMEBACK_SPINS_PER_DAY } from "./wheel";
 
 const keyFor = (playerId: string) => `cbspin:${playerId}`;
+// Per-player "armed" flag: set once the player has climbed above the comeback threshold,
+// so a later fall back into the bottom slice is a *genuine* comeback (worth alerting).
+const armedKeyFor = (playerId: string) => `cbarm:${playerId}`;
+
+// Accounts that existed before the "only alert genuine drops" rule shipped are
+// grandfathered in: we can't reconstruct whether they climbed-then-fell, so anyone created
+// before this launch moment is treated as already-armed and still sees the Comeback alert
+// while they're in the bottom slice. Players who join AFTER this only get the alert once
+// they've climbed above the threshold and dropped back (a real comeback) — a brand-new
+// player starts low but hasn't "dropped", so they get the wheel without the alert.
+export const COMEBACK_ALERT_GRANDFATHER_BEFORE = "2026-06-26T14:49:43Z";
+
+// Is the Comeback *alert* warranted for this player? True when the player has previously
+// been above the threshold (stored flag) or is a grandfathered pre-launch account. The
+// wheel itself stays available to everyone in the bottom slice regardless of this.
+export async function isComebackArmed(
+  playerId: string,
+  createdAt: string | null | undefined
+): Promise<boolean> {
+  if (createdAt && new Date(createdAt).getTime() < Date.parse(COMEBACK_ALERT_GRANDFATHER_BEFORE)) {
+    return true;
+  }
+  const { data } = await supabase
+    .from("app_meta")
+    .select("value")
+    .eq("key", armedKeyFor(playerId))
+    .maybeSingle();
+  return (data as any)?.value === "1";
+}
+
+// Remember that the player has climbed above the comeback threshold (idempotent), so a
+// later fall back into the bottom slice will show the comeback alert.
+export async function armComeback(playerId: string): Promise<void> {
+  await supabase
+    .from("app_meta")
+    .upsert(
+      { key: armedKeyFor(playerId), value: "1", updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+}
 
 // Which wheel(s) a player sees/can use. Admins always see BOTH, so they can preview the
 // Comeback Wheel without losing their own (and before it's live). Real players are split
