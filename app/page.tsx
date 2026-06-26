@@ -5,7 +5,7 @@ import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
 import { spinRatchet, loseWomp, winFanfareShort, winFanfareTriumph, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
-import { FREE_BET_STAKE } from "@/lib/payout";
+import { FREE_BET_STAKE, MOTD_BONUS } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
 
@@ -182,6 +182,23 @@ function effMult(p: Prediction): string {
   const flames = (p.bonus_mult ?? 1) > 1 ? " 🔥" : "";
   const bolt = p.boosted ? " ⚡" : "";
   return `×${s}${flames}${bolt}`;
+}
+
+// The guaranteed multiplier locked in for a FRESH bet of this type — mirrors the
+// server's computeBonusMult for the parts the client can know up front:
+//   • a Featured Winner pays exactly the headline rate (this REPLACES the usual
+//     bonuses — no underdog/MOTD stacks on it), and
+//   • Match of the Day adds a fixed bonus on top of the base for any market.
+// The underdog bonus is crowd-dependent, so it isn't included here — it's surfaced
+// separately as "unpopular picks win even more".
+function effectiveWinMult(
+  type: BetType,
+  isFeatured?: boolean,
+  featuredMult?: number,
+  isMotd?: boolean
+): number {
+  if (isFeatured && type === "WINNER") return featuredMult ?? BASE_MULT.WINNER;
+  return BASE_MULT[type] * (isMotd ? 1 + MOTD_BONUS : 1);
 }
 
 // Level/tier from XP (100 XP per level). `tierKey` maps to an i18n `tier.*` key.
@@ -3263,6 +3280,9 @@ function BetForm({
   coins,
   boost = 0,
   freeBets = 0,
+  isFeatured,
+  featuredMult,
+  isMotd,
   initial,
   submitLabel,
   onSubmit,
@@ -3274,6 +3294,9 @@ function BetForm({
   coins: number; // max stake available
   boost?: number; // available 2× power-ups (0 = no boost option shown)
   freeBets?: number; // available free bet tokens (0 = no free-bet option shown)
+  isFeatured?: boolean; // Road-to-the-Final featured match (Winner pays the headline rate)
+  featuredMult?: number; // that headline rate
+  isMotd?: boolean; // Match of the Day (fixed bonus on top of base)
   initial?: BetDraft;
   submitLabel: string;
   onSubmit: (body: any) => Promise<{ error?: string }>;
@@ -3291,6 +3314,13 @@ function BetForm({
 
   // A free bet forces a fixed stake and can't be combined with a 2× boost.
   const effStake = useFreeBet ? FREE_BET_STAKE : stake;
+
+  // The multiplier this bet would actually pay (featured rate / MOTD bonus included),
+  // so the "if correct" preview matches what settlement pays — not just the base rate.
+  const winMult = effectiveWinMult(type, isFeatured, featuredMult, isMotd);
+  // The crowd-based underdog bonus can still push it higher — but not on a Featured
+  // Winner (fixed headline rate) or an Exact score (no underdog market).
+  const underdogApplies = type !== "EXACT" && !(isFeatured && type === "WINNER");
 
   async function submit() {
     setBusy(true);
@@ -3437,11 +3467,13 @@ function BetForm({
       {effStake > 0 && (
         <p className="mt-2 text-center text-sm font-semibold text-yellow-200">
           {t("form.ifCorrect", {
-            n: (effStake * BASE_MULT[type] * (useBoost && boost > 0 && !useFreeBet ? 2 : 1)).toLocaleString(),
+            n: Math.round(effStake * winMult * (useBoost && boost > 0 && !useFreeBet ? 2 : 1)).toLocaleString(),
           })}
           {useBoost && boost > 0 && !useFreeBet && <span className="text-amber-300"> ⚡2×</span>}
           {useFreeBet && <span className="text-purple-300"> 🎟️</span>}
-          <span className="block text-xs font-normal text-blue-100/60">{t("form.unpopular")}</span>
+          {underdogApplies && (
+            <span className="block text-xs font-normal text-blue-100/60">{t("form.unpopular")}</span>
+          )}
         </p>
       )}
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
@@ -3459,6 +3491,9 @@ function BetEditor({
   away,
   token,
   coins,
+  isFeatured,
+  featuredMult,
+  isMotd,
   onChange,
 }: {
   p: Prediction;
@@ -3466,6 +3501,9 @@ function BetEditor({
   away: string;
   token: string;
   coins: number;
+  isFeatured?: boolean;
+  featuredMult?: number;
+  isMotd?: boolean;
   onChange: () => void;
 }) {
   const { t } = useLang();
@@ -3508,6 +3546,9 @@ function BetEditor({
           home={home}
           away={away}
           coins={coins + p.stake}
+          isFeatured={isFeatured}
+          featuredMult={featuredMult}
+          isMotd={isMotd}
           submitLabel={t("form.save")}
           onCancel={() => setEditing(false)}
           initial={{
@@ -3681,6 +3722,9 @@ function MatchCard({
               away={match.away_team}
               token={token}
               coins={coins}
+              isFeatured={isFeatured}
+              featuredMult={featuredMult}
+              isMotd={isMotd}
               onChange={onPlaced}
             />
           )}
@@ -3698,6 +3742,9 @@ function MatchCard({
             coins={coins}
             boost={boost}
             freeBets={freeBets}
+            isFeatured={isFeatured}
+            featuredMult={featuredMult}
+            isMotd={isMotd}
             submitLabel={t("form.predict")}
             onSubmit={place}
           />

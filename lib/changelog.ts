@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.35",
+    date: "2026-06-26",
+    changes: [
+      {
+        en: "🛠️ Fixed the bet card's 'If correct, you win' preview: on a Featured match (or Match of the Day) it was only showing the base 2× payout. It now reflects the real rate — e.g. a 🪙5,000 Winner bet on a 3.5× featured match correctly shows 🪙17,500.",
+        he: "🛠️ תוקן התצוגה 'אם תצדקו, תזכו' בכרטיס ההימור: במשחק נבחר (או משחק היום) הוצג רק התשלום הבסיסי של פי 2. עכשיו מוצג השיעור האמיתי — למשל הימור מנצח של 🪙5,000 על משחק נבחר בפי 3.5 מציג נכון 🪙17,500.",
+      },
+    ],
+  },
+  {
     version: "4.34",
     date: "2026-06-26",
     changes: [
