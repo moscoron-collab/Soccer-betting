@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
   const username = String(body?.username ?? "").trim();
   const password = String(body?.password ?? "");
+  const deviceId = String(body?.deviceId ?? "").trim();
 
   if (username.length < 2 || username.length > 20) {
     return NextResponse.json({ error: "Username must be 2–20 characters." }, { status: 400 });
@@ -44,6 +45,21 @@ export async function POST(req: Request) {
     );
   }
 
+  // One account per device: if this device already owns an account, send them to log in.
+  if (deviceId) {
+    const { data: sameDevice } = await supabase
+      .from("players")
+      .select("id")
+      .eq("device_id", deviceId)
+      .maybeSingle();
+    if (sameDevice) {
+      return NextResponse.json(
+        { error: "This device already has an account. Please log in instead." },
+        { status: 409 }
+      );
+    }
+  }
+
   const token = randomUUID() + randomUUID().replace(/-/g, "");
   const { data, error } = await supabase
     .from("players")
@@ -52,6 +68,7 @@ export async function POST(req: Request) {
       secret_token: token,
       password_hash: hashPassword(password),
       coins: STARTING_COINS,
+      device_id: deviceId || null,
     })
     .select("id, username, coins")
     .single();

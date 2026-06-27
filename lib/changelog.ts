@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.37",
+    date: "2026-06-27",
+    changes: [
+      {
+        en: "🔒 One account per device: a phone or computer can now make just one player. If this device already has an account, sign-up asks you to log in instead. Existing players are unaffected.",
+        he: "🔒 חשבון אחד לכל מכשיר: טלפון או מחשב יכולים ליצור עכשיו רק שחקן אחד. אם כבר יש חשבון במכשיר הזה, ההרשמה תבקש להתחבר במקום. שחקנים קיימים אינם מושפעים.",
+      },
+    ],
+  },
+  {
     version: "4.36",
     date: "2026-06-26",
     changes: [

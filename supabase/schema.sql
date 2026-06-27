@@ -26,6 +26,7 @@ create table if not exists players (
   last_login_day  date,                              -- last local day the login bonus was granted
   last_cashback_at timestamptz,                      -- last time daily loss-cashback was granted
   last_seen_at    timestamptz,                       -- last load (powers the "we missed you" welcome-back gift)
+  device_id       text,                              -- "one device = one account": stable id from the browser (null for legacy accounts)
   created_at      timestamptz not null default now()
 );
 
@@ -43,6 +44,13 @@ alter table players add column if not exists login_streak     integer not null d
 alter table players add column if not exists last_login_day   date;
 alter table players add column if not exists last_cashback_at timestamptz;
 alter table players add column if not exists last_seen_at     timestamptz;
+alter table players add column if not exists device_id        text;
+
+-- "One device = one account": at most one player per device_id. Legacy rows have
+-- device_id = null and are exempt (Postgres treats nulls as distinct), so existing
+-- players are grandfathered in and never blocked.
+create unique index if not exists players_device_id_idx
+  on players (device_id) where device_id is not null;
 
 -- ---------- matches (mirrors football-data.org) ----------
 create table if not exists matches (

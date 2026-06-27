@@ -83,6 +83,22 @@ function safeRemove(key: string): void {
   }
 }
 
+// Stable per-device id for the "one device = one account" rule. Generated once and
+// kept in localStorage; sent on signup (to block a second account on this device)
+// and on login (to claim the device for legacy accounts that predate this).
+const DEVICE_KEY = "spg_device";
+function getDeviceId(): string {
+  let id = safeGet(DEVICE_KEY);
+  if (!id) {
+    id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    safeSet(DEVICE_KEY, id);
+  }
+  return id;
+}
+
 type Player = {
   id: string;
   username: string;
@@ -734,7 +750,7 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password, deviceId: getDeviceId() }),
       });
       const data = await res.json();
       if (!res.ok) {
