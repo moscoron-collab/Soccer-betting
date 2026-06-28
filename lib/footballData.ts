@@ -16,6 +16,8 @@ export type FdMatch = {
   awayScore: number | null;
   halfHome: number | null;
   halfAway: number | null;
+  stage: string | null; // GROUP_STAGE | LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL …
+  winner: "HOME" | "AWAY" | "DRAW" | null; // overall result incl. extra-time/penalties (knockouts)
 };
 
 function getKey(): string {
@@ -59,7 +61,19 @@ function mapMatch(m: any, fallbackCode = ""): FdMatch {
     awayScore: m.score?.fullTime?.away ?? null,
     halfHome: m.score?.halfTime?.home ?? null,
     halfAway: m.score?.halfTime?.away ?? null,
+    stage: m.stage ?? null,
+    winner: mapWinner(m.score?.winner),
   };
+}
+
+// football-data reports the winner as HOME_TEAM | AWAY_TEAM | DRAW (or null while
+// unplayed). For knockout games this already accounts for extra time and penalties,
+// so it's the source of truth for who advances in the bracket.
+function mapWinner(w: any): "HOME" | "AWAY" | "DRAW" | null {
+  if (w === "HOME_TEAM") return "HOME";
+  if (w === "AWAY_TEAM") return "AWAY";
+  if (w === "DRAW") return "DRAW";
+  return null;
 }
 
 async function fetchCompetitionMatches(

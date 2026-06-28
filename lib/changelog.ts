@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.38",
+    date: "2026-06-28",
+    changes: [
+      {
+        en: "🏆 New “Road to the Final” tab: a live World Cup knockout bracket from the Round of 32 to the Final. Watch every team, score and result fill in automatically as the real matches are played.",
+        he: "🏆 לשונית חדשה «הדרך לגמר»: עץ נוקאאוט חי של המונדיאל משלב ה-32 ועד הגמר. עקבו אחרי כל קבוצה, תוצאה ומנצחת שמתעדכנים אוטומטית עם המשחקים האמיתיים.",
+      },
+    ],
+  },
+  {
     version: "4.37",
     date: "2026-06-27",
     changes: [

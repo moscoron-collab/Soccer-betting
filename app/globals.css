@@ -25,3 +25,113 @@ body {
     left: calc(100% - 8px);
   }
 }
+
+/* ---------- "Road to the Final" knockout bracket ---------- */
+/* A two-sided bracket that fans out from the centre Final. Connector lines are
+   drawn with CSS borders so the markup stays just nested flex columns. Gold rails
+   on a deep navy panel mirror the event artwork. Horizontally scrollable so the
+   full draw stays usable on a phone. */
+:root {
+  --rtf-gold: #d9b34a;
+  --rtf-line: rgba(217, 179, 74, 0.55);
+}
+.rtf-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 4px 12px;
+}
+.rtf-board {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  min-width: max-content;
+  margin: 0 auto;
+}
+.rtf-side {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.rtf-side.right {
+  flex-direction: row-reverse;
+}
+.rtf-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 8px;
+  min-width: 58px;
+}
+/* Each match cell; centred in its share of the column so siblings pair up cleanly. */
+.rtf-cell {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* Horizontal stub leaving every match toward the next round (centre). */
+.rtf-side.left .rtf-col:not(:last-child) .rtf-cell::after,
+.rtf-side.right .rtf-col:not(:last-child) .rtf-cell::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 2px;
+  background: var(--rtf-line);
+}
+.rtf-side.left .rtf-col:not(:last-child) .rtf-cell::after {
+  right: -6px;
+}
+.rtf-side.right .rtf-col:not(:last-child) .rtf-cell::after {
+  left: -6px;
+}
+/* Vertical rail joining each pair of siblings into their parent. */
+.rtf-side.left .rtf-col:not(:last-child) .rtf-cell::before,
+.rtf-side.right .rtf-col:not(:last-child) .rtf-cell::before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  background: var(--rtf-line);
+}
+.rtf-side.left .rtf-col:not(:last-child) .rtf-cell::before {
+  right: -6px;
+}
+.rtf-side.right .rtf-col:not(:last-child) .rtf-cell::before {
+  left: -6px;
+}
+.rtf-side .rtf-col:not(:last-child) .rtf-cell:nth-child(odd)::before {
+  top: 50%;
+  height: calc(50% + 4px);
+}
+.rtf-side .rtf-col:not(:last-child) .rtf-cell:nth-child(even)::before {
+  bottom: 50%;
+  height: calc(50% + 4px);
+}
+/* A match node: the two stacked team chips inside a rounded panel. */
+.rtf-node {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(217, 179, 74, 0.25);
+  border-radius: 9px;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rtf-node.live {
+  border-color: rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
+}
+.rtf-team {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.1;
+  opacity: 0.72;
+}
+.rtf-team.won {
+  opacity: 1;
+  font-weight: 700;
+}

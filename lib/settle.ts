@@ -24,6 +24,8 @@ export async function upsertMatches(fdMatches: FdMatch[]): Promise<number> {
     away_score: m.awayScore,
     half_home: m.halfHome,
     half_away: m.halfAway,
+    stage: m.stage,
+    winner: m.winner,
     updated_at: new Date().toISOString(),
   }));
   const { error } = await supabase.from("matches").upsert(rows, { onConflict: "id" });

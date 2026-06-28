@@ -8,6 +8,8 @@ import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSli
 import { FREE_BET_STAKE, MOTD_BONUS } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
+import type { Bracket, BracketMatch, BracketTeam } from "@/lib/bracket";
+import { STAGE_SIZE } from "@/lib/bracket";
 
 // Translator type, so helpers can take `t` without importing React context.
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -1504,7 +1506,7 @@ function Game({
   const [featuredMults, setFeaturedMults] = useState<Record<number, number>>({});
   const [comp, setComp] = useState("All");
   const [visible, setVisible] = useState(10);
-  const [view, setView] = useState<"play" | "log">("play");
+  const [view, setView] = useState<"play" | "log" | "bracket">("play");
   const [showChanges, setShowChanges] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [viewPlayer, setViewPlayer] = useState<string | null>(null);
@@ -1750,6 +1752,12 @@ function Game({
           {t("game.tabLog")}
           <NotifDot count={logBadge} />
         </button>
+        <button
+          onClick={() => setView("bracket")}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "bracket" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+        >
+          {t("game.tabBracket")}
+        </button>
       </div>
 
       {/* When the Play dot is lit by unclaimed challenge rewards (not games left to
@@ -1778,6 +1786,8 @@ function Game({
           badgeCount={logBadge}
         />
       )}
+
+      {view === "bracket" && <RoadToFinal />}
 
       {view === "play" && (
         <>
@@ -3180,6 +3190,192 @@ function Empty({ text }: { text: string }) {
 }
 
 /* ------------------------------ Shared bits ------------------------------- */
+
+// ---------- Road to the Final: live World Cup knockout bracket (read-only) ----------
+// Mirrors the event artwork — a two-sided draw fanning out from a centre trophy, flag
+// circles for every team, gold connector rails, live scores. Horizontally scrollable
+// so the whole bracket stays usable on a phone. All data is live from the feed; we
+// never guess who advances (the feed fills the next round once fixtures are set).
+
+// Circular flag/crest, with team initials as a graceful fallback.
+function RtfCrest({ url, name }: { url: string | null; name: string }) {
+  return (
+    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 ring-1 ring-white/20">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={(e) => ((e.currentTarget.style.display = "none"))}
+        />
+      ) : (
+        <span className="text-[8px] font-bold text-blue-100/80">
+          {name.slice(0, 3).toUpperCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function RtfTeamRow({ team }: { team: BracketTeam | null }) {
+  const { t } = useLang();
+  if (!team) {
+    return (
+      <div className="rtf-team">
+        <span className="inline-block h-5 w-5 shrink-0 rounded-full bg-white/5 ring-1 ring-white/10" />
+        <span className="truncate text-blue-100/40">{t("rtf.tbd")}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`rtf-team ${team.won ? "won" : ""}`} dir="auto">
+      <RtfCrest url={team.crest} name={team.name} />
+      <span className="max-w-[64px] truncate">{team.name}</span>
+      {team.score != null && <span className="ml-auto tabular-nums text-amber-200">{team.score}</span>}
+    </div>
+  );
+}
+
+function RtfNode({ match }: { match: BracketMatch | null }) {
+  if (!match) {
+    return (
+      <div className="rtf-node opacity-60">
+        <RtfTeamRow team={null} />
+        <RtfTeamRow team={null} />
+      </div>
+    );
+  }
+  return (
+    <div className={`rtf-node ${match.status === "IN_PLAY" ? "live" : ""}`}>
+      <RtfTeamRow team={match.home} />
+      <RtfTeamRow team={match.away} />
+    </div>
+  );
+}
+
+// Pad a half-round to the shape of a full bracket so the tree fans out symmetrically
+// even before the later rounds have any fixtures (empty slots show as "TBD").
+function rtfPad(list: BracketMatch[], target: number): (BracketMatch | null)[] {
+  const out: (BracketMatch | null)[] = [...list];
+  while (out.length < target) out.push(null);
+  return out;
+}
+
+function RtfSide({
+  rounds,
+  side,
+}: {
+  rounds: Bracket["rounds"];
+  side: "left" | "right";
+}) {
+  return (
+    <div className={`rtf-side ${side}`}>
+      {rounds.map((r) => {
+        const target = Math.max((STAGE_SIZE[r.key] ?? 2) / 2, (side === "left" ? r.left : r.right).length);
+        const cells = rtfPad(side === "left" ? r.left : r.right, target);
+        return (
+          <div className="rtf-col" key={`${side}-${r.key}`}>
+            {cells.map((m, i) => (
+              <div className="rtf-cell" key={i}>
+                <RtfNode match={m} />
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RoadToFinal() {
+  const { t } = useLang();
+  const [bracket, setBracket] = useState<Bracket | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/bracket", { cache: "no-store" });
+      const data = await res.json();
+      if (data?.bracket) setBracket(data.bracket as Bracket);
+    } catch {
+      /* leave whatever we have; the empty state covers a cold start */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load on open, then refresh live scores every minute while the tab is showing.
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  // The champion is the winner of a finished Final.
+  const champ =
+    bracket?.final?.status === "FINISHED"
+      ? bracket.final.home?.won
+        ? bracket.final.home
+        : bracket.final.away?.won
+          ? bracket.final.away
+          : null
+      : null;
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl bg-gradient-to-b from-[#0d1b3a] to-[#0a1428] ring-1 ring-amber-300/20">
+      <div className="px-4 pt-4 text-center">
+        <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-amber-300/70">
+          {t("rtf.subtitle")}
+        </div>
+        <div className="text-xl font-black uppercase tracking-wide text-white">
+          {t("rtf.title")}
+        </div>
+      </div>
+
+      {loading && !bracket ? (
+        <div className="px-4 py-10 text-center text-sm text-blue-100/70">{t("common.loading")}</div>
+      ) : !bracket || !bracket.hasData ? (
+        <div className="px-6 py-10 text-center text-sm text-blue-100/70">{t("rtf.empty")}</div>
+      ) : (
+        <>
+          <div className="rtf-scroll">
+            <div className="rtf-board">
+              <RtfSide rounds={bracket.rounds} side="left" />
+
+              {/* Centre: the Final + trophy + crowned champion. */}
+              <div className="flex flex-col items-center justify-center gap-1 px-1">
+                <div className="text-3xl drop-shadow-[0_0_8px_rgba(217,179,74,0.5)]">🏆</div>
+                <div className="text-[9px] font-bold uppercase tracking-widest text-amber-300/80">
+                  {t("rtf.final")}
+                </div>
+                <div className="min-w-[84px]">
+                  <RtfNode match={bracket.final} />
+                </div>
+                {champ && (
+                  <div className="mt-0.5 max-w-[92px] truncate text-center text-[11px] font-bold text-amber-300" dir="auto">
+                    👑 {champ.name}
+                  </div>
+                )}
+                {bracket.thirdPlace && (
+                  <div className="mt-2 w-[84px]">
+                    <div className="text-center text-[8px] font-semibold uppercase tracking-wider text-blue-100/50">
+                      {t("rtf.thirdPlace")}
+                    </div>
+                    <RtfNode match={bracket.thirdPlace} />
+                  </div>
+                )}
+              </div>
+
+              <RtfSide rounds={bracket.rounds} side="right" />
+            </div>
+          </div>
+          <div className="px-4 pb-3 text-center text-[10px] text-blue-100/40">{t("rtf.scrollHint")}</div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // Small team flag / crest image (countries show flags, clubs show logos).
 function Crest({ url }: { url: string | null }) {

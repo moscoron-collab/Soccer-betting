@@ -157,6 +157,25 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "game.tabPlay": { en: "🎮 Play", he: "🎮 משחק" },
   "game.tabLog": { en: "📊 My Log", he: "📊 היומן שלי" },
+  "game.tabBracket": { en: "🏆 Road to Final", he: "🏆 הדרך לגמר" },
+
+  // Road to the Final — knockout bracket tab (read-only, live results)
+  "rtf.title": { en: "Road to the Final", he: "הדרך לגמר" },
+  "rtf.subtitle": { en: "2026 World Cup knockouts", he: "נוקאאוט מונדיאל 2026" },
+  "rtf.r32": { en: "Round of 32", he: "שלב ה-32" },
+  "rtf.r16": { en: "Round of 16", he: "שמינית הגמר" },
+  "rtf.qf": { en: "Quarter-finals", he: "רבע גמר" },
+  "rtf.sf": { en: "Semi-finals", he: "חצי גמר" },
+  "rtf.final": { en: "Final", he: "הגמר" },
+  "rtf.thirdPlace": { en: "3rd place", he: "מקום שלישי" },
+  "rtf.champion": { en: "Champion", he: "אלופה" },
+  "rtf.tbd": { en: "TBD", he: "ייקבע" },
+  "rtf.live": { en: "● LIVE", he: "● שידור חי" },
+  "rtf.scrollHint": { en: "← swipe to see the whole bracket →", he: "← החליקו לצדדים לכל העץ →" },
+  "rtf.empty": {
+    en: "The bracket lights up once the World Cup knockout fixtures are in. Check back soon!",
+    he: "העץ יתמלא ברגע שמשחקי הנוקאאוט של המונדיאל ייכנסו. חזרו בקרוב!",
+  },
   // Hint under the tabs explaining the Play dot when it's lit by unclaimed challenge
   // rewards (so it doesn't read as "more games to play"). Taps through to the challenges.
   "game.goClaim": { en: "🎁 Go claim your reward! →", he: "🎁 לכו לאסוף את הפרס! ←" },

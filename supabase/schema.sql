@@ -66,12 +66,18 @@ create table if not exists matches (
   half_away    integer,                              -- half-time score (away)
   home_crest   text,                                 -- team flag / logo URL
   away_crest   text,
+  stage        text,                                  -- knockout stage from the feed (LAST_32, LAST_16, QUARTER_FINALS, SEMI_FINALS, THIRD_PLACE, FINAL) — powers the "Road to the Final" bracket
+  winner       text,                                  -- HOME | AWAY | DRAW (from the feed; reflects extra-time/penalty outcome in knockouts)
   settled      boolean not null default false,
   updated_at   timestamptz not null default now()
 );
 
 create index if not exists matches_kickoff_idx on matches (kickoff_at);
 create index if not exists matches_status_idx on matches (status);
+
+-- Upgrade existing installs: these no-op if the columns already exist.
+alter table matches add column if not exists stage  text;
+alter table matches add column if not exists winner text;
 
 -- ---------- predictions ----------
 create table if not exists predictions (
