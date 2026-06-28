@@ -3339,7 +3339,9 @@ function RoadToFinal() {
         <div className="px-6 py-10 text-center text-sm text-blue-100/70">{t("rtf.empty")}</div>
       ) : (
         <>
-          <div className="rtf-scroll">
+          {/* The bracket is an inherently left→right structure: force LTR so it
+              never mirrors/breaks in Hebrew (RTL). Team names stay dir="auto". */}
+          <div className="rtf-scroll" dir="ltr">
             <div className="rtf-board">
               <RtfSide rounds={bracket.rounds} side="left" />
 
