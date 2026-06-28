@@ -17,6 +17,29 @@ export const KO_STAGES = [
 ] as const;
 export type StageKey = (typeof KO_STAGES)[number] | "THIRD_PLACE";
 
+// Map the feed's stage string to our canonical round key. Tolerant of the common
+// naming variants so a slightly different label can't make a whole round vanish.
+// Anything not a knockout round (e.g. GROUP_STAGE) maps to null and is ignored.
+const STAGE_ALIASES: Record<string, StageKey> = {
+  LAST_32: "LAST_32",
+  ROUND_OF_32: "LAST_32",
+  LAST_16: "LAST_16",
+  ROUND_OF_16: "LAST_16",
+  QUARTER_FINALS: "QUARTER_FINALS",
+  QUARTER_FINAL: "QUARTER_FINALS",
+  SEMI_FINALS: "SEMI_FINALS",
+  SEMI_FINAL: "SEMI_FINALS",
+  THIRD_PLACE: "THIRD_PLACE",
+  THIRD_PLACE_FINAL: "THIRD_PLACE",
+  THIRD_PLACE_PLAY_OFF: "THIRD_PLACE",
+  FINAL: "FINAL",
+};
+
+export function normStage(raw: string | null): StageKey | null {
+  if (!raw) return null;
+  return STAGE_ALIASES[raw.trim().toUpperCase()] ?? null;
+}
+
 // How many matches a complete round has — used to lay the bracket out symmetrically
 // even while later rounds are still empty.
 export const STAGE_SIZE: Record<string, number> = {
@@ -105,12 +128,13 @@ function sortMatches(a: MatchRow, b: MatchRow): number {
 
 // Build the whole bracket from the World Cup knockout rows.
 export function buildBracket(rows: MatchRow[]): Bracket {
-  const byStage = new Map<string, MatchRow[]>();
+  const byStage = new Map<StageKey, MatchRow[]>();
   for (const r of rows) {
-    if (!r.stage) continue;
-    const list = byStage.get(r.stage) ?? [];
+    const stage = normStage(r.stage);
+    if (!stage) continue;
+    const list = byStage.get(stage) ?? [];
     list.push(r);
-    byStage.set(r.stage, list);
+    byStage.set(stage, list);
   }
 
   const rounds: BracketRound[] = [];

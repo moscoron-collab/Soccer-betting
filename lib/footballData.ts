@@ -76,6 +76,30 @@ function mapWinner(w: any): "HOME" | "AWAY" | "DRAW" | null {
   return null;
 }
 
+// The football-data competition code for the World Cup (overridable via env).
+export function worldCupCode(): string {
+  return (process.env.WORLD_CUP_CODE || "WC").trim();
+}
+
+// Pull EVERY match of one competition in one request, with NO date window. The
+// knockout bracket needs the whole World Cup at once — later rounds (and even some
+// of the Round of 32) fall outside the normal "recent + soon" sync window.
+export async function fetchCompetitionAll(code: string): Promise<FdMatch[]> {
+  const url = `${BASE}/competitions/${code}/matches`;
+  const res = await fetch(url, {
+    headers: { "X-Auth-Token": getKey() },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    // 403/404 = not on this plan / unknown code — skip quietly.
+    if (res.status === 403 || res.status === 404) return [];
+    throw new Error(`football-data ${code} (all) failed: ${res.status}`);
+  }
+  const data = await res.json();
+  const matches = Array.isArray(data?.matches) ? data.matches : [];
+  return matches.map((m: any) => mapMatch(m, code));
+}
+
 async function fetchCompetitionMatches(
   code: string,
   dateFrom: string,

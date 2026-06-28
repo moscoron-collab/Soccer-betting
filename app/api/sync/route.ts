@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchMatches } from "@/lib/footballData";
-import { upsertMatches, settleAll, settleEarly } from "@/lib/settle";
+import { upsertMatches, settleAll, settleEarly, refreshWorldCup } from "@/lib/settle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +21,10 @@ async function runSync() {
   const fdMatches = await fetchMatches(3, 10);
   const upserted = await upsertMatches(fdMatches);
 
+  // 1b) Pull the full World Cup (every round/date) so the "Road to the Final"
+  //     bracket stays complete beyond the normal few-day window.
+  const wcUpserted = await refreshWorldCup();
+
   // 2) Settle everything that's now ready (predictions, crowd guesses, parlays).
   const counts = await settleAll();
 
@@ -28,7 +32,7 @@ async function runSync() {
   //    "guaranteed yes" goal markets) so winnings free up before full-time.
   const settledEarly = await settleEarly();
 
-  return { upserted, ...counts, settledEarly };
+  return { upserted, wcUpserted, ...counts, settledEarly };
 }
 
 export async function POST(req: Request) {

@@ -3,7 +3,7 @@
 
 import { supabase } from "./supabase";
 import { computePayout, PredictionType, BOOST_MULTIPLIER } from "./payout";
-import { fetchRecentResults, FdMatch } from "./footballData";
+import { fetchRecentResults, fetchCompetitionAll, worldCupCode, FdMatch } from "./footballData";
 
 // Bonus coins when a winning bet reaches these streak lengths.
 const STREAK_BONUS: Record<number, number> = { 3: 50, 5: 150, 10: 500 };
@@ -298,6 +298,38 @@ export async function settleEarly(): Promise<number> {
     }
   }
   return settled;
+}
+
+// Pull the WHOLE World Cup (every round, every date) into our table so the
+// "Road to the Final" bracket is complete — the normal sync only covers a few days
+// either side of now, which leaves most knockout ties unfetched. Throttled to one
+// call every few minutes via app_meta, and best-effort (never throws).
+const WC_REFRESH_THROTTLE_MS = 5 * 60_000;
+
+export async function refreshWorldCup(): Promise<number> {
+  try {
+    // Read the last-fetch marker (auto-created if missing, so no schema re-run is
+    // needed). If we pulled recently, skip — the bracket data barely changes.
+    const { data: row } = await supabase
+      .from("app_meta")
+      .select("value")
+      .eq("key", "last_wc_fetch")
+      .maybeSingle();
+    const last = row?.value ? new Date(row.value).getTime() : 0;
+    if (Date.now() - last < WC_REFRESH_THROTTLE_MS) return 0;
+
+    // Claim the slot first (so concurrent loads don't all fetch), then pull.
+    const nowIso = new Date().toISOString();
+    await supabase
+      .from("app_meta")
+      .upsert({ key: "last_wc_fetch", value: nowIso, updated_at: nowIso }, { onConflict: "key" });
+
+    const all = await fetchCompetitionAll(worldCupCode());
+    return await upsertMatches(all);
+  } catch (err) {
+    console.error("[refreshWorldCup]", err);
+    return 0;
+  }
 }
 
 // How often (ms) the activity-driven refresh may hit the football-data feed.

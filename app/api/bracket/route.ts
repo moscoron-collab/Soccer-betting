@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { buildBracket, MatchRow } from "@/lib/bracket";
+import { refreshWorldCup } from "@/lib/settle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// A full World Cup pull is a single (but slow, rate-limited) feed call.
+export const maxDuration = 60;
 
 // GET /api/bracket -> the live "Road to the Final" knockout bracket, built from the
 // World Cup matches mirrored into our table. Read-only: every team/score/status
 // comes from the football-data feed.
 export async function GET() {
   try {
+    // Make sure the whole bracket is loaded (throttled to one feed call every few
+    // minutes); the regular sync only covers a few days, missing later rounds.
+    await refreshWorldCup();
+
     // World Cup rows only. We store the competition NAME ("FIFA World Cup") from the
     // feed; match it loosely and also accept the bare "WC" code as a fallback.
     const { data, error } = await supabase

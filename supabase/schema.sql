@@ -211,6 +211,12 @@ insert into app_meta (key, value)
   values ('last_results_fetch', '1970-01-01T00:00:00.000Z')
   on conflict (key) do nothing;
 
+-- Throttles the full World Cup pull that keeps the "Road to the Final" bracket
+-- complete (the app self-creates this row too, so re-running is optional).
+insert into app_meta (key, value)
+  values ('last_wc_fetch', '1970-01-01T00:00:00.000Z')
+  on conflict (key) do nothing;
+
 -- ---------- "Road to the Final" event config (the admin control panel) ----------
 -- Stored as app_meta key/value rows. Defaults keep the event OFF and the banner
 -- admin-only (preview mode) until the admin flips them from the in-app panel.
