@@ -9,7 +9,6 @@ import { FREE_BET_STAKE, MOTD_BONUS } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
 import type { Bracket, BracketMatch, BracketTeam } from "@/lib/bracket";
-import { STAGE_SIZE } from "@/lib/bracket";
 
 // Translator type, so helpers can take `t` without importing React context.
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -3254,14 +3253,6 @@ function RtfNode({ match }: { match: BracketMatch | null }) {
   );
 }
 
-// Pad a half-round to the shape of a full bracket so the tree fans out symmetrically
-// even before the later rounds have any fixtures (empty slots show as "TBD").
-function rtfPad(list: BracketMatch[], target: number): (BracketMatch | null)[] {
-  const out: (BracketMatch | null)[] = [...list];
-  while (out.length < target) out.push(null);
-  return out;
-}
-
 // Round title for a column, by stage key.
 function rtfRoundLabel(t: (k: string) => string, key: string): string {
   switch (key) {
@@ -3291,8 +3282,7 @@ function RtfSide({
   return (
     <div className={`rtf-side ${side}`}>
       {rounds.map((r) => {
-        const target = Math.max((STAGE_SIZE[r.key] ?? 2) / 2, (side === "left" ? r.left : r.right).length);
-        const cells = rtfPad(side === "left" ? r.left : r.right, target);
+        const cells = side === "left" ? r.left : r.right;
         return (
           <div className="rtf-col" key={`${side}-${r.key}`}>
             <div className="rtf-col-label">{rtfRoundLabel(t, r.key)}</div>

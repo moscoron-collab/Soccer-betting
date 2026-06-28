@@ -84,8 +84,8 @@ export type BracketMatch = {
 
 export type BracketRound = {
   key: StageKey;
-  left: BracketMatch[]; // top/left half of the draw
-  right: BracketMatch[]; // bottom/right half of the draw
+  left: (BracketMatch | null)[]; // top/left half of the draw (null = empty slot)
+  right: (BracketMatch | null)[]; // bottom/right half of the draw
 };
 
 export type Bracket = {
@@ -129,6 +129,89 @@ function sortMatches(a: MatchRow, b: MatchRow): number {
   return t !== 0 ? t : a.id - b.id;
 }
 
+// ---- Fixed bracket positions ----
+// The feed tells us each match's ROUND but not which side/slot of the draw it sits
+// in, so we pin the canonical 2026 World Cup bracket here (from the official Round
+// of 32 graphic). Index 0..15, top→bottom: slots 0-7 are the left half, 8-15 the
+// right half. Because every team maps to its R32 slot, later-round games (whose
+// teams are the winners) land in the correct slot automatically — the road to the
+// final stays structurally right as results come in.
+const R32_ORDER: readonly (readonly [string, string])[] = [
+  ["Germany", "Paraguay"], // 0  ┐ left, top
+  ["France", "Sweden"], // 1     ┘
+  ["South Africa", "Canada"], // 2 ┐
+  ["Netherlands", "Morocco"], // 3 ┘
+  ["Portugal", "Croatia"], // 4  ┐
+  ["Spain", "Austria"], // 5     ┘
+  ["USA", "Bosnia and Herzegovina"], // 6 ┐
+  ["Belgium", "Senegal"], // 7   ┘  left, bottom
+  ["Brazil", "Japan"], // 8      ┐  right, top
+  ["Ivory Coast", "Norway"], // 9 ┘
+  ["Mexico", "Ecuador"], // 10   ┐
+  ["England", "Congo DR"], // 11 ┘
+  ["Argentina", "Cape Verde"], // 12 ┐
+  ["Australia", "Egypt"], // 13  ┘
+  ["Switzerland", "Algeria"], // 14 ┐
+  ["Colombia", "Ghana"], // 15   ┘  right, bottom
+];
+
+// Tolerant team-name matching: the feed's spelling may differ from ours.
+const TEAM_ALIASES: Record<string, string> = {
+  "bosnia h": "bosnia and herzegovina",
+  "bosnia herzegovina": "bosnia and herzegovina",
+  bosnia: "bosnia and herzegovina",
+  "united states": "usa",
+  "united states of america": "usa",
+  us: "usa",
+  "dr congo": "congo dr",
+  "democratic republic of congo": "congo dr",
+  "democratic republic of the congo": "congo dr",
+  "congo democratic republic": "congo dr",
+  "cote d ivoire": "ivory coast",
+  "cote divoire": "ivory coast",
+  "cabo verde": "cape verde",
+};
+
+function normTeam(name: string): string {
+  // NFD splits accents into combining marks; the [^a-z0-9] pass then drops them
+  // (and any punctuation/spacing), leaving a clean lowercase token.
+  const base = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  return TEAM_ALIASES[base] ?? base;
+}
+
+const TEAM_SLOT = new Map<string, number>();
+R32_ORDER.forEach(([a, b], i) => {
+  TEAM_SLOT.set(normTeam(a), i);
+  TEAM_SLOT.set(normTeam(b), i);
+});
+
+// Round depth from the leaves: R32 = 0, R16 = 1, QF = 2, SF = 3. A match's slot in
+// its round is its R32 slot divided by 2^depth (standard bracket folding).
+const ROUND_DEPTH: Record<string, number> = {
+  LAST_32: 0,
+  LAST_16: 1,
+  QUARTER_FINALS: 2,
+  SEMI_FINALS: 3,
+  FINAL: 4,
+};
+
+// The fixed slot for a match in its round, from whichever of its teams we recognise.
+// null when neither team is known yet (an undecided tie) — the caller then fills the
+// remaining free slots in order so the tree shape is preserved.
+function matchSlot(row: MatchRow, depth: number): number | null {
+  for (const name of [row.home_team, row.away_team]) {
+    if (isPlaceholderTeam(name)) continue;
+    const r32 = TEAM_SLOT.get(normTeam(name));
+    if (r32 != null) return Math.floor(r32 / Math.pow(2, depth));
+  }
+  return null;
+}
+
 // Build the whole bracket from the World Cup knockout rows.
 export function buildBracket(rows: MatchRow[]): Bracket {
   const byStage = new Map<StageKey, MatchRow[]>();
@@ -143,14 +226,32 @@ export function buildBracket(rows: MatchRow[]): Bracket {
   const rounds: BracketRound[] = [];
   let hasData = false;
 
-  // LAST_32 … SEMI_FINALS — each split down the middle into the two halves of the
-  // draw so the bracket can fan out symmetrically toward the centre Final.
+  // LAST_32 … SEMI_FINALS — drop each match into its fixed slot, then split the
+  // full-size round down the middle into the two halves of the draw.
   for (const stage of KO_STAGES) {
     if (stage === "FINAL") continue;
-    const list = (byStage.get(stage) ?? []).sort(sortMatches).map((r) => toMatch(r, stage));
+    const size = STAGE_SIZE[stage];
+    const depth = ROUND_DEPTH[stage];
+    const list = byStage.get(stage) ?? [];
     if (list.length) hasData = true;
-    const half = Math.ceil(list.length / 2);
-    rounds.push({ key: stage, left: list.slice(0, half), right: list.slice(half) });
+
+    const slots: (BracketMatch | null)[] = new Array(size).fill(null);
+    const leftovers: MatchRow[] = [];
+    for (const r of [...list].sort(sortMatches)) {
+      const s = matchSlot(r, depth);
+      if (s != null && s >= 0 && s < size && slots[s] == null) {
+        slots[s] = toMatch(r, stage);
+      } else {
+        leftovers.push(r); // undecided tie or unrecognised team — place after
+      }
+    }
+    let li = 0;
+    for (let s = 0; s < size && li < leftovers.length; s++) {
+      if (slots[s] == null) slots[s] = toMatch(leftovers[li++], stage);
+    }
+
+    const half = size / 2;
+    rounds.push({ key: stage, left: slots.slice(0, half), right: slots.slice(half) });
   }
 
   const finalRows = (byStage.get("FINAL") ?? []).sort(sortMatches);
