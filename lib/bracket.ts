@@ -101,21 +101,24 @@ function normStatus(s: string): "SCHEDULED" | "IN_PLAY" | "FINISHED" {
   return "SCHEDULED";
 }
 
+// A team isn't decided yet when the feed has no real name — for undetermined
+// knockout slots football-data returns blank teams, which our upsert stores as the
+// fallback "Home"/"Away". Treat those as empty so the UI shows a clean "TBD".
+function isPlaceholderTeam(name: string | null): boolean {
+  if (!name) return true;
+  const n = name.trim().toLowerCase();
+  return n === "" || n === "home" || n === "away" || n === "tbd";
+}
+
 function toMatch(row: MatchRow, stage: StageKey): BracketMatch {
   const status = normStatus(row.status);
   const decided = status === "FINISHED";
-  const home: BracketTeam = {
-    name: row.home_team,
-    crest: row.home_crest,
-    score: row.home_score,
-    won: decided && row.winner === "HOME",
-  };
-  const away: BracketTeam = {
-    name: row.away_team,
-    crest: row.away_crest,
-    score: row.away_score,
-    won: decided && row.winner === "AWAY",
-  };
+  const home: BracketTeam | null = isPlaceholderTeam(row.home_team)
+    ? null
+    : { name: row.home_team, crest: row.home_crest, score: row.home_score, won: decided && row.winner === "HOME" };
+  const away: BracketTeam | null = isPlaceholderTeam(row.away_team)
+    ? null
+    : { name: row.away_team, crest: row.away_crest, score: row.away_score, won: decided && row.winner === "AWAY" };
   return { id: row.id, stage, home, away, status, kickoff: row.kickoff_at };
 }
 

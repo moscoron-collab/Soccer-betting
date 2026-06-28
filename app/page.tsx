@@ -3262,6 +3262,24 @@ function rtfPad(list: BracketMatch[], target: number): (BracketMatch | null)[] {
   return out;
 }
 
+// Round title for a column, by stage key.
+function rtfRoundLabel(t: (k: string) => string, key: string): string {
+  switch (key) {
+    case "LAST_32":
+      return t("rtf.r32");
+    case "LAST_16":
+      return t("rtf.r16");
+    case "QUARTER_FINALS":
+      return t("rtf.qf");
+    case "SEMI_FINALS":
+      return t("rtf.sf");
+    case "FINAL":
+      return t("rtf.final");
+    default:
+      return "";
+  }
+}
+
 function RtfSide({
   rounds,
   side,
@@ -3269,6 +3287,7 @@ function RtfSide({
   rounds: Bracket["rounds"];
   side: "left" | "right";
 }) {
+  const { t } = useLang();
   return (
     <div className={`rtf-side ${side}`}>
       {rounds.map((r) => {
@@ -3276,11 +3295,14 @@ function RtfSide({
         const cells = rtfPad(side === "left" ? r.left : r.right, target);
         return (
           <div className="rtf-col" key={`${side}-${r.key}`}>
-            {cells.map((m, i) => (
-              <div className="rtf-cell" key={i}>
-                <RtfNode match={m} />
-              </div>
-            ))}
+            <div className="rtf-col-label">{rtfRoundLabel(t, r.key)}</div>
+            <div className="rtf-col-cells">
+              {cells.map((m, i) => (
+                <div className="rtf-cell" key={i}>
+                  <RtfNode match={m} />
+                </div>
+              ))}
+            </div>
           </div>
         );
       })}
