@@ -4,7 +4,7 @@
 // exist yet (or the read fails) the event simply stays dormant and nothing breaks.
 
 import { supabase } from "./supabase";
-import { pickFeaturedGlobal } from "./motd";
+import { pickFeaturedGlobal, getMotdId } from "./motd";
 
 export type EventConfig = {
   bannerPublic: boolean; // false = only admins see the banner (preview mode)
@@ -125,6 +125,24 @@ export async function setEventConfig(updates: Partial<EventConfig>): Promise<voi
 export function featuredMultFor(cfg: EventConfig, matchId: number): number {
   const m = cfg.featuredMults?.[matchId];
   return typeof m === "number" && Number.isFinite(m) && m >= 1 ? m : cfg.featuredMult;
+}
+
+// The Match of the Day, accounting for an admin-chosen featured match.
+//
+// Simple rule the user asked for: "let me pick which Match of the Day pays more."
+// When the admin has hand-picked a featured match (event on), THAT match IS the
+// Match of the Day — so there's a single highlighted game that pays the rate the
+// admin set, not a separate auto-pick competing with it. With no admin pick, we
+// fall back to the usual auto Match of the Day (biggest game of the player's day).
+export async function effectiveMotdId(
+  tz: string | null | undefined,
+  cfg?: EventConfig
+): Promise<number | null> {
+  const c = cfg ?? (await getEventConfig());
+  if (c.eventOn && c.featuredOverrides.length > 0) {
+    return c.featuredOverrides[0];
+  }
+  return getMotdId(tz);
 }
 
 // The current featured match ids: the admin's picks if any, else the single

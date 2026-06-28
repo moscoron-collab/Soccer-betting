@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { getMotdId } from "@/lib/motd";
-import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
+import { getEventConfig, getFeaturedMatchIds, effectiveMotdId } from "@/lib/event";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,10 +65,12 @@ export async function GET(req: Request) {
     bet_stats: statsByMatch.get(m.id) ?? { home: 0, draw: 0, away: 0, voters: [] },
   }));
 
-  const motdId = await getMotdId(tz);
   // Featured matches (the gold "pop" set) so the list can highlight them too.
   const cfg = await getEventConfig();
   const featuredIds = cfg.eventOn ? await getFeaturedMatchIds(cfg) : [];
+  // The Match of the Day follows the admin's featured pick when there is one, so a
+  // single game is highlighted (not a separate auto-pick alongside it).
+  const motdId = await effectiveMotdId(tz, cfg);
 
   // serverNow lets the client run its kickoff countdown/lock on OUR clock, so a
   // wrong device clock can't make a kicked-off match look open (or vice-versa).

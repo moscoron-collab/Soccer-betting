@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { getEventConfig, getFeaturedMatchIds, featuredMultFor } from "@/lib/event";
-import { getMotdId } from "@/lib/motd";
+import { getEventConfig, getFeaturedMatchIds, featuredMultFor, effectiveMotdId } from "@/lib/event";
 import { netWorthLeaderboard, RankedPlayer } from "@/lib/networth";
 
 export const runtime = "nodejs";
@@ -267,9 +266,10 @@ export async function GET(req: Request) {
   }
 
   // Match of the Day for this player (per their local day; the ⭐ bonus game).
+  // Follows the admin's featured pick when set, so the highlight is one game.
   let motd: any = null;
   const tz = new URL(req.url).searchParams.get("tz");
-  const motdId = await getMotdId(tz);
+  const motdId = await effectiveMotdId(tz, cfg);
   if (motdId) {
     const { data } = await supabase
       .from("matches")

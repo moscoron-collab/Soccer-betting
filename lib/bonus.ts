@@ -1,7 +1,6 @@
 import { supabase } from "./supabase";
 import { PredictionType, underdogBonus, MOTD_BONUS, MAX_BONUS, baseMultiplier } from "./payout";
-import { getMotdId } from "./motd";
-import { getEventConfig, getFeaturedMatchIds, featuredMultFor } from "./event";
+import { getEventConfig, getFeaturedMatchIds, featuredMultFor, effectiveMotdId } from "./event";
 
 // Computes the bonus multiplier locked in when a bet is placed:
 //   underdog bonus (based on the current crowd split) + Match of the Day bonus.
@@ -48,8 +47,8 @@ export async function computeBonusMult(
     }
   }
 
-  // Match of the Day bonus (one fixed match per the player's local day).
-  const motdId = await getMotdId(tz);
+  // Match of the Day bonus (the admin's featured pick if set, else the auto pick).
+  const motdId = await effectiveMotdId(tz);
   if (motdId === matchId) bonus += MOTD_BONUS;
 
   return Math.min(MAX_BONUS, Math.round(bonus * 100) / 100);
