@@ -437,12 +437,12 @@ const DICT: Record<string, { en: string; he: string }> = {
 
   // Match card
   "card.motd": {
-    en: "⭐ Match of the Day — winning bets get a bonus!",
+    en: "⭐ Game of the Day — winning bets get a bonus!",
     he: "⭐ משחק היום — הימורים מנצחים מקבלים בונוס!",
   },
   "card.featured": {
-    en: "⭐ FEATURED — Winner pays {mult}×!",
-    he: "⭐ משחק נבחר — מנצח משלם {mult}×!",
+    en: "⭐ Game of the Day — pays {mult}×!",
+    he: "⭐ משחק היום — משלם {mult}×!",
   },
   "card.tip": {
     en: "💡 Place a bet on each option — backing the unpopular pick pays an underdog bonus.",
@@ -491,25 +491,25 @@ const DICT: Record<string, { en: string; he: string }> = {
   "banner.live": { en: "🔴 LIVE: {home} {hs}–{as} {away}", he: "🔴 חי: {home} {hs}–{as} {away}" },
   "banner.fullTime": { en: "✅ Full time: {home} {hs}–{as} {away}", he: "✅ סיום: {home} {hs}–{as} {away}" },
   "banner.motdIn": {
-    en: "⭐ Match of the Day: {home} vs {away} — kicks off in {time}",
+    en: "⭐ Game of the Day: {home} vs {away} — kicks off in {time}",
     he: "⭐ משחק היום: {home} נגד {away} — בעוד {time}",
   },
   "banner.motdLive": {
-    en: "⭐ Match of the Day LIVE: {home} {hs}–{as} {away}",
+    en: "⭐ Game of the Day LIVE: {home} {hs}–{as} {away}",
     he: "⭐ משחק היום חי: {home} {hs}–{as} {away}",
   },
   "banner.motdFt": {
-    en: "⭐ Match of the Day: {home} {hs}–{as} {away} (full time)",
+    en: "⭐ Game of the Day: {home} {hs}–{as} {away} (full time)",
     he: "⭐ משחק היום: {home} {hs}–{as} {away} (סיום)",
   },
-  "banner.motd": { en: "⭐ Match of the Day: {home} vs {away}", he: "⭐ משחק היום: {home} נגד {away}" },
+  "banner.motd": { en: "⭐ Game of the Day: {home} vs {away}", he: "⭐ משחק היום: {home} נגד {away}" },
   "banner.eventOn": {
-    en: "🔥 {name} is ON — featured match pays {mult}×!",
-    he: "🔥 {name} פעיל — המשחק הנבחר משלם {mult}×!",
+    en: "🔥 {name} is ON — Game of the Day pays {mult}×!",
+    he: "🔥 {name} פעיל — משחק היום משלם {mult}×!",
   },
   "banner.featured": {
-    en: "⭐ Featured: {home} vs {away} — Winner pays {mult}×",
-    he: "⭐ המשחק הנבחר: {home} נגד {away} — מנצח משלם {mult}×",
+    en: "⭐ Game of the Day: {home} vs {away} — pays {mult}×",
+    he: "⭐ משחק היום: {home} נגד {away} — משלם {mult}×",
   },
   "banner.jackpot": {
     en: "💰 Spin the Wheel and hit the 🪙{amount} jackpot!",
@@ -624,7 +624,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   "admin.eventOn": { en: "Road to the Final event ON", he: "אירוע הדרך לגמר פעיל" },
   "admin.mult": { en: "Default Winner multiplier (×)", he: "מכפיל ברירת מחדל למנצח (×)" },
   "admin.jackpot": { en: "Jackpot amount (🪙)", he: "סכום הג׳קפוט (🪙)" },
-  "admin.override": { en: "Featured matches — set each game's own ×", he: "משחקים נבחרים — קבעו מכפיל לכל משחק" },
+  "admin.override": { en: "Game of the Day — set each game's own ×", he: "משחק היום — קבעו מכפיל לכל משחק" },
   "admin.autoPick": { en: "Auto — biggest upcoming game", he: "אוטומטי — המשחק הגדול הקרוב" },
   "admin.eventName": { en: "Event name", he: "שם האירוע" },
   "admin.saved": { en: "Saved ✓", he: "נשמר ✓" },
