@@ -11,8 +11,8 @@ export const CHANGELOG: Release[] = [
     date: "2026-06-28",
     changes: [
       {
-        en: "🛠️ Knockout fixtures with an undecided side no longer show up as 'Home' or 'Away'. Matches now appear for betting only once both real teams are known.",
-        he: "🛠️ משחקי נוקאאוט עם יריב שטרם נקבע כבר לא מופיעים בתור 'בית' או 'חוץ'. משחק יוצג להימור רק כששתי הקבוצות האמיתיות ידועות.",
+        en: "🛠️ Knockout fixtures whose opponent isn't drawn yet now show 'TBD' instead of 'Away', and betting is locked until both real teams are known. Once a team is confirmed, the match opens for bets automatically.",
+        he: "🛠️ משחקי נוקאאוט שהיריב בהם טרם נקבע מציגים עכשיו 'טרם נקבע' במקום 'חוץ', וההימורים נעולים עד ששתי הקבוצות האמיתיות ידועות. ברגע שקבוצה נקבעת, המשחק נפתח להימורים אוטומטית.",
       },
     ],
   },

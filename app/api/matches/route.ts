@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getMotdId } from "@/lib/motd";
 import { getEventConfig, getFeaturedMatchIds } from "@/lib/event";
+import { isMatchTbd } from "@/lib/teams";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,16 +13,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const tz = new URL(req.url).searchParams.get("tz");
 
-  // Knockout fixtures whose opponents aren't drawn yet come from football-data.org
-  // with null teams, which lib/footballData.ts stores as the placeholders
-  // "Home"/"Away". Don't offer those for betting — only fully-drawn matchups.
   const { data: matches, error } = await supabase
     .from("matches")
     .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status")
     .eq("status", "SCHEDULED")
     .gt("kickoff_at", new Date().toISOString())
-    .neq("home_team", "Home")
-    .neq("away_team", "Away")
     .order("kickoff_at", { ascending: true })
     .limit(60);
 
@@ -68,6 +64,10 @@ export async function GET(req: Request) {
 
   const withStats = list.map((m) => ({
     ...m,
+    // Knockout fixtures whose opponents aren't drawn yet arrive with placeholder
+    // team names. They stay in the list (so the schedule isn't empty) but the
+    // client shows "TBD" and locks betting until both real teams are known.
+    tbd: isMatchTbd(m.home_team, m.away_team),
     bet_stats: statsByMatch.get(m.id) ?? { home: 0, draw: 0, away: 0, voters: [] },
   }));
 

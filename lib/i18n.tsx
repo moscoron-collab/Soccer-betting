@@ -24,6 +24,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   "common.away": { en: "Away", he: "חוץ" },
   "common.vs": { en: "vs", he: "נגד" },
   "common.match": { en: "Match", he: "משחק" },
+  "common.tbd": { en: "TBD", he: "טרם נקבע" },
   "common.pending": { en: "Pending", he: "ממתין" },
   "common.won": { en: "Won", he: "זכייה" },
   "common.lost": { en: "Lost", he: "הפסד" },
@@ -447,6 +448,10 @@ const DICT: Record<string, { en: string; he: string }> = {
   "card.closedNotice": {
     en: "This match has kicked off — betting is closed.",
     he: "המשחק התחיל — ההימורים סגורים.",
+  },
+  "card.tbdNotice": {
+    en: "⏳ Teams not confirmed yet — betting opens once both teams are known.",
+    he: "⏳ הקבוצות טרם נקבעו — ההימורים ייפתחו כששתי הקבוצות יהיו ידועות.",
   },
   "card.betLine": {
     en: "Stake {s} · could win 🪙{w} ({mult})",

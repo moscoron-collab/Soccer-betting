@@ -8,6 +8,7 @@ import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSli
 import { FREE_BET_STAKE, MOTD_BONUS } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
+import { isPlaceholderTeam } from "@/lib/teams";
 
 // Translator type, so helpers can take `t` without importing React context.
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -121,6 +122,7 @@ type Match = {
   home_crest: string | null;
   away_crest: string | null;
   kickoff_at: string;
+  tbd?: boolean; // knockout fixture whose teams aren't drawn yet — not bettable
   bet_stats?: {
     home: number;
     draw: number;
@@ -3263,11 +3265,14 @@ function TeamLine({
   awayCrest: string | null;
 }) {
   const { t } = useLang();
+  // Undecided knockout slots arrive as placeholders — show a localized "TBD".
+  const homeName = isPlaceholderTeam(home) ? t("common.tbd") : home;
+  const awayName = isPlaceholderTeam(away) ? t("common.tbd") : away;
   return (
     <div className="mt-1 flex items-center justify-center gap-2 text-base font-bold">
-      <Crest url={homeCrest} /> {home}
+      <Crest url={homeCrest} /> {homeName}
       <span className="text-blue-100/60">{t("common.vs")}</span>
-      {away} <Crest url={awayCrest} />
+      {awayName} <Crest url={awayCrest} />
     </div>
   );
 }
@@ -3648,6 +3653,8 @@ function MatchCard({
   // make a kicked-off match look bettable (the server would reject it anyway).
   const minsLeft = Math.max(0, Math.round((kickoff.getTime() - serverNow()) / 60000));
   const closed = serverNow() >= kickoff.getTime();
+  // Knockout fixture whose teams aren't drawn yet: shown, but not bettable.
+  const tbd = !!match.tbd;
   const [tab, setTab] = useState<BetType>("WINNER");
 
   // The player's bet of the currently selected type, if any.
@@ -3698,34 +3705,40 @@ function MatchCard({
         awayCrest={match.away_crest}
       />
 
-      <p
-        className={`mt-2 text-center text-xs font-semibold ${
-          closed ? "text-red-300" : minsLeft <= 15 ? "text-amber-300" : "text-blue-100/55"
-        }`}
-      >
-        {closed
-          ? t("card.closedAt", { time: kickoffTime })
-          : minsLeft <= 15
-            ? t("card.lastCall", { n: minsLeft, time: kickoffTime })
-            : t("card.closesAt", { time: kickoffTime })}
-      </p>
-      {!closed && <p className="mt-1 text-center text-xs text-blue-100/60">{t("card.tip")}</p>}
-
-      {/* Bet-type tabs: ✓ marks ones you've already bet. */}
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-        {BET_TYPES.map((bt) => (
-          <button
-            key={bt}
-            onClick={() => setTab(bt)}
-            className={`rounded-lg px-2 py-1.5 font-semibold ${tab === bt ? "bg-blue-600" : "bg-white/10"}`}
+      {tbd ? (
+        <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-center text-sm text-blue-100/70">
+          {t("card.tbdNotice")}
+        </div>
+      ) : (
+        <>
+          <p
+            className={`mt-2 text-center text-xs font-semibold ${
+              closed ? "text-red-300" : minsLeft <= 15 ? "text-amber-300" : "text-blue-100/55"
+            }`}
           >
-            {betByType.has(bt) ? "✓ " : ""}
-            {t(`bet.${bt}`)}
-          </button>
-        ))}
-      </div>
+            {closed
+              ? t("card.closedAt", { time: kickoffTime })
+              : minsLeft <= 15
+                ? t("card.lastCall", { n: minsLeft, time: kickoffTime })
+                : t("card.closesAt", { time: kickoffTime })}
+          </p>
+          {!closed && <p className="mt-1 text-center text-xs text-blue-100/60">{t("card.tip")}</p>}
 
-      {current ? (
+          {/* Bet-type tabs: ✓ marks ones you've already bet. */}
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+            {BET_TYPES.map((bt) => (
+              <button
+                key={bt}
+                onClick={() => setTab(bt)}
+                className={`rounded-lg px-2 py-1.5 font-semibold ${tab === bt ? "bg-blue-600" : "bg-white/10"}`}
+              >
+                {betByType.has(bt) ? "✓ " : ""}
+                {t(`bet.${bt}`)}
+              </button>
+            ))}
+          </div>
+
+          {current ? (
         <div className="mt-3 rounded-lg bg-blue-600/20 px-3 py-2 text-sm">
           {t("card.yourBet")}{" "}
           <b>
@@ -3779,6 +3792,8 @@ function MatchCard({
             onSubmit={place}
           />
         </div>
+          )}
+        </>
       )}
 
       <WhoWins match={match} onOpenPlayer={onOpenPlayer} />

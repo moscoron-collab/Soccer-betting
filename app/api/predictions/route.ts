@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
 import { computeBonusMult } from "@/lib/bonus";
 import { PredictionType, validateSelection, FREE_BET_STAKE } from "@/lib/payout";
+import { isMatchTbd } from "@/lib/teams";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,10 +54,15 @@ function fmtKickoff(iso: string, tz?: string | null): string {
 async function getOpenMatch(matchId: number, tz?: string | null) {
   const { data: match } = await supabase
     .from("matches")
-    .select("id, status, kickoff_at")
+    .select("id, status, kickoff_at, home_team, away_team")
     .eq("id", matchId)
     .maybeSingle();
   if (!match) return { error: "Match not found", status: 404 as const };
+
+  // A knockout fixture whose teams aren't drawn yet isn't open for betting.
+  if (isMatchTbd(match.home_team, match.away_team)) {
+    return { error: "Teams aren't confirmed yet — betting opens once both are known.", status: 400 as const };
+  }
 
   const now = new Date();
   const kickedOff = new Date(match.kickoff_at) <= now;
