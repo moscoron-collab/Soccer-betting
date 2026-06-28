@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.38",
+    date: "2026-06-28",
+    changes: [
+      {
+        en: "🛠️ Knockout fixtures with an undecided side no longer show up as 'Home' or 'Away'. Matches now appear for betting only once both real teams are known.",
+        he: "🛠️ משחקי נוקאאוט עם יריב שטרם נקבע כבר לא מופיעים בתור 'בית' או 'חוץ'. משחק יוצג להימור רק כששתי הקבוצות האמיתיות ידועות.",
+      },
+    ],
+  },
+  {
     version: "4.37",
     date: "2026-06-27",
     changes: [

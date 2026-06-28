@@ -12,11 +12,16 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const tz = new URL(req.url).searchParams.get("tz");
 
+  // Knockout fixtures whose opponents aren't drawn yet come from football-data.org
+  // with null teams, which lib/footballData.ts stores as the placeholders
+  // "Home"/"Away". Don't offer those for betting — only fully-drawn matchups.
   const { data: matches, error } = await supabase
     .from("matches")
     .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status")
     .eq("status", "SCHEDULED")
     .gt("kickoff_at", new Date().toISOString())
+    .neq("home_team", "Home")
+    .neq("away_team", "Away")
     .order("kickoff_at", { ascending: true })
     .limit(60);
 
