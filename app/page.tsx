@@ -1735,27 +1735,44 @@ function Game({
         <LowCoinsPanel canBailout={canBailout} onBailout={bailout} />
       )}
 
-      {/* Tabs */}
-      <div className="mt-4 flex gap-2 rounded-xl bg-white/5 p-1">
+      {/* Tabs — colour-coded (blue / green / gold). Active = gradient fill + soft
+          glow; idle = tinted background + matching border. Road to Final gets a
+          gold promo treatment and a NEW badge since it's the newest feature. */}
+      <div className="mt-4 flex gap-2 rounded-xl bg-black/20 p-1.5">
         <button
           onClick={() => setView("play")}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "play" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+          className={`relative flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
+            view === "play"
+              ? "bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/40 ring-1 ring-blue-300/60"
+              : "bg-blue-500/10 text-blue-200 ring-1 ring-blue-400/30 hover:bg-blue-500/20"
+          }`}
         >
           {t("game.tabPlay")}
           <NotifDot count={playBadge} />
         </button>
         <button
           onClick={() => setView("log")}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "log" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+          className={`relative flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
+            view === "log"
+              ? "bg-gradient-to-b from-emerald-500 to-green-700 text-white shadow-lg shadow-emerald-500/40 ring-1 ring-emerald-300/60"
+              : "bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/20"
+          }`}
         >
           {t("game.tabLog")}
           <NotifDot count={logBadge} />
         </button>
         <button
           onClick={() => setView("bracket")}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${view === "bracket" ? "bg-blue-600 text-white" : "text-blue-100"}`}
+          className={`relative flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
+            view === "bracket"
+              ? "bg-gradient-to-b from-amber-300 to-yellow-500 text-gray-900 shadow-lg shadow-amber-400/50 ring-1 ring-amber-200/80"
+              : "bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/50 hover:bg-amber-400/25"
+          }`}
         >
           {t("game.tabBracket")}
+          <span className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-none tracking-wide text-white shadow ring-1 ring-white/30">
+            {t("game.new")}
+          </span>
         </button>
       </div>
 

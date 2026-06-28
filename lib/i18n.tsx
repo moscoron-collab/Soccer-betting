@@ -158,6 +158,7 @@ const DICT: Record<string, { en: string; he: string }> = {
   "game.tabPlay": { en: "🎮 Play", he: "🎮 משחק" },
   "game.tabLog": { en: "📊 My Log", he: "📊 היומן שלי" },
   "game.tabBracket": { en: "🏆 Road to Final", he: "🏆 הדרך לגמר" },
+  "game.new": { en: "NEW", he: "חדש" },
 
   // Road to the Final — knockout bracket tab (read-only, live results)
   "rtf.title": { en: "Road to the Final", he: "הדרך לגמר" },
