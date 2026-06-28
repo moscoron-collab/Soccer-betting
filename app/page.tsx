@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { celebrate, confettiBurst, playCheer, toast } from "@/lib/celebrate";
+import { celebrate, confettiBurst, playCheer, playGroan, toast } from "@/lib/celebrate";
 import { spinRatchet, loseWomp, winFanfareShort, winFanfareTriumph, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
@@ -2983,6 +2983,12 @@ function PenaltyShootout({
     setResult(isGoal ? t("penalty.goal") : t("penalty.saved"));
     setGoals(newGoals);
     setShots(newShots);
+
+    // Stadium reaction: crowd roar on a goal, disappointed groan on a save/miss.
+    if (!isMuted()) {
+      if (isGoal) playCheer();
+      else playGroan();
+    }
 
     if (newShots >= 5) {
       doneRef.current = true;

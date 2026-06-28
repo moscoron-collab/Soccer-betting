@@ -61,6 +61,49 @@ export function playCheer() {
   });
 }
 
+// A stadium-style groan: a duller, lower swell of crowd noise plus a short
+// descending "aww" — the disappointed reaction to a missed/saved penalty. The
+// mirror image of playCheer(). Synthesized live, so it always works.
+export function playGroan() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") ctx.resume();
+  const now = ctx.currentTime;
+
+  const dur = 1.1;
+  const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 500; // lower & duller than the cheer's 1100
+  bp.Q.value = 0.7;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.3, now + 0.18);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  noise.connect(bp).connect(g).connect(ctx.destination);
+  noise.start(now);
+  noise.stop(now + dur);
+
+  // A descending three-note "aww".
+  [392, 311, 247].forEach((f, i) => {
+    const o = ctx.createOscillator();
+    const og = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.value = f;
+    const t = now + 0.06 + i * 0.14;
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.16, t + 0.04);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(og).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.34);
+  });
+}
+
 export function confettiBurst() {
   if (typeof document === "undefined") return;
   const colors = ["#fbbf24", "#3b82f6", "#22c55e", "#ef4444", "#a855f7", "#ffffff"];
