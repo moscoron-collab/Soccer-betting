@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
-import { baseMultiplier, validateSelection } from "@/lib/payout";
+import { baseMultiplier, validateSelection, isKnockoutStage } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   // All matches must exist and still be open.
   const { data: matches } = await supabase
     .from("matches")
-    .select("id, status, kickoff_at, home_team, away_team")
+    .select("id, status, kickoff_at, home_team, away_team, stage")
     .in("id", matchIds);
   const byId = new Map((matches ?? []).map((m) => [m.id, m]));
   const now = new Date();
@@ -80,6 +80,17 @@ export async function POST(req: Request) {
     if (!m) return NextResponse.json({ error: "A match was not found." }, { status: 404 });
     if (m.status !== "SCHEDULED" || new Date(m.kickoff_at) <= now) {
       return NextResponse.json({ error: "A match in your combo has already started." }, { status: 400 });
+    }
+  }
+
+  // A knockout match can't end in a draw — reject any DRAW Winner leg on one.
+  for (const l of rawLegs) {
+    const m = byId.get(Number(l?.matchId));
+    if (m && l?.type === "WINNER" && l?.pick === "DRAW" && isKnockoutStage(m.stage)) {
+      return NextResponse.json(
+        { error: "A knockout match can't end in a draw — pick a winner." },
+        { status: 400 }
+      );
     }
   }
 

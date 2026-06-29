@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
   const { data: matches, error } = await supabase
     .from("matches")
-    .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status")
+    .select("id, competition, home_team, away_team, home_crest, away_crest, kickoff_at, status, stage")
     .eq("status", "SCHEDULED")
     .gt("kickoff_at", new Date().toISOString())
     .order("kickoff_at", { ascending: true })

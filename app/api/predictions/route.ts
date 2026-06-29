@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
 import { computeBonusMult } from "@/lib/bonus";
-import { PredictionType, validateSelection, FREE_BET_STAKE } from "@/lib/payout";
+import { PredictionType, validateSelection, FREE_BET_STAKE, isKnockoutStage } from "@/lib/payout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,20 @@ function parsePrediction(body: any): { ok: true; value: ParsedPrediction } | { o
   };
 }
 
+// Knockout matches can't end in a draw, so the full-time Winner market only offers
+// the two teams. Returns an error message if a DRAW pick slips through, else null.
+// (Half-time leader still allows a draw — a knockout game can be level at the break.)
+function knockoutDrawError(
+  stage: string | null | undefined,
+  type: PredictionType,
+  pick: string | null
+): string | null {
+  if (type === "WINNER" && pick === "DRAW" && isKnockoutStage(stage)) {
+    return "This is a knockout match — pick a winner. A tie is decided in extra time and penalties.";
+  }
+  return null;
+}
+
 // A short kickoff time like "3:00 PM" in the player's timezone, for clear errors.
 function fmtKickoff(iso: string, tz?: string | null): string {
   try {
@@ -53,7 +67,7 @@ function fmtKickoff(iso: string, tz?: string | null): string {
 async function getOpenMatch(matchId: number, tz?: string | null) {
   const { data: match } = await supabase
     .from("matches")
-    .select("id, status, kickoff_at")
+    .select("id, status, kickoff_at, stage")
     .eq("id", matchId)
     .maybeSingle();
   if (!match) return { error: "Match not found", status: 404 as const };
@@ -117,6 +131,9 @@ export async function POST(req: Request) {
 
   const open = await getOpenMatch(matchId, body?.tz);
   if ("error" in open) return NextResponse.json({ error: open.error }, { status: open.status });
+
+  const koErr = knockoutDrawError(open.match.stage, p.type, p.pick);
+  if (koErr) return NextResponse.json({ error: koErr }, { status: 400 });
 
   // One bet of each type per match per player.
   const { data: existing } = await supabase
@@ -228,7 +245,7 @@ async function getEditablePrediction(player: Player, predictionId: string, tz?: 
   }
   const open = await getOpenMatch(pred.match_id, tz);
   if ("error" in open) return { error: open.error, status: open.status };
-  return { pred };
+  return { pred, stage: open.match.stage as string | null };
 }
 
 // PUT /api/predictions — edit an existing bet before kickoff.
@@ -253,6 +270,9 @@ export async function PUT(req: Request) {
   const parsed = parsePrediction(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const p = parsed.value;
+
+  const koErr = knockoutDrawError(found.stage, p.type, p.pick);
+  if (koErr) return NextResponse.json({ error: koErr }, { status: 400 });
 
   // Coins available = current balance + the stake we'll refund from the old bet.
   const available = player.coins + old.stake;

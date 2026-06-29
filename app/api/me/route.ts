@@ -192,7 +192,7 @@ export async function GET(req: Request) {
   const { data: predictions } = await supabase
     .from("predictions")
     .select(
-      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, boosted, free_bet, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest)"
+      "id, match_id, type, pick, exact_home, exact_away, stake, payout, bonus_mult, boosted, free_bet, status, created_at, matches(home_team, away_team, competition, kickoff_at, status, home_score, away_score, half_home, half_away, home_crest, away_crest, stage)"
     )
     .eq("player_id", player.id)
     .order("created_at", { ascending: false })

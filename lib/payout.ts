@@ -39,6 +39,30 @@ export const WELCOMEBACK_AWAY_HOURS = 48;
 export type PredictionType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
 export type WinnerPick = "HOME" | "DRAW" | "AWAY";
 
+// Knockout stages can't end level: a tie after 90' goes to extra time and
+// penalties, so one side always advances and there is no DRAW outcome on the
+// full-time Winner market. (football-data v4 stage codes plus common aliases, so
+// a slightly different label can't sneak a draw market into a knockout game.)
+const KNOCKOUT_STAGES = new Set([
+  "LAST_32",
+  "ROUND_OF_32",
+  "LAST_16",
+  "ROUND_OF_16",
+  "QUARTER_FINALS",
+  "QUARTER_FINAL",
+  "SEMI_FINALS",
+  "SEMI_FINAL",
+  "THIRD_PLACE",
+  "THIRD_PLACE_FINAL",
+  "THIRD_PLACE_PLAY_OFF",
+  "FINAL",
+]);
+
+export function isKnockoutStage(stage: string | null | undefined): boolean {
+  if (!stage) return false;
+  return KNOCKOUT_STAGES.has(stage.trim().toUpperCase());
+}
+
 export function baseMultiplier(type: PredictionType): number {
   if (type === "EXACT") return EXACT_MULTIPLIER;
   if (type === "TOTALS") return TOTALS_MULTIPLIER;
@@ -135,11 +159,15 @@ export function computePayout(
   awayScore: number,
   halfHome: number | null,
   halfAway: number | null,
-  bonusMult: number = 1
+  bonusMult: number = 1,
+  // For knockout matches, the side that actually ADVANCED (extra time + penalties
+  // included, from the feed's winner). When given it decides the Winner market
+  // instead of the 90-minute score, which may be a tie that's settled on penalties.
+  koWinner: WinnerPick | null = null
 ): { won: boolean; payout: number } {
   let won = false;
   if (type === "WINNER") {
-    won = pick === resultFromScore(homeScore, awayScore);
+    won = pick === (koWinner ?? resultFromScore(homeScore, awayScore));
   } else if (type === "HALFTIME") {
     // Missing half-time data is treated as 0–0.
     won = pick === resultFromScore(halfHome ?? 0, halfAway ?? 0);

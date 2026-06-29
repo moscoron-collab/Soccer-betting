@@ -5,7 +5,7 @@ import { celebrate, confettiBurst, playCheer, playGroan, toast } from "@/lib/cel
 import { spinRatchet, loseWomp, winFanfareShort, winFanfareTriumph, isMuted } from "@/lib/sounds";
 import { VERSION, CHANGELOG } from "@/lib/changelog";
 import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSlice, bigWinTier, type WheelSlice } from "@/lib/wheel";
-import { FREE_BET_STAKE, MOTD_BONUS } from "@/lib/payout";
+import { FREE_BET_STAKE, MOTD_BONUS, isKnockoutStage } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
 import type { Bracket, BracketMatch, BracketTeam } from "@/lib/bracket";
@@ -122,6 +122,7 @@ type Match = {
   home_crest: string | null;
   away_crest: string | null;
   kickoff_at: string;
+  stage?: string | null;
   bet_stats?: {
     home: number;
     draw: number;
@@ -155,6 +156,7 @@ type Prediction = {
     half_away: number | null;
     home_crest: string | null;
     away_crest: string | null;
+    stage?: string | null;
   } | null;
 };
 
@@ -3546,6 +3548,7 @@ function BetForm({
   isFeatured,
   featuredMult,
   isMotd,
+  isKnockout,
   initial,
   submitLabel,
   onSubmit,
@@ -3560,6 +3563,7 @@ function BetForm({
   isFeatured?: boolean; // Road-to-the-Final featured match (Winner pays the headline rate)
   featuredMult?: number; // that headline rate
   isMotd?: boolean; // Match of the Day (fixed bonus on top of base)
+  isKnockout?: boolean; // knockout tie — Winner market has no Draw (ET + penalties decide)
   initial?: BetDraft;
   submitLabel: string;
   onSubmit: (body: any) => Promise<{ error?: string }>;
@@ -3626,16 +3630,28 @@ function BetForm({
               ["2-3", "2–3"],
               ["4+", "4+"],
             ]
-          : [
-              ["HOME", home],
-              ["DRAW", t("common.draw")],
-              ["AWAY", away],
-            ];
-  const twoCols = type === "GOALS3" || type === "BTTS";
+          : // Knockout Winner market has no Draw — a tie is settled in extra time
+            // and penalties, so only the two teams are offered. Half-time leader
+            // keeps Draw (a knockout game can still be level at the break).
+            type === "WINNER" && isKnockout
+            ? [
+                ["HOME", home],
+                ["AWAY", away],
+              ]
+            : [
+                ["HOME", home],
+                ["DRAW", t("common.draw")],
+                ["AWAY", away],
+              ];
+  const twoCols =
+    type === "GOALS3" || type === "BTTS" || (type === "WINNER" && isKnockout);
 
   return (
     <div>
       <p className="mb-2 text-center text-xs font-semibold text-blue-100/80">{t(`prompt.${type}`)}</p>
+      {type === "WINNER" && isKnockout && (
+        <p className="mb-2 text-center text-[11px] text-blue-100/60">{t("form.knockout")}</p>
+      )}
       {type === "EXACT" ? (
         <div className="flex items-center justify-center gap-2">
           <input
@@ -3757,6 +3773,7 @@ function BetEditor({
   isFeatured,
   featuredMult,
   isMotd,
+  isKnockout,
   onChange,
 }: {
   p: Prediction;
@@ -3767,6 +3784,7 @@ function BetEditor({
   isFeatured?: boolean;
   featuredMult?: number;
   isMotd?: boolean;
+  isKnockout?: boolean;
   onChange: () => void;
 }) {
   const { t } = useLang();
@@ -3812,6 +3830,7 @@ function BetEditor({
           isFeatured={isFeatured}
           featuredMult={featuredMult}
           isMotd={isMotd}
+          isKnockout={isKnockout}
           submitLabel={t("form.save")}
           onCancel={() => setEditing(false)}
           initial={{
@@ -3881,6 +3900,7 @@ function MatchCard({
   // make a kicked-off match look bettable (the server would reject it anyway).
   const minsLeft = Math.max(0, Math.round((kickoff.getTime() - serverNow()) / 60000));
   const closed = serverNow() >= kickoff.getTime();
+  const knockout = isKnockoutStage(match.stage);
   const [tab, setTab] = useState<BetType>("WINNER");
 
   // The player's bet of the currently selected type, if any.
@@ -3988,6 +4008,7 @@ function MatchCard({
               isFeatured={isFeatured}
               featuredMult={featuredMult}
               isMotd={isMotd}
+              isKnockout={knockout}
               onChange={onPlaced}
             />
           )}
@@ -4008,6 +4029,7 @@ function MatchCard({
             isFeatured={isFeatured}
             featuredMult={featuredMult}
             isMotd={isMotd}
+            isKnockout={knockout}
             submitLabel={t("form.predict")}
             onSubmit={place}
           />
@@ -4032,7 +4054,9 @@ function WhoWins({
   const { t } = useLang();
   const s = match.bet_stats;
   if (!s) return null;
-  const total = s.home + s.draw + s.away;
+  // Knockout ties have no Draw market, so leave it out of the split entirely.
+  const knockout = isKnockoutStage(match.stage);
+  const total = s.home + (knockout ? 0 : s.draw) + s.away;
   if (total === 0) return null;
   const pct = (n: number) => Math.round((n / total) * 100);
 
@@ -4047,12 +4071,12 @@ function WhoWins({
       </p>
       <div className="flex h-3 overflow-hidden rounded-full bg-white/10">
         <div className="bg-yellow-400" style={{ width: `${pct(s.home)}%` }} />
-        <div className="bg-blue-300" style={{ width: `${pct(s.draw)}%` }} />
+        {!knockout && <div className="bg-blue-300" style={{ width: `${pct(s.draw)}%` }} />}
         <div className="bg-sky-400" style={{ width: `${pct(s.away)}%` }} />
       </div>
       <div className="mt-1 flex justify-between text-blue-100/80">
         <span>🟨 {match.home_team} {pct(s.home)}%</span>
-        <span>🟩 {t("common.draw")} {pct(s.draw)}%</span>
+        {!knockout && <span>🟩 {t("common.draw")} {pct(s.draw)}%</span>}
         <span>🟦 {match.away_team} {pct(s.away)}%</span>
       </div>
       {s.voters.length > 0 && (
@@ -4119,6 +4143,7 @@ function MatchBetsCard({
                 away={m.away_team}
                 token={token}
                 coins={coins}
+                isKnockout={isKnockoutStage(m.stage)}
                 onChange={onChange}
               />
             )}

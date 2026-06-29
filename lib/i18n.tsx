@@ -426,6 +426,10 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "form.predict": { en: "Predict", he: "נחשו" },
   "form.save": { en: "Save", he: "שמירה" },
+  "form.knockout": {
+    en: "⚔️ Knockout — no draw. A tie is decided in extra time & penalties.",
+    he: "⚔️ נוקאאוט — אין תיקו. שוויון מוכרע בהארכה ובפנדלים.",
+  },
 
   // Bet editor
   "editor.confirm": {

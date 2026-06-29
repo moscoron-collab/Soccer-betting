@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.39",
+    date: "2026-06-29",
+    changes: [
+      {
+        en: "⚔️ Knockout matches (Round of 32 onward) can't end in a draw: the Winner market now offers only the two teams. A tie after 90' is decided by extra time and penalties, and bets pay out on whoever actually advances.",
+        he: "⚔️ משחקי נוקאאוט (משלב ה-32 והלאה) לא יכולים להסתיים בתיקו: שוק המנצח מציע עכשיו רק את שתי הקבוצות. שוויון אחרי 90 דקות מוכרע בהארכה ובפנדלים, וההימורים משלמים לפי מי שבאמת עולה הלאה.",
+      },
+    ],
+  },
+  {
     version: "4.38",
     date: "2026-06-28",
     changes: [

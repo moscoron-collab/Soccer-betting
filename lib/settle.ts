@@ -2,7 +2,7 @@
 // "settle while players are online" refresh that /api/me triggers.
 
 import { supabase } from "./supabase";
-import { computePayout, PredictionType, BOOST_MULTIPLIER } from "./payout";
+import { computePayout, PredictionType, WinnerPick, BOOST_MULTIPLIER, isKnockoutStage } from "./payout";
 import { fetchRecentResults, fetchCompetitionAll, worldCupCode, FdMatch } from "./footballData";
 
 // Bonus coins when a winning bet reaches these streak lengths.
@@ -42,7 +42,7 @@ export async function settleAll() {
   // 1) Finished, unsettled matches with scores -> settle their predictions.
   const { data: finished } = await supabase
     .from("matches")
-    .select("id, home_score, away_score, half_home, half_away")
+    .select("id, home_score, away_score, half_home, half_away, stage, winner")
     .eq("status", "FINISHED")
     .eq("settled", false)
     .not("home_score", "is", null)
@@ -56,6 +56,16 @@ export async function settleAll() {
     const awayScore = match.away_score as number;
     const halfHome = (match.half_home as number | null) ?? null;
     const halfAway = (match.half_away as number | null) ?? null;
+
+    // Knockout games never end in a draw — settle the Winner market on who ADVANCED
+    // (the feed's winner, which already accounts for extra time and penalties).
+    const knockout = isKnockoutStage(match.stage as string | null);
+    const koWinner = (match.winner as WinnerPick | null) ?? null;
+    if (knockout && koWinner !== "HOME" && koWinner !== "AWAY") {
+      // Finished knockout but the advancing side isn't in the feed yet — wait, so a
+      // penalty-decided tie is never mis-paid as a draw. We'll settle on a later pass.
+      continue;
+    }
 
     const { data: preds } = await supabase
       .from("predictions")
@@ -74,7 +84,8 @@ export async function settleAll() {
         awayScore,
         halfHome,
         halfAway,
-        Number(p.bonus_mult ?? 1)
+        Number(p.bonus_mult ?? 1),
+        knockout ? koWinner : null
       );
       const won = result.won;
       // A spent "2x payout" power-up doubles a winning bet.
@@ -165,18 +176,28 @@ export async function settleAll() {
     const ids = legs.map((l) => l.match_id);
     const { data: legMatches } = await supabase
       .from("matches")
-      .select("id, status, home_score, away_score, half_home, half_away")
+      .select("id, status, home_score, away_score, half_home, half_away, stage, winner")
       .in("id", ids);
     const mById = new Map((legMatches ?? []).map((m) => [m.id, m]));
 
     const allFinished = legs.every((l) => {
       const m = mById.get(l.match_id);
-      return m && m.status === "FINISHED" && m.home_score != null && m.away_score != null;
+      if (!m || m.status !== "FINISHED" || m.home_score == null || m.away_score == null) {
+        return false;
+      }
+      // A finished knockout leg also needs its advancing side before we settle.
+      if (isKnockoutStage(m.stage as string | null)) {
+        return m.winner === "HOME" || m.winner === "AWAY";
+      }
+      return true;
     });
     if (!allFinished) continue;
 
     const allWon = legs.every((l) => {
       const m = mById.get(l.match_id)!;
+      const koWinner = isKnockoutStage(m.stage as string | null)
+        ? (m.winner as WinnerPick | null)
+        : null;
       return computePayout(
         l.type as PredictionType,
         l.pick ?? null,
@@ -186,7 +207,9 @@ export async function settleAll() {
         m.home_score as number,
         m.away_score as number,
         m.half_home,
-        m.half_away
+        m.half_away,
+        1,
+        koWinner
       ).won;
     });
 
