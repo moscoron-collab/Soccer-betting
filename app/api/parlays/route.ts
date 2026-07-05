@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { baseMultiplier, validateSelection, isKnockoutStage } from "@/lib/payout";
+import { needsSpinBeforeBet } from "@/lib/betgate";
+import { localDate } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +37,14 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Must take today's regular-wheel spin before betting (regular wheel only).
+  if (await needsSpinBeforeBet(player, localDate(body?.tz))) {
+    return NextResponse.json(
+      { error: "🎡 Spin the wheel first! Take today's spin before placing a bet.", code: "SPIN_REQUIRED" },
+      { status: 403 }
+    );
   }
 
   const stake = Math.floor(Number(body?.stake));

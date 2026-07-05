@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.41",
+    date: "2026-07-05",
+    changes: [
+      {
+        en: "🎡 Spin to bet: you now have to take your daily wheel spin before you can place any bets that day. No more skipping the wheel to dodge its risk slices! (Comeback-wheel players are exempt.)",
+        he: "🎡 סובבו כדי להמר: מעכשיו צריך לקחת את הסיבוב היומי בגלגל לפני שאפשר להמר באותו יום. אי אפשר יותר לדלג על הגלגל כדי להתחמק מפרוסות הסיכון! (שחקני גלגל הקאמבק פטורים.)",
+      },
+    ],
+  },
+  {
     version: "4.40",
     date: "2026-07-05",
     changes: [

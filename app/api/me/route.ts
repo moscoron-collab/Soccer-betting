@@ -234,6 +234,11 @@ export async function GET(req: Request) {
   if (!bottomSlice && !armed) await armComeback(player.id);
   const showComebackAlert = player.is_admin === true ? showComeback : showComeback && armed;
 
+  // Regular-wheel players must take today's spin before they can bet (the wheel now has
+  // lose-a-% slices, so betting without spinning would dodge that risk). Comeback-group
+  // players and admins are exempt. `used`/`showRegular` are already computed above.
+  const mustSpinToBet = player.is_admin !== true && showRegular && used === 0;
+
   return NextResponse.json(
     {
       player,
@@ -244,6 +249,7 @@ export async function GET(req: Request) {
       showComeback,
       showRegular,
       showComebackAlert,
+      mustSpinToBet,
       comebackSpinsLeft: comebackLeft,
       canPenalty,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
