@@ -2,15 +2,20 @@
 // and the UI (which draws the same slices and animates to the winning one), so
 // there is a single source of truth for the prizes.
 
-export type WheelKind = "COINS" | "BOOST" | "SHIELD" | "JACKPOT" | "FREEBET";
+export type WheelKind = "COINS" | "BOOST" | "SHIELD" | "JACKPOT" | "FREEBET" | "PCT";
 
 export type WheelSlice = {
   kind: WheelKind;
-  amount: number; // coins for COINS/JACKPOT; charge/token count for BOOST/SHIELD/FREEBET
+  // coins for COINS/JACKPOT; charge/token count for BOOST/SHIELD/FREEBET;
+  // for PCT it's a SIGNED percentage of the player's own coins (+10 = gain 10%, -15 = lose 15%).
+  amount: number;
   label: string; // short text shown on the slice
   emoji: string;
   color: string; // slice fill colour (hex)
   weight: number; // relative probability (bigger = more common)
+  // RESULT ONLY: for a PCT slice the server fills in the actual signed coin change
+  // (e.g. -9,000), since the percentage depends on the spinner's live balance.
+  delta?: number;
 };
 
 // The jackpot pays a RANDOM amount in this range (shown on the wheel as "up to 2K").
@@ -23,17 +28,16 @@ export function rollJackpot(): number {
 }
 
 // Order matters: this is the clockwise order the slices are drawn in.
+// PCT slices win/lose a % of the spinner's OWN coin balance (self-balancing: they scale
+// with how rich you are, which keeps the wheel meaningful even for huge balances).
 export const WHEEL: WheelSlice[] = [
-  { kind: "COINS", amount: 50, label: "50", emoji: "🪙", color: "#2563eb", weight: 5 },
-  { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
-  { kind: "COINS", amount: 25, label: "25", emoji: "🪙", color: "#475569", weight: 5 },
   { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#3b82f6", weight: 4 },
-  { kind: "SHIELD", amount: 1, label: "Shield", emoji: "🛡️", color: "#14b8a6", weight: 2 },
-  { kind: "FREEBET", amount: 1, label: "Free bet", emoji: "🎟️", color: "#a855f7", weight: 2 },
-  { kind: "COINS", amount: 75, label: "75", emoji: "🪙", color: "#1d4ed8", weight: 4 },
+  { kind: "PCT", amount: 10, label: "Gain 10%", emoji: "📈", color: "#16a34a", weight: 3 },
+  { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
+  { kind: "PCT", amount: -10, label: "Lose 10%", emoji: "📉", color: "#dc2626", weight: 2 },
   { kind: "COINS", amount: 250, label: "250", emoji: "🪙", color: "#60a5fa", weight: 2 },
   { kind: "JACKPOT", amount: JACKPOT_MAX, label: "up to 2K", emoji: "💰", color: "#eab308", weight: 1 },
-  { kind: "COINS", amount: 150, label: "150", emoji: "🪙", color: "#1e40af", weight: 3 },
+  { kind: "PCT", amount: -15, label: "Lose 15%", emoji: "💸", color: "#991b1b", weight: 1 },
   { kind: "COINS", amount: 500, label: "500", emoji: "🪙", color: "#1e3a8a", weight: 1 },
   { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#334155", weight: 1 },
 ];
@@ -103,6 +107,13 @@ export function describePrize(slice: WheelSlice): string {
       return `💰 JACKPOT! +🪙${slice.amount.toLocaleString()}`;
     case "FREEBET":
       return `🎟️ ${slice.amount} × free bet token!`;
+    case "PCT": {
+      const pct = Math.abs(slice.amount);
+      const delta = slice.delta ?? 0;
+      return delta >= 0
+        ? `📈 +${pct}% — +🪙${delta.toLocaleString()} coins!`
+        : `📉 −${pct}% — −🪙${Math.abs(delta).toLocaleString()} coins`;
+    }
     default:
       return slice.amount === 0
         ? "😬 No win this time — try another spin!"
@@ -110,9 +121,11 @@ export function describePrize(slice: WheelSlice): string {
   }
 }
 
-// Did the spin actually win something? Everything is a prize EXCEPT the 0-coin
-// "No win" slice — so the UI knows when NOT to celebrate (no confetti/cheer).
+// Did the spin actually win something? A win = anything that ADDS value, so the UI
+// knows when to celebrate (confetti/cheer) vs. commiserate. NOT a win: the 0-coin
+// "No win" slice and the PCT loss slices.
 export function isWinningSlice(slice: WheelSlice): boolean {
+  if (slice.kind === "PCT") return slice.amount > 0; // gains cheer; losses don't
   return !(slice.kind === "COINS" && slice.amount === 0);
 }
 

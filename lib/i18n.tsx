@@ -341,6 +341,8 @@ const DICT: Record<string, { en: string; he: string }> = {
   "wheel.shield": { en: "Shield", he: "מגן" },
   "wheel.jackpot": { en: "up to 2K", he: "עד 2K" },
   "wheel.freebet": { en: "Free bet", he: "הימור חינם" },
+  "wheel.gain": { en: "Gain {pct}%", he: "רווח {pct}%" },
+  "wheel.lose": { en: "Lose {pct}%", he: "הפסד {pct}%" },
 
   // Prize toasts
   "prize.boost": { en: "⚡ {n} × 2× payout power-up!", he: "⚡ {n} × כוח הכפלת זכייה 2×!" },
@@ -352,6 +354,8 @@ const DICT: Record<string, { en: string; he: string }> = {
     he: "😬 אין זכייה הפעם — נסו סיבוב נוסף!",
   },
   "prize.coins": { en: "🪙 +{n} coins", he: "🪙 +{n} מטבעות" },
+  "prize.gain": { en: "📈 +{pct}% — +🪙{n} coins!", he: "📈 +{pct}% — +🪙{n} מטבעות!" },
+  "prize.lose": { en: "📉 −{pct}% — −🪙{n} coins", he: "📉 −{pct}% — −🪙{n} מטבעות" },
 
   // Penalty shootout
   "penalty.title": { en: "⚽ Penalty Shootout", he: "⚽ דו-קרב פנדלים" },

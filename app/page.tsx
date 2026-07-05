@@ -24,6 +24,13 @@ function prizeText(t: T, slice: WheelSlice): string {
       return t("prize.jackpot", { n: slice.amount.toLocaleString() });
     case "FREEBET":
       return t("prize.freebet", { n: slice.amount });
+    case "PCT": {
+      const pct = Math.abs(slice.amount);
+      const delta = slice.delta ?? 0;
+      return delta >= 0
+        ? t("prize.gain", { pct, n: delta.toLocaleString() })
+        : t("prize.lose", { pct, n: Math.abs(delta).toLocaleString() });
+    }
     default:
       return slice.amount === 0
         ? t("prize.noWin")
@@ -37,6 +44,10 @@ function sliceLabel(t: T, slice: WheelSlice): string {
   if (slice.kind === "BOOST") return t("wheel.boost");
   if (slice.kind === "SHIELD") return t("wheel.shield");
   if (slice.kind === "FREEBET") return t("wheel.freebet");
+  if (slice.kind === "PCT") {
+    const pct = Math.abs(slice.amount);
+    return slice.amount >= 0 ? t("wheel.gain", { pct }) : t("wheel.lose", { pct });
+  }
   if (slice.amount === 0) return t("wheel.noWin");
   return slice.label;
 }

@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.40",
+    date: "2026-07-05",
+    changes: [
+      {
+        en: "🎡 Wheel shake-up: dropped the small coin slices (25/50/75/150), the free bet and the shield. Added three high-stakes slices that swing a % of YOUR coins — 📈 Gain 10%, 📉 Lose 10% and 💸 Lose 15% — so a spin finally matters no matter how rich you are.",
+        he: "🎡 שינוי בגלגל: הוסרו פרוסות המטבעות הקטנות (25/50/75/150), ההימור החינם והמגן. נוספו שלוש פרוסות בסיכון גבוה שמזיזות אחוז מהמטבעות שלכם — 📈 רווח 10%, 📉 הפסד 10% ו-💸 הפסד 15% — כך שלסיבוב יש משמעות אמיתית בלי קשר לכמה עשירים אתם.",
+      },
+    ],
+  },
+  {
     version: "4.39",
     date: "2026-06-29",
     changes: [

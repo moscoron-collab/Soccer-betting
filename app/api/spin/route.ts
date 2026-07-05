@@ -74,8 +74,19 @@ export async function POST(req: Request) {
   let coins = player.coins;
   if (!isFree) coins -= EXTRA_SPIN_COST;
 
+  // For a PCT slice the real coin change depends on the player's live balance, so we
+  // compute it here (a % of their current cash) rather than trusting a fixed amount.
+  let pctDelta = 0;
+
   if (slice.kind === "COINS" || slice.kind === "JACKPOT") {
     coins += awarded;
+  } else if (slice.kind === "PCT") {
+    // % of the cash balance (after any spin cost). Gains add; losses subtract but
+    // never below 0, and only touch spendable coins (in-play stakes are untouched).
+    const magnitude = Math.floor((coins * Math.abs(slice.amount)) / 100);
+    pctDelta = slice.amount >= 0 ? magnitude : -Math.min(magnitude, coins);
+    coins += pctDelta;
+    awarded = pctDelta;
   } else if (slice.kind === "BOOST") {
     update.boost_2x = player.boost_2x + slice.amount;
   } else if (slice.kind === "SHIELD") {
@@ -94,8 +105,12 @@ export async function POST(req: Request) {
   // A little XP for playing, so progress moves even without a betting win.
   await supabase.rpc("increment_xp", { p_player: player.id, p_amount: 5 });
 
-  // Echo the actual prize back (jackpot amount is randomised), so the UI shows it.
-  const resultSlice = { ...slice, amount: awarded };
+  // Echo the actual prize back so the UI shows it. Jackpot amount is randomised;
+  // a PCT slice keeps its % in `amount` but carries the real coin change in `delta`.
+  const resultSlice =
+    slice.kind === "PCT"
+      ? { ...slice, delta: pctDelta }
+      : { ...slice, amount: awarded };
 
   return NextResponse.json({
     sliceIndex,
