@@ -5,9 +5,11 @@
 export type Change = { en: string; he: string };
 export type Release = { version: string; date: string; changes: Change[] };
 
+// Versioning: one number after the dot, bumped by one each release — 5.0, 5.1,
+// 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
-    version: "4.44",
+    version: "5.0",
     date: "2026-07-06",
     changes: [
       {

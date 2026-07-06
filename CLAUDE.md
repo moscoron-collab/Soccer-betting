@@ -29,6 +29,8 @@ match results, win/lose coins, climb a leaderboard, play mini-games. **No real m
   1. If `supabase/schema.sql` changed, re-run it in Supabase.
   2. Confirm Vercel finished deploying (and that Vercel's production branch is correct).
 - Bump `lib/changelog.ts` VERSION + add an entry for user-visible changes.
+  - **Version scheme:** one number after the dot, incremented by one per release —
+    `5.0 → 5.1 → 5.2 … 5.9 → 6.0`. Never use two-digit/decimal suffixes like `4.44`.
 
 ## Go-live checklist (for the user — the parts Claude cannot do)
 **1. Database (only needed when Claude says the schema changed)**
