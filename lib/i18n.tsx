@@ -259,6 +259,25 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "playerLog.noBets": { en: "No bets to show.", he: "אין הימורים להצגה." },
 
+  // Coin loans (lend to a friend, manual repay)
+  "loan.lendTitle": { en: "🤝 Lend coins to {name}", he: "🤝 הלוואת מטבעות ל-{name}" },
+  "loan.amountPlaceholder": { en: "Amount", he: "סכום" },
+  "loan.lendBtn": { en: "Lend", he: "הלוואה" },
+  "loan.sending": { en: "Sending…", he: "שולח…" },
+  "loan.sent": { en: "Sent 🪙{amount} to {name}!", he: "נשלחו 🪙{amount} ל-{name}!" },
+  "loan.tooSmall": { en: "Loans start at 🪙{min}.", he: "הלוואות מתחילות מ-🪙{min}." },
+  "loan.cooldown": {
+    en: "You've already sent a loan today. Come back tomorrow!",
+    he: "כבר שלחת הלוואה היום. חזרו מחר!",
+  },
+  "loan.errGeneric": { en: "Could not send the loan. Try again.", he: "לא הצלחנו לשלוח את ההלוואה. נסו שוב." },
+  "loan.panelTitle": { en: "🤝 Loans", he: "🤝 הלוואות" },
+  "loan.oweLine": { en: "You owe 🪙{amount} to {name}", he: "אתם חייבים 🪙{amount} ל-{name}" },
+  "loan.owedToMeLine": { en: "{name} owes you 🪙{amount}", he: "{name} חייב/ת לכם 🪙{amount}" },
+  "loan.repayBtn": { en: "Repay", he: "החזר" },
+  "loan.repaying": { en: "Repaying…", he: "מחזיר…" },
+  "loan.repaidToast": { en: "Loan repaid — 🪙{amount} sent back!", he: "ההלוואה הוחזרה — נשלחו 🪙{amount}!" },
+
   // Changelog
   "changelog.title": { en: "🆕 What's new", he: "🆕 מה חדש" },
 

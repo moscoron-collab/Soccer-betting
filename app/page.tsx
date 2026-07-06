@@ -8,6 +8,7 @@ import { WHEEL, COMEBACK_WHEEL, EXTRA_SPIN_COST, MAX_SPINS_PER_DAY, isWinningSli
 import { FREE_BET_STAKE, MOTD_BONUS, isKnockoutStage } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
+import { MIN_LOAN_AMOUNT } from "@/lib/loan";
 import type { Bracket, BracketMatch, BracketTeam } from "@/lib/bracket";
 
 // Translator type, so helpers can take `t` without importing React context.
@@ -271,6 +272,13 @@ type LeaderRow = {
   xp?: number; // drives the tier emoji shown next to the name
 };
 
+type LoanRow = {
+  id: string;
+  amount: number;
+  created_at: string;
+  username: string; // the other party: who I owe, or who owes me
+};
+
 function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
 }
@@ -356,6 +364,9 @@ function Home() {
   const [mustSpinToBet, setMustSpinToBet] = useState(false);
   const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
+  const [canLendToday, setCanLendToday] = useState(false);
+  const [loansOwed, setLoansOwed] = useState<LoanRow[]>([]);
+  const [loansOwedToMe, setLoansOwedToMe] = useState<LoanRow[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
   const [welcomeBack, setWelcomeBack] = useState<{ giftAmount: number; awayHours: number } | null>(null);
@@ -453,6 +464,9 @@ function Home() {
     setMustSpinToBet(!!data.mustSpinToBet);
     setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
+    setCanLendToday(!!data.canLendToday);
+    setLoansOwed(data.loansOwed ?? []);
+    setLoansOwedToMe(data.loansOwedToMe ?? []);
     setLeaderboard(data.leaderboard ?? []);
     setMyRank(data.myRank ?? null);
     if (data.welcomeBack) {
@@ -521,6 +535,9 @@ function Home() {
           mustSpinToBet={mustSpinToBet}
           comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
+          canLendToday={canLendToday}
+          loansOwed={loansOwed}
+          loansOwedToMe={loansOwedToMe}
           leaderboard={leaderboard}
           myRank={myRank}
           welcomeBack={welcomeBack}
@@ -1491,6 +1508,9 @@ function Game({
   mustSpinToBet,
   comebackSpinsLeft,
   canPenalty,
+  canLendToday,
+  loansOwed,
+  loansOwedToMe,
   leaderboard,
   myRank,
   welcomeBack,
@@ -1509,6 +1529,9 @@ function Game({
   mustSpinToBet: boolean;
   comebackSpinsLeft: number;
   canPenalty: boolean;
+  canLendToday: boolean;
+  loansOwed: LoanRow[];
+  loansOwedToMe: LoanRow[];
   leaderboard: LeaderRow[];
   myRank: number | null;
   welcomeBack: { giftAmount: number; awayHours: number } | null;
@@ -1642,6 +1665,28 @@ function Game({
     onRefresh();
   }
 
+  const [repayingId, setRepayingId] = useState<string | null>(null);
+  async function repayLoan(loanId: string) {
+    if (repayingId) return;
+    setRepayingId(loanId);
+    try {
+      const res = await fetch("/api/loan/repay", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ loanId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        celebrate(t("loan.repaidToast", { amount: data.amount?.toLocaleString?.() ?? data.amount }));
+        onRefresh();
+      } else {
+        alert(data.error ?? t("loan.errGeneric"));
+      }
+    } finally {
+      setRepayingId(null);
+    }
+  }
+
   // Map of matchId -> the player's bets on that match (up to one of each type).
   const predByMatch = new Map<number, Prediction[]>();
   for (const p of predictions) {
@@ -1751,6 +1796,16 @@ function Game({
 
       {player.coins <= LOW_COINS && (
         <LowCoinsPanel canBailout={canBailout} onBailout={bailout} />
+      )}
+
+      {(loansOwed.length > 0 || loansOwedToMe.length > 0) && (
+        <LoansPanel
+          owed={loansOwed}
+          owedToMe={loansOwedToMe}
+          myCoins={player.coins}
+          repayingId={repayingId}
+          onRepay={repayLoan}
+        />
       )}
 
       {/* Tabs — colour-coded (blue / green / gold). Active = gradient fill + soft
@@ -2040,7 +2095,14 @@ function Game({
         />
       )}
       {viewPlayer && (
-        <PlayerLogModal username={viewPlayer} onClose={() => setViewPlayer(null)} />
+        <PlayerLogModal
+          username={viewPlayer}
+          onClose={() => setViewPlayer(null)}
+          token={token}
+          myUsername={player.username}
+          canLendToday={canLendToday}
+          onLent={onRefresh}
+        />
       )}
     </main>
     </>
@@ -2241,7 +2303,21 @@ function resizeImage(file: File, size: number): Promise<string> {
 /* --------------------------- Player log modal ----------------------------- */
 // Opens when you tap another player's avatar — shows their profile + bet log.
 
-function PlayerLogModal({ username, onClose }: { username: string; onClose: () => void }) {
+function PlayerLogModal({
+  username,
+  onClose,
+  token,
+  myUsername,
+  canLendToday,
+  onLent,
+}: {
+  username: string;
+  onClose: () => void;
+  token?: string;
+  myUsername?: string;
+  canLendToday?: boolean;
+  onLent?: () => void | Promise<void>;
+}) {
   const { t, lang } = useLang();
   const [data, setData] = useState<{
     player: { username: string; avatar: string | null; coins: number; win_streak: number; hide_picks?: boolean; created_at?: string | null };
@@ -2252,6 +2328,9 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [lendAmount, setLendAmount] = useState("");
+  const [lending, setLending] = useState(false);
+  const [lendMsg, setLendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -2274,6 +2353,39 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
       live = false;
     };
   }, [username, t]);
+
+  const canLend = !!token && !!myUsername && myUsername !== username;
+
+  async function lendCoins() {
+    if (!token || lending) return;
+    const amount = Math.floor(Number(lendAmount));
+    if (!Number.isFinite(amount) || amount < MIN_LOAN_AMOUNT) {
+      setLendMsg(t("loan.tooSmall", { min: MIN_LOAN_AMOUNT }));
+      return;
+    }
+    setLending(true);
+    setLendMsg(null);
+    try {
+      const res = await fetch("/api/loan", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ toUsername: username, amount, tz: clientTz() }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setLendMsg(t("loan.sent", { amount: amount.toLocaleString(), name: username }));
+        setLendAmount("");
+        celebrate(t("loan.sent", { amount: amount.toLocaleString(), name: username }));
+        await onLent?.();
+      } else {
+        setLendMsg(d.error ?? t("loan.errGeneric"));
+      }
+    } catch {
+      setLendMsg(t("loan.errGeneric"));
+    } finally {
+      setLending(false);
+    }
+  }
 
   return (
     <>
@@ -2335,6 +2447,35 @@ function PlayerLogModal({ username, onClose }: { username: string; onClose: () =
               <p className="mt-3 rounded-lg bg-white/5 p-2 text-xs text-blue-100/60">
                 {t("playerLog.hides")}
               </p>
+            )}
+
+            {canLend && (
+              <div className="mt-4 rounded-lg bg-white/5 p-3">
+                <p className="text-sm font-bold text-blue-100">{t("loan.lendTitle", { name: username })}</p>
+                {canLendToday === false ? (
+                  <p className="mt-1 text-xs text-blue-100/60">{t("loan.cooldown")}</p>
+                ) : (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={MIN_LOAN_AMOUNT}
+                      step={10}
+                      value={lendAmount}
+                      onChange={(e) => setLendAmount(e.target.value)}
+                      placeholder={t("loan.amountPlaceholder")}
+                      className="w-28 rounded-lg bg-white/10 px-2 py-1.5 text-sm"
+                    />
+                    <button
+                      onClick={lendCoins}
+                      disabled={lending}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                    >
+                      {lending ? t("loan.sending") : t("loan.lendBtn")}
+                    </button>
+                  </div>
+                )}
+                {lendMsg && <p className="mt-2 text-xs text-blue-100/80">{lendMsg}</p>}
+              </div>
             )}
 
             <div className="mt-4 space-y-2">
@@ -3237,6 +3378,55 @@ function LowCoinsPanel({
       </div>
       <p className="mt-3 text-xs text-blue-100/70">{t("lowcoins.loginHint")}</p>
       <p className="mt-1 text-xs text-blue-100/70">{t("lowcoins.cashbackHint")}</p>
+    </div>
+  );
+}
+
+// Outstanding coin loans: what I still owe (repay button, only enabled once I can
+// actually afford it) and what's still owed to me (informational — repayment is
+// never enforced, so this is just a reminder of who owes what).
+function LoansPanel({
+  owed,
+  owedToMe,
+  myCoins,
+  repayingId,
+  onRepay,
+}: {
+  owed: LoanRow[];
+  owedToMe: LoanRow[];
+  myCoins: number;
+  repayingId: string | null;
+  onRepay: (loanId: string) => void;
+}) {
+  const { t } = useLang();
+  return (
+    <div className="mt-4 rounded-xl bg-purple-500/15 p-4 ring-1 ring-purple-400/30">
+      <p className="text-sm font-bold text-purple-200">{t("loan.panelTitle")}</p>
+      {owed.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {owed.map((l) => (
+            <div key={l.id} className="flex items-center justify-between gap-2 text-sm">
+              <span>{t("loan.oweLine", { amount: l.amount.toLocaleString(), name: l.username })}</span>
+              <button
+                onClick={() => onRepay(l.id)}
+                disabled={repayingId === l.id || myCoins < l.amount}
+                className="shrink-0 rounded-lg bg-purple-500 px-2.5 py-1 text-xs font-bold disabled:opacity-40"
+              >
+                {repayingId === l.id ? t("loan.repaying") : t("loan.repayBtn")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {owedToMe.length > 0 && (
+        <div className={owed.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
+          {owedToMe.map((l) => (
+            <p key={l.id} className="text-xs text-blue-100/70">
+              {t("loan.owedToMeLine", { name: l.username, amount: l.amount.toLocaleString() })}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

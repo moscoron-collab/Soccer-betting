@@ -45,6 +45,7 @@ alter table players add column if not exists last_login_day   date;
 alter table players add column if not exists last_cashback_at timestamptz;
 alter table players add column if not exists last_seen_at     timestamptz;
 alter table players add column if not exists device_id        text;
+alter table players add column if not exists loan_day         date; -- local day this player last lent coins (once-per-day cooldown)
 
 -- "One device = one account": at most one player per device_id. Legacy rows have
 -- device_id = null and are exempt (Postgres treats nulls as distinct), so existing
@@ -228,6 +229,23 @@ insert into app_meta (key, value) values
   ('jackpot_amount',   '5000'),                -- displayed jackpot (admin bumps it)
   ('featured_override','')                      -- a match id to force-feature, or '' for auto
   on conflict (key) do nothing;
+
+-- ---------- loans (peer-to-peer coin loans between players) ----------
+-- A player can lend coins straight from their own balance to another player
+-- (e.g. a friend who's run low). Repayment is manual and unenforced: the
+-- borrower sees what they owe and repays whenever they choose via a Repay
+-- button; if they never do, the lender simply eats the loss.
+create table if not exists loans (
+  id           uuid primary key default gen_random_uuid(),
+  lender_id    uuid not null references players(id) on delete cascade,
+  borrower_id  uuid not null references players(id) on delete cascade,
+  amount       integer not null,
+  repaid       boolean not null default false,
+  created_at   timestamptz not null default now(),
+  repaid_at    timestamptz
+);
+create index if not exists loans_lender_idx on loans (lender_id) where not repaid;
+create index if not exists loans_borrower_idx on loans (borrower_id) where not repaid;
 
 -- ---------- jackpot_wins (log of jackpot payouts, for the Hall of Fame) ----------
 create table if not exists jackpot_wins (

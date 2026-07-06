@@ -206,6 +206,34 @@ export async function GET(req: Request) {
   const nextSpinFree = used === 0;
 
   const canPenalty = isNewLocalDay(player.last_penalty_at, tz);
+  const canLendToday = player.loan_day !== today;
+
+  // Outstanding loans: what I still owe (as borrower) and what's still owed to me
+  // (as lender). Repayment is manual, so these just stick around until repaid.
+  const { data: owedRows } = await supabase
+    .from("loans")
+    .select("id, amount, created_at, lender:lender_id(username)")
+    .eq("borrower_id", player.id)
+    .eq("repaid", false)
+    .order("created_at", { ascending: true });
+  const { data: owedToMeRows } = await supabase
+    .from("loans")
+    .select("id, amount, created_at, borrower:borrower_id(username)")
+    .eq("lender_id", player.id)
+    .eq("repaid", false)
+    .order("created_at", { ascending: true });
+  const loansOwed = (owedRows ?? []).map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    created_at: r.created_at,
+    username: r.lender?.username ?? "?",
+  }));
+  const loansOwedToMe = (owedToMeRows ?? []).map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    created_at: r.created_at,
+    username: r.borrower?.username ?? "?",
+  }));
 
   // Serve the leaderboard from here too: /api/me is always dynamic (it reads the
   // player token), so it can't be edge-cached the way the public /api/leaderboard
@@ -253,6 +281,9 @@ export async function GET(req: Request) {
       mustSpinToBet,
       comebackSpinsLeft: comebackLeft,
       canPenalty,
+      canLendToday,
+      loansOwed,
+      loansOwedToMe,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
       myRank,
       myInPlay,

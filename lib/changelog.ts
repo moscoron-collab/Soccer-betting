@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.43",
+    date: "2026-07-06",
+    changes: [
+      {
+        en: "🤝 Lend a hand: open any player's profile to lend them coins straight from your own balance — great for a friend who's run low. One loan per player per day. They repay you whenever they choose with a tap — it's on the honor system, so only lend what you'd be OK not getting back.",
+        he: "🤝 תנו יד: פתחו את הפרופיל של כל שחקן כדי להלוות לו מטבעות ישירות מהיתרה שלכם — מעולה לחבר שנגמרו לו המטבעות. הלוואה אחת לשחקן ביום. הוא יחזיר לכם מתי שירצה בלחיצה — זה מבוסס אמון, אז הלוו רק סכום שתהיו בסדר איתו גם אם לא יחזור.",
+      },
+    ],
+  },
+  {
     version: "4.42",
     date: "2026-07-06",
     changes: [
