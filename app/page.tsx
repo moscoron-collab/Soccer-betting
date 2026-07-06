@@ -366,7 +366,6 @@ function Home() {
   const [mustSpinToBet, setMustSpinToBet] = useState(false);
   const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
-  const [canLendToday, setCanLendToday] = useState(false);
   const [loansOwed, setLoansOwed] = useState<LoanRow[]>([]);
   const [loansOwedToMe, setLoansOwedToMe] = useState<LoanRow[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
@@ -466,7 +465,6 @@ function Home() {
     setMustSpinToBet(!!data.mustSpinToBet);
     setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
-    setCanLendToday(!!data.canLendToday);
     setLoansOwed(data.loansOwed ?? []);
     setLoansOwedToMe(data.loansOwedToMe ?? []);
     setLeaderboard(data.leaderboard ?? []);
@@ -537,7 +535,6 @@ function Home() {
           mustSpinToBet={mustSpinToBet}
           comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
-          canLendToday={canLendToday}
           loansOwed={loansOwed}
           loansOwedToMe={loansOwedToMe}
           leaderboard={leaderboard}
@@ -1510,7 +1507,6 @@ function Game({
   mustSpinToBet,
   comebackSpinsLeft,
   canPenalty,
-  canLendToday,
   loansOwed,
   loansOwedToMe,
   leaderboard,
@@ -1531,7 +1527,6 @@ function Game({
   mustSpinToBet: boolean;
   comebackSpinsLeft: number;
   canPenalty: boolean;
-  canLendToday: boolean;
   loansOwed: LoanRow[];
   loansOwedToMe: LoanRow[];
   leaderboard: LeaderRow[];
@@ -2102,7 +2097,6 @@ function Game({
           onClose={() => setViewPlayer(null)}
           token={token}
           myUsername={player.username}
-          canLendToday={canLendToday}
           onLent={onRefresh}
         />
       )}
@@ -2310,14 +2304,12 @@ function PlayerLogModal({
   onClose,
   token,
   myUsername,
-  canLendToday,
   onLent,
 }: {
   username: string;
   onClose: () => void;
   token?: string;
   myUsername?: string;
-  canLendToday?: boolean;
   onLent?: () => void | Promise<void>;
 }) {
   const { t, lang } = useLang();
@@ -2454,28 +2446,24 @@ function PlayerLogModal({
             {canLend && (
               <div className="mt-4 rounded-lg bg-white/5 p-3">
                 <p className="text-sm font-bold text-blue-100">{t("loan.lendTitle", { name: username })}</p>
-                {canLendToday === false ? (
-                  <p className="mt-1 text-xs text-blue-100/60">{t("loan.cooldown")}</p>
-                ) : (
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={MIN_LOAN_AMOUNT}
-                      step={10}
-                      value={lendAmount}
-                      onChange={(e) => setLendAmount(e.target.value)}
-                      placeholder={t("loan.amountPlaceholder")}
-                      className="w-28 rounded-lg bg-white/10 px-2 py-1.5 text-sm"
-                    />
-                    <button
-                      onClick={lendCoins}
-                      disabled={lending}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
-                    >
-                      {lending ? t("loan.sending") : t("loan.lendBtn")}
-                    </button>
-                  </div>
-                )}
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={MIN_LOAN_AMOUNT}
+                    step={10}
+                    value={lendAmount}
+                    onChange={(e) => setLendAmount(e.target.value)}
+                    placeholder={t("loan.amountPlaceholder")}
+                    className="w-28 rounded-lg bg-white/10 px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    onClick={lendCoins}
+                    disabled={lending}
+                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {lending ? t("loan.sending") : t("loan.lendBtn")}
+                  </button>
+                </div>
                 {lendMsg && <p className="mt-2 text-xs text-blue-100/80">{lendMsg}</p>}
               </div>
             )}

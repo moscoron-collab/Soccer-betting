@@ -45,7 +45,6 @@ alter table players add column if not exists last_login_day   date;
 alter table players add column if not exists last_cashback_at timestamptz;
 alter table players add column if not exists last_seen_at     timestamptz;
 alter table players add column if not exists device_id        text;
-alter table players add column if not exists loan_day         date; -- local day this player last lent coins (once-per-day cooldown)
 
 -- "One device = one account": at most one player per device_id. Legacy rows have
 -- device_id = null and are exempt (Postgres treats nulls as distinct), so existing

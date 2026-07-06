@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.1",
+    date: "2026-07-06",
+    changes: [
+      {
+        en: "🤝 Loans are now unlimited: lend to anyone, any time, as many times as you like — the one-loan-a-day limit is gone. (You still can't lend more coins than you have.)",
+        he: "🤝 ההלוואות עכשיו ללא הגבלה: הלוו לכל אחד, בכל זמן, כמה פעמים שתרצו — מגבלת הלוואה אחת ביום בוטלה. (עדיין אי אפשר להלוות יותר מטבעות ממה שיש לכם.)",
+      },
+    ],
+  },
+  {
     version: "5.0",
     date: "2026-07-06",
     changes: [

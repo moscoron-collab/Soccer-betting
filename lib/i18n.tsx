@@ -266,10 +266,6 @@ const DICT: Record<string, { en: string; he: string }> = {
   "loan.sending": { en: "Sending…", he: "שולח…" },
   "loan.sent": { en: "Sent 🪙{amount} to {name}!", he: "נשלחו 🪙{amount} ל-{name}!" },
   "loan.tooSmall": { en: "Loans start at 🪙{min}.", he: "הלוואות מתחילות מ-🪙{min}." },
-  "loan.cooldown": {
-    en: "You've already sent a loan today. Come back tomorrow!",
-    he: "כבר שלחת הלוואה היום. חזרו מחר!",
-  },
   "loan.errGeneric": { en: "Could not send the loan. Try again.", he: "לא הצלחנו לשלוח את ההלוואה. נסו שוב." },
   "loan.panelTitle": { en: "🤝 Loans", he: "🤝 הלוואות" },
   "loan.oweLine": { en: "You owe 🪙{amount} to {name}", he: "אתם חייבים 🪙{amount} ל-{name}" },

@@ -206,7 +206,6 @@ export async function GET(req: Request) {
   const nextSpinFree = used === 0;
 
   const canPenalty = isNewLocalDay(player.last_penalty_at, tz);
-  const canLendToday = player.loan_day !== today;
 
   // Loans I'm involved in, as borrower (what I owe) and as lender (what's owed to
   // me). We include repaid ones too so the panel can show a greyed-out history;
@@ -289,7 +288,6 @@ export async function GET(req: Request) {
       mustSpinToBet,
       comebackSpinsLeft: comebackLeft,
       canPenalty,
-      canLendToday,
       loansOwed,
       loansOwedToMe,
       leaderboard: toPublic(rankedAll.slice(0, 50)),

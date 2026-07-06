@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, escapeLike } from "@/lib/auth";
-import { localDate } from "@/lib/time";
 import { MIN_LOAN_AMOUNT } from "@/lib/loan";
 
 export const runtime = "nodejs";
@@ -24,19 +23,12 @@ export async function POST(req: Request) {
 
   const toUsername = String(body?.toUsername ?? "").trim();
   const amount = Math.floor(Number(body?.amount));
-  const today = localDate(body?.tz);
 
   if (!toUsername) {
     return NextResponse.json({ error: "Missing recipient" }, { status: 400 });
   }
   if (!Number.isFinite(amount) || amount < MIN_LOAN_AMOUNT) {
     return NextResponse.json({ error: `Loans start at 🪙${MIN_LOAN_AMOUNT}.` }, { status: 400 });
-  }
-  if (player.loan_day === today) {
-    return NextResponse.json(
-      { error: "You've already sent a loan today. Come back tomorrow!" },
-      { status: 429 }
-    );
   }
   if (player.coins < amount) {
     return NextResponse.json({ error: "You don't have enough coins to lend that much." }, { status: 400 });
@@ -54,13 +46,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You can't lend coins to yourself." }, { status: 400 });
   }
 
-  // Everything validated — now actually move the coins and burn today's cooldown.
-  const { error: lenderErr } = await supabase
-    .from("players")
-    .update({ loan_day: today })
-    .eq("id", player.id);
-  if (lenderErr) return NextResponse.json({ error: "Could not send the loan. Try again." }, { status: 500 });
-
+  // Everything validated — move the coins. No frequency limit: a player may lend
+  // to anyone, any number of times, as long as they can cover it.
   await supabase.rpc("increment_coins", { p_player: player.id, p_amount: -amount });
   await supabase.rpc("increment_coins", { p_player: borrower.id, p_amount: amount });
 
