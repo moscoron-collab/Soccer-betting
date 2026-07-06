@@ -3922,7 +3922,7 @@ function MatchCard({
   featuredMult?: number;
   boost?: number;
   freeBets?: number;
-  mustSpin?: boolean; // regular-wheel player still owes today's spin — block new bets
+  mustSpin?: boolean; // regular-wheel player still owes today's spins — block new bets
   onOpenPlayer?: (username: string) => void;
   onPlaced: () => void;
 }) {

@@ -109,10 +109,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing match" }, { status: 400 });
   }
 
-  // Must take today's regular-wheel spin before betting (regular wheel only).
+  // Must use up all of today's regular-wheel spins before betting (regular wheel only).
   if (await needsSpinBeforeBet(player, localDate(body?.tz))) {
     return NextResponse.json(
-      { error: "🎡 Spin the wheel first! Take today's spin before placing a bet.", code: "SPIN_REQUIRED" },
+      { error: "🎡 Spin the wheel first! Use up all of today's spins before placing a bet.", code: "SPIN_REQUIRED" },
       { status: 403 }
     );
   }

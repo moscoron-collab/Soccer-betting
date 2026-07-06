@@ -234,10 +234,11 @@ export async function GET(req: Request) {
   if (!bottomSlice && !armed) await armComeback(player.id);
   const showComebackAlert = player.is_admin === true ? showComeback : showComeback && armed;
 
-  // Regular-wheel players must take today's spin before they can bet (the wheel now has
-  // lose-a-% slices, so betting without spinning would dodge that risk). Comeback-group
-  // players and admins are exempt. `used`/`showRegular` are already computed above.
-  const mustSpinToBet = player.is_admin !== true && showRegular && used === 0;
+  // Regular-wheel players must use up ALL of today's spins before they can bet (the
+  // wheel now has lose-a-% slices, so betting after only the free spin would still
+  // dodge most of that risk). Comeback-group players and admins are exempt.
+  // `used`/`showRegular` are already computed above.
+  const mustSpinToBet = player.is_admin !== true && showRegular && used < MAX_SPINS_PER_DAY;
 
   return NextResponse.json(
     {

@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.42",
+    date: "2026-07-06",
+    changes: [
+      {
+        en: "🎡 Spin to bet, take 2: it now takes ALL of today's spins (not just the free one) to unlock betting for the day. Comeback-wheel players and admins are still exempt.",
+        he: "🎡 סובבו כדי להמר, גרסה 2: כעת צריך לנצל את כל הסיבובים של היום (לא רק את החינמי) כדי לפתוח הימורים לאותו יום. שחקני גלגל הקאמבק ומנהלים עדיין פטורים.",
+      },
+    ],
+  },
+  {
     version: "4.41",
     date: "2026-07-05",
     changes: [

@@ -358,13 +358,13 @@ const DICT: Record<string, { en: string; he: string }> = {
   "prize.lose": { en: "📉 −{pct}% — −🪙{n} coins", he: "📉 −{pct}% — −🪙{n} מטבעות" },
 
   // "Spin before you bet" gate (regular wheel only)
-  "gate.title": { en: "Spin the wheel to unlock betting", he: "סובבו את הגלגל כדי לפתוח הימורים" },
+  "gate.title": { en: "Use all your spins to unlock betting", he: "נצלו את כל הסיבובים כדי לפתוח הימורים" },
   "gate.desc": {
-    en: "Take your daily spin first — then you can place bets today.",
-    he: "קחו קודם את הסיבוב היומי — ואז תוכלו להמר היום.",
+    en: "Use up all of today's spins first — then you can place bets today.",
+    he: "נצלו קודם את כל הסיבובים של היום — ואז תוכלו להמר היום.",
   },
   "gate.cta": { en: "Spin now", he: "לסובב עכשיו" },
-  "gate.card": { en: "Spin the wheel first to bet", he: "סובבו קודם את הגלגל כדי להמר" },
+  "gate.card": { en: "Use all today's spins first to bet", he: "נצלו קודם את כל הסיבובים של היום כדי להמר" },
 
   // Penalty shootout
   "penalty.title": { en: "⚽ Penalty Shootout", he: "⚽ דו-קרב פנדלים" },
