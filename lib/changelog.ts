@@ -7,6 +7,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 
 export const CHANGELOG: Release[] = [
   {
+    version: "4.44",
+    date: "2026-07-06",
+    changes: [
+      {
+        en: "🤝 Loan history: the Loans panel now keeps a record of paid-back loans too, shown greyed out under your outstanding ones — so you can see who you've lent to (and who's paid you back) over time.",
+        he: "🤝 היסטוריית הלוואות: פאנל ההלוואות שומר עכשיו גם רישום של הלוואות שהוחזרו, מוצגות באפור מתחת לאלה שעדיין פתוחות — כך שתוכלו לראות למי הלוויתם (ומי החזיר לכם) לאורך זמן.",
+      },
+    ],
+  },
+  {
     version: "4.43",
     date: "2026-07-06",
     changes: [

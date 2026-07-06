@@ -277,6 +277,9 @@ const DICT: Record<string, { en: string; he: string }> = {
   "loan.repayBtn": { en: "Repay", he: "החזר" },
   "loan.repaying": { en: "Repaying…", he: "מחזיר…" },
   "loan.repaidToast": { en: "Loan repaid — 🪙{amount} sent back!", he: "ההלוואה הוחזרה — נשלחו 🪙{amount}!" },
+  "loan.historyTitle": { en: "History", he: "היסטוריה" },
+  "loan.repaidOweLine": { en: "You repaid 🪙{amount} to {name}", he: "החזרתם 🪙{amount} ל-{name}" },
+  "loan.repaidOwedToMeLine": { en: "{name} repaid you 🪙{amount}", he: "{name} החזיר/ה לכם 🪙{amount}" },
 
   // Changelog
   "changelog.title": { en: "🆕 What's new", he: "🆕 מה חדש" },

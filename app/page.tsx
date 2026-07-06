@@ -277,6 +277,8 @@ type LoanRow = {
   amount: number;
   created_at: string;
   username: string; // the other party: who I owe, or who owes me
+  repaid?: boolean;
+  repaid_at?: string | null;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -3399,12 +3401,27 @@ function LoansPanel({
   onRepay: (loanId: string) => void;
 }) {
   const { t } = useLang();
+
+  // Split each direction into still-open (actionable) and already-repaid (history).
+  const owedOpen = owed.filter((l) => !l.repaid);
+  const owedToMeOpen = owedToMe.filter((l) => !l.repaid);
+  // Merged, most-recent-first history of everything that's been paid back, tagging
+  // each with which side of the loan I was on so we can word it correctly.
+  const history = [
+    ...owed.filter((l) => l.repaid).map((l) => ({ ...l, mine: true })),
+    ...owedToMe.filter((l) => l.repaid).map((l) => ({ ...l, mine: false })),
+  ]
+    .sort((a, b) => new Date(b.repaid_at ?? 0).getTime() - new Date(a.repaid_at ?? 0).getTime())
+    .slice(0, 10);
+
+  const hasOpen = owedOpen.length > 0 || owedToMeOpen.length > 0;
+
   return (
     <div className="mt-4 rounded-xl bg-purple-500/15 p-4 ring-1 ring-purple-400/30">
       <p className="text-sm font-bold text-purple-200">{t("loan.panelTitle")}</p>
-      {owed.length > 0 && (
+      {owedOpen.length > 0 && (
         <div className="mt-2 space-y-1.5">
-          {owed.map((l) => (
+          {owedOpen.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2 text-sm">
               <span>{t("loan.oweLine", { amount: l.amount.toLocaleString(), name: l.username })}</span>
               <button
@@ -3418,13 +3435,29 @@ function LoansPanel({
           ))}
         </div>
       )}
-      {owedToMe.length > 0 && (
-        <div className={owed.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
-          {owedToMe.map((l) => (
+      {owedToMeOpen.length > 0 && (
+        <div className={owedOpen.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
+          {owedToMeOpen.map((l) => (
             <p key={l.id} className="text-xs text-blue-100/70">
               {t("loan.owedToMeLine", { name: l.username, amount: l.amount.toLocaleString() })}
             </p>
           ))}
+        </div>
+      )}
+      {history.length > 0 && (
+        <div className={hasOpen ? "mt-3 border-t border-white/10 pt-2" : "mt-2"}>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-100/40">
+            {t("loan.historyTitle")}
+          </p>
+          <div className="mt-1 space-y-0.5">
+            {history.map((l) => (
+              <p key={l.id} className="text-xs text-blue-100/40 line-through decoration-blue-100/30">
+                {l.mine
+                  ? t("loan.repaidOweLine", { amount: l.amount.toLocaleString(), name: l.username })
+                  : t("loan.repaidOwedToMeLine", { name: l.username, amount: l.amount.toLocaleString() })}
+              </p>
+            ))}
+          </div>
         </div>
       )}
     </div>

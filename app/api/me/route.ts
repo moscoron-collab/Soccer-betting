@@ -208,30 +208,38 @@ export async function GET(req: Request) {
   const canPenalty = isNewLocalDay(player.last_penalty_at, tz);
   const canLendToday = player.loan_day !== today;
 
-  // Outstanding loans: what I still owe (as borrower) and what's still owed to me
-  // (as lender). Repayment is manual, so these just stick around until repaid.
+  // Loans I'm involved in, as borrower (what I owe) and as lender (what's owed to
+  // me). We include repaid ones too so the panel can show a greyed-out history;
+  // outstanding come first, then the most recent repaid ones (capped). Repayment
+  // is manual, so unpaid loans just stick around until the borrower clears them.
   const { data: owedRows } = await supabase
     .from("loans")
-    .select("id, amount, created_at, lender:lender_id(username)")
+    .select("id, amount, created_at, repaid, repaid_at, lender:lender_id(username)")
     .eq("borrower_id", player.id)
-    .eq("repaid", false)
-    .order("created_at", { ascending: true });
+    .order("repaid", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(50);
   const { data: owedToMeRows } = await supabase
     .from("loans")
-    .select("id, amount, created_at, borrower:borrower_id(username)")
+    .select("id, amount, created_at, repaid, repaid_at, borrower:borrower_id(username)")
     .eq("lender_id", player.id)
-    .eq("repaid", false)
-    .order("created_at", { ascending: true });
+    .order("repaid", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(50);
   const loansOwed = (owedRows ?? []).map((r: any) => ({
     id: r.id,
     amount: r.amount,
     created_at: r.created_at,
+    repaid: r.repaid === true,
+    repaid_at: r.repaid_at ?? null,
     username: r.lender?.username ?? "?",
   }));
   const loansOwedToMe = (owedToMeRows ?? []).map((r: any) => ({
     id: r.id,
     amount: r.amount,
     created_at: r.created_at,
+    repaid: r.repaid === true,
+    repaid_at: r.repaid_at ?? null,
     username: r.borrower?.username ?? "?",
   }));
 
