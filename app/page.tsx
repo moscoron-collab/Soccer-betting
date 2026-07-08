@@ -2495,9 +2495,10 @@ function PushToggle({ token }: { token: string }) {
       await navigator.serviceWorker.register("/sw.js");
       const reg = await navigator.serviceWorker.ready;
       const keyRes = await fetch("/api/push", { cache: "no-store" });
-      const { publicKey } = await keyRes.json();
+      const { publicKey } = await keyRes.json().catch(() => ({}) as any);
       if (!publicKey) {
-        setMsg(t("push.error"));
+        // The server has no VAPID keys — tell the admin exactly what's missing.
+        setMsg(t("push.notConfigured"));
         return;
       }
       const sub =
@@ -2511,8 +2512,12 @@ function PushToggle({ token }: { token: string }) {
         headers: authHeaders(token),
         body: JSON.stringify({ subscription: sub }),
       });
-      if (res.ok) setEnabled(true);
-      else setMsg(t("push.error"));
+      if (res.ok) {
+        setEnabled(true);
+      } else {
+        const d = await res.json().catch(() => ({}) as any);
+        setMsg(d?.error === "DB_MISSING" ? t("push.dbMissing") : t("push.error"));
+      }
     } catch {
       setMsg(t("push.error"));
     } finally {
@@ -2533,7 +2538,11 @@ function PushToggle({ token }: { token: string }) {
       >
         {enabled ? t("push.on") : busy ? t("push.enabling") : t("push.enable")}
       </button>
-      {msg && <p className="basis-full text-xs text-blue-100/70">{msg}</p>}
+      {msg && (
+        <p className="basis-full rounded-lg bg-yellow-400/10 px-2 py-1 text-xs font-semibold text-yellow-200 ring-1 ring-yellow-300/30">
+          {msg}
+        </p>
+      )}
     </>
   );
 }

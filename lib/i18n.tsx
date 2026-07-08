@@ -309,6 +309,14 @@ const DICT: Record<string, { en: string; he: string }> = {
   },
   "push.unsupported": { en: "This browser doesn't support alerts.", he: "הדפדפן הזה לא תומך בהתראות." },
   "push.error": { en: "Couldn't enable alerts. Try again.", he: "לא ניתן להפעיל התראות. נסו שוב." },
+  "push.notConfigured": {
+    en: "Server keys missing: in Vercel add VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY (Settings → Environment Variables), then Redeploy.",
+    he: "חסרים מפתחות בשרת: ב-Vercel הוסיפו VAPID_PUBLIC_KEY ו-VAPID_PRIVATE_KEY (הגדרות → משתני סביבה) ואז עשו Redeploy.",
+  },
+  "push.dbMissing": {
+    en: "Database table missing: re-run schema.sql in the Supabase SQL editor, then tap again.",
+    he: "חסרה טבלה בבסיס הנתונים: הריצו שוב את schema.sql בעורך ה-SQL של Supabase ואז הקישו שוב.",
+  },
   // --- Gift conversation thread ---
   "giftThread.titleFrom": { en: "🎁 Gift from {name}", he: "🎁 מתנה מ-{name}" },
   "giftThread.titleTo": { en: "🎁 Gift to {name}", he: "🎁 מתנה ל-{name}" },

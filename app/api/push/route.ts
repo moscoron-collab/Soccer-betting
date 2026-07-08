@@ -43,7 +43,15 @@ export async function POST(req: Request) {
       { player_id: player.id, endpoint, p256dh, auth },
       { onConflict: "endpoint" }
     );
-  if (error) return NextResponse.json({ error: "Could not save. Try again." }, { status: 500 });
+  if (error) {
+    // 42P01 = table doesn't exist — schema.sql hasn't been re-run since push was
+    // added. Surface a distinct code so the (admin-only) UI can say exactly that.
+    const missingTable = (error as any)?.code === "42P01";
+    return NextResponse.json(
+      { error: missingTable ? "DB_MISSING" : "Could not save. Try again." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
