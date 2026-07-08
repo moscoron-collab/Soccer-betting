@@ -282,6 +282,13 @@ type LoanRow = {
   repaid_at?: string | null;
 };
 
+type GiftRow = {
+  id: string;
+  amount: number;
+  created_at: string;
+  username: string; // the other party: who gifted me, or who I gifted
+};
+
 type NotifRow = {
   id: string;
   kind: string; // 'gift' | 'gift_reply'
@@ -377,6 +384,9 @@ function Home() {
   const [canPenalty, setCanPenalty] = useState(false);
   const [loansOwed, setLoansOwed] = useState<LoanRow[]>([]);
   const [loansOwedToMe, setLoansOwedToMe] = useState<LoanRow[]>([]);
+  const [giftsReceived, setGiftsReceived] = useState<GiftRow[]>([]);
+  const [giftsSent, setGiftsSent] = useState<GiftRow[]>([]);
+  const [giftTotals, setGiftTotals] = useState<{ received: number; sent: number }>({ received: 0, sent: 0 });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
@@ -477,6 +487,9 @@ function Home() {
     setCanPenalty(!!data.canPenalty);
     setLoansOwed(data.loansOwed ?? []);
     setLoansOwedToMe(data.loansOwedToMe ?? []);
+    setGiftsReceived(data.giftsReceived ?? []);
+    setGiftsSent(data.giftsSent ?? []);
+    setGiftTotals(data.giftTotals ?? { received: 0, sent: 0 });
     setUnreadNotifications(data.unreadNotifications ?? 0);
     setLeaderboard(data.leaderboard ?? []);
     setMyRank(data.myRank ?? null);
@@ -548,6 +561,9 @@ function Home() {
           canPenalty={canPenalty}
           loansOwed={loansOwed}
           loansOwedToMe={loansOwedToMe}
+          giftsReceived={giftsReceived}
+          giftsSent={giftsSent}
+          giftTotals={giftTotals}
           unreadNotifications={unreadNotifications}
           leaderboard={leaderboard}
           myRank={myRank}
@@ -1521,6 +1537,9 @@ function Game({
   canPenalty,
   loansOwed,
   loansOwedToMe,
+  giftsReceived,
+  giftsSent,
+  giftTotals,
   unreadNotifications,
   leaderboard,
   myRank,
@@ -1542,6 +1561,9 @@ function Game({
   canPenalty: boolean;
   loansOwed: LoanRow[];
   loansOwedToMe: LoanRow[];
+  giftsReceived: GiftRow[];
+  giftsSent: GiftRow[];
+  giftTotals: { received: number; sent: number };
   unreadNotifications: number;
   leaderboard: LeaderRow[];
   myRank: number | null;
@@ -1561,6 +1583,7 @@ function Game({
   const [showChanges, setShowChanges] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [threadGiftId, setThreadGiftId] = useState<string | null>(null);
   const [viewPlayer, setViewPlayer] = useState<string | null>(null);
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
   // How many claimable challenges / badges are waiting, for the reminder dots.
@@ -1821,14 +1844,25 @@ function Game({
         <LowCoinsPanel canBailout={canBailout} onBailout={bailout} />
       )}
 
-      {(loansOwed.length > 0 || loansOwedToMe.length > 0) && (
-        <LoansPanel
-          owed={loansOwed}
-          owedToMe={loansOwedToMe}
-          myCoins={player.coins}
-          repayingId={repayingId}
-          onRepay={repayLoan}
-        />
+      {(loansOwed.length > 0 ||
+        loansOwedToMe.length > 0 ||
+        giftsReceived.length > 0 ||
+        giftsSent.length > 0) && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <LoansPanel
+            owed={loansOwed}
+            owedToMe={loansOwedToMe}
+            myCoins={player.coins}
+            repayingId={repayingId}
+            onRepay={repayLoan}
+          />
+          <GiftsPanel
+            received={giftsReceived}
+            sent={giftsSent}
+            totals={giftTotals}
+            onOpenThread={(id) => setThreadGiftId(id)}
+          />
+        </div>
       )}
 
       {/* Tabs — colour-coded (blue / green / gold). Active = gradient fill + soft
@@ -2122,6 +2156,16 @@ function Game({
           token={token}
           onClose={() => setShowNotifications(false)}
           onRead={onRefresh}
+        />
+      )}
+      {threadGiftId && (
+        <GiftThreadModal
+          token={token}
+          giftId={threadGiftId}
+          onClose={() => {
+            setThreadGiftId(null);
+            onRefresh();
+          }}
         />
       )}
       {viewPlayer && (
@@ -3778,10 +3822,12 @@ function LoansPanel({
     .slice(0, 10);
 
   const hasOpen = owedOpen.length > 0 || owedToMeOpen.length > 0;
+  const isEmpty = !hasOpen && history.length === 0;
 
   return (
-    <div className="mt-4 rounded-xl bg-purple-500/15 p-4 ring-1 ring-purple-400/30">
+    <div className="h-full rounded-xl bg-purple-500/15 p-4 ring-1 ring-purple-400/30">
       <p className="text-sm font-bold text-purple-200">{t("loan.panelTitle")}</p>
+      {isEmpty && <p className="mt-2 text-xs text-blue-100/50">{t("loan.none")}</p>}
       {owedOpen.length > 0 && (
         <div className="mt-2 space-y-1.5">
           {owedOpen.map((l) => (
@@ -3821,6 +3867,65 @@ function LoansPanel({
               </p>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A record of coin gifts, sitting next to the Loans panel. Gifts are one-way and
+// never repaid, so there's no repay button or history split — just who gave what,
+// plus all-time totals. Tapping a gift opens its note + reply conversation.
+function GiftsPanel({
+  received,
+  sent,
+  totals,
+  onOpenThread,
+}: {
+  received: GiftRow[];
+  sent: GiftRow[];
+  totals: { received: number; sent: number };
+  onOpenThread: (giftId: string) => void;
+}) {
+  const { t } = useLang();
+  const isEmpty = received.length === 0 && sent.length === 0;
+
+  return (
+    <div className="h-full rounded-xl bg-pink-500/15 p-4 ring-1 ring-pink-400/30">
+      <p className="text-sm font-bold text-pink-200">{t("gift.panelTitle")}</p>
+      {(totals.received > 0 || totals.sent > 0) && (
+        <p className="mt-1 text-[11px] text-blue-100/60">
+          {t("gift.totalsLine", {
+            recv: totals.received.toLocaleString(),
+            sent: totals.sent.toLocaleString(),
+          })}
+        </p>
+      )}
+      {isEmpty && <p className="mt-2 text-xs text-blue-100/50">{t("gift.none")}</p>}
+      {received.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {received.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => onOpenThread(g.id)}
+              className="block w-full rounded-lg px-1.5 py-1 text-start text-sm hover:bg-white/10"
+            >
+              {t("gift.receivedLine", { name: g.username, amount: g.amount.toLocaleString() })}
+            </button>
+          ))}
+        </div>
+      )}
+      {sent.length > 0 && (
+        <div className={received.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
+          {sent.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => onOpenThread(g.id)}
+              className="block w-full rounded-lg px-1.5 py-1 text-start text-xs text-blue-100/70 hover:bg-white/10"
+            >
+              {t("gift.sentLine", { name: g.username, amount: g.amount.toLocaleString() })}
+            </button>
+          ))}
         </div>
       )}
     </div>

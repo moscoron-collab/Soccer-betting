@@ -284,6 +284,12 @@ const DICT: Record<string, { en: string; he: string }> = {
   "gift.tooSmall": { en: "Gifts start at 🪙{min}.", he: "מתנות מתחילות מ-🪙{min}." },
   "gift.errGeneric": { en: "Could not send the gift. Try again.", he: "לא הצלחנו לשלוח את המתנה. נסו שוב." },
   "gift.notePlaceholder": { en: "Add a note (optional)…", he: "הוסיפו הודעה (רשות)…" },
+  "gift.panelTitle": { en: "🎁 Gifts", he: "🎁 מתנות" },
+  "gift.totalsLine": { en: "Received 🪙{recv} · Sent 🪙{sent}", he: "התקבלו 🪙{recv} · נשלחו 🪙{sent}" },
+  "gift.receivedLine": { en: "{name} gifted you 🪙{amount}", he: "{name} נתן/ה לכם 🪙{amount}" },
+  "gift.sentLine": { en: "You gifted {name} 🪙{amount}", he: "נתתם ל-{name} 🪙{amount}" },
+  "gift.none": { en: "No gifts yet", he: "אין מתנות עדיין" },
+  "loan.none": { en: "No loans yet", he: "אין הלוואות עדיין" },
   // --- Notifications inbox (the header bell) ---
   "notif.bell": { en: "Alerts", he: "התראות" },
   "notif.title": { en: "🔔 Notifications", he: "🔔 התראות" },

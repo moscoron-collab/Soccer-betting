@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.4",
+    date: "2026-07-08",
+    changes: [
+      {
+        en: "🎁 Gifts record: a new Gifts panel now sits next to Loans, showing every gift you've received and sent (with all-time totals). Tap any gift to open its note & reply conversation.",
+        he: "🎁 רישום מתנות: פאנל מתנות חדש מופיע ליד ההלוואות, ומראה כל מתנה שקיבלתם ושלחתם (עם סיכומים כלליים). הקישו על כל מתנה כדי לפתוח את שיחת ההודעות והתשובות שלה.",
+      },
+    ],
+  },
+  {
     version: "5.3",
     date: "2026-07-08",
     changes: [

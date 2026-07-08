@@ -242,6 +242,39 @@ export async function GET(req: Request) {
     username: r.borrower?.username ?? "?",
   }));
 
+  // Gifts I'm involved in, both directions, for the Gifts panel (a record next to
+  // Loans). Gifts are one-way and never repaid, so there's no open/history split —
+  // just who gave what. We pull up to 200 each way: the newest 50 are shown, and
+  // all fetched rows feed the all-time totals line.
+  const { data: giftsRecvRows } = await supabase
+    .from("gifts")
+    .select("id, amount, created_at, sender:sender_id(username)")
+    .eq("recipient_id", player.id)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const { data: giftsSentRows } = await supabase
+    .from("gifts")
+    .select("id, amount, created_at, recipient:recipient_id(username)")
+    .eq("sender_id", player.id)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const giftsReceived = (giftsRecvRows ?? []).slice(0, 50).map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    created_at: r.created_at,
+    username: r.sender?.username ?? "?",
+  }));
+  const giftsSent = (giftsSentRows ?? []).slice(0, 50).map((r: any) => ({
+    id: r.id,
+    amount: r.amount,
+    created_at: r.created_at,
+    username: r.recipient?.username ?? "?",
+  }));
+  const giftTotals = {
+    received: (giftsRecvRows ?? []).reduce((s: number, r: any) => s + (r.amount || 0), 0),
+    sent: (giftsSentRows ?? []).reduce((s: number, r: any) => s + (r.amount || 0), 0),
+  };
+
   // Unread notification count for the header bell badge. The full list is fetched
   // lazily by /api/notifications only when the player opens the inbox.
   const { count: unreadNotifications } = await supabase
@@ -298,6 +331,9 @@ export async function GET(req: Request) {
       canPenalty,
       loansOwed,
       loansOwedToMe,
+      giftsReceived,
+      giftsSent,
+      giftTotals,
       unreadNotifications: unreadNotifications ?? 0,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
       myRank,
