@@ -124,6 +124,7 @@ type Player = {
   boost_2x?: number;
   streak_shield?: number;
   free_bets?: number;
+  is_admin?: boolean;
   created_at?: string | null;
 };
 type BetType = "WINNER" | "EXACT" | "HALFTIME" | "GOALS3" | "BTTS" | "TOTALS";
@@ -1878,6 +1879,9 @@ function Game({
             </span>
           )}
         </button>
+        {/* Phone-push preview: admin-only while the owner tries it out. Remove the
+            is_admin gate to roll phone alerts out to every player. */}
+        {player.is_admin === true && <PushToggle token={token} />}
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           {t("game.invite")}
         </button>
@@ -2423,12 +2427,13 @@ function resizeImage(file: File, size: number): Promise<string> {
 }
 
 /* --------------------------- Phone push alerts ---------------------------- */
-// DORMANT — not rendered anywhere right now (the owner chose in-app Messages
-// over phone push for launch). Kept so switching push on later is just:
-// render <PushToggle token={token} /> in the header and set the VAPID env vars
-// in Vercel. Registers the service worker, asks for notification permission,
-// subscribes to Web Push and stores the subscription server-side. Handles the
-// iOS quirk where push only works once the site is installed to the home screen.
+// ADMIN-ONLY PREVIEW — rendered in the header only for players with is_admin,
+// so the owner can trial phone push before rolling it out to everyone (drop the
+// is_admin gate at the render site to go wide). Needs the VAPID env vars set in
+// Vercel to actually deliver. Registers the service worker, asks for
+// notification permission, subscribes to Web Push and stores the subscription
+// server-side. Handles the iOS quirk where push only works once the site is
+// installed to the home screen.
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
