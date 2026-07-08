@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, escapeLike } from "@/lib/auth";
 import { MIN_GIFT_AMOUNT } from "@/lib/gift";
 import { cleanMessage } from "@/lib/chat";
+import { sendPushToPlayer } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,6 +104,15 @@ export async function POST(req: Request) {
     player_id: recipient.id,
     kind: "gift",
     data: { from: player.username, amount, giftId: gift.id, note: note ?? undefined },
+  });
+
+  // Phone push (best-effort; no-ops if push isn't configured or they haven't opted in).
+  await sendPushToPlayer(recipient.id, {
+    title: "🎁 You got a gift!",
+    body: note
+      ? `${player.username} gifted you 🪙${amount.toLocaleString()}: "${note}"`
+      : `${player.username} gifted you 🪙${amount.toLocaleString()}`,
+    tag: `gift-${gift.id}`,
   });
 
   return NextResponse.json({ ok: true, amount, toUsername: recipient.username });

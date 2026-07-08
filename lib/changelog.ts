@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.5",
+    date: "2026-07-08",
+    changes: [
+      {
+        en: "📲 Phone alerts: tap “🔔 Phone alerts” next to the bell to get push notifications on your phone — even with the game closed — when someone gifts you coins, replies to a gift, or @mentions you in chat. (On iPhone, first add the app to your Home Screen.)",
+        he: "📲 התראות לנייד: הקישו על “🔔 התראות לנייד” ליד הפעמון כדי לקבל התראות לטלפון — גם כשהמשחק סגור — כשמישהו נותן לכם מטבעות במתנה, מגיב למתנה, או מזכיר אתכם בצ'אט עם @. (באייפון, קודם הוסיפו את האפליקציה למסך הבית.)",
+      },
+    ],
+  },
+  {
     version: "5.4",
     date: "2026-07-08",
     changes: [

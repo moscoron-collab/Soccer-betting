@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { getPlayerFromRequest } from "@/lib/auth";
-import { cleanMessage, RATE_MAX, RATE_WINDOW_MS } from "@/lib/chat";
+import { getPlayerFromRequest, escapeLike } from "@/lib/auth";
+import { cleanMessage, extractMentions, RATE_MAX, RATE_WINDOW_MS } from "@/lib/chat";
+import { sendPushToPlayer } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,30 @@ export async function POST(req: Request) {
     .select("id, body, created_at")
     .single();
   if (error || !data) return NextResponse.json({ error: "Try again." }, { status: 500 });
+
+  // @mentions: drop a notification + phone push on each mentioned player (not
+  // yourself). Best-effort — never fails the send.
+  const mentions = extractMentions(clean.text);
+  if (mentions.length) {
+    for (const name of mentions.slice(0, 5)) {
+      const { data: who } = await supabase
+        .from("players")
+        .select("id, username")
+        .ilike("username", escapeLike(name))
+        .maybeSingle();
+      if (!who || who.id === player.id) continue;
+      await supabase.from("notifications").insert({
+        player_id: who.id,
+        kind: "chat_mention",
+        data: { from: player.username },
+      });
+      await sendPushToPlayer(who.id, {
+        title: "💬 You were mentioned",
+        body: `${player.username}: ${clean.text}`,
+        tag: "chat",
+      });
+    }
+  }
 
   return NextResponse.json({ ok: true, message: data });
 }

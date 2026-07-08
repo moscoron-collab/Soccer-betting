@@ -290,6 +290,21 @@ create table if not exists notifications (
 );
 create index if not exists notifications_player_idx on notifications (player_id, read, created_at desc);
 
+-- ---------- push_subscriptions (Web Push endpoints for phone notifications) ----------
+-- Each row is one browser/device a player has opted in from. We push to every
+-- endpoint a player has. Dead endpoints (410/404 from the push service) are
+-- pruned on send. `endpoint` is unique so re-subscribing the same device is a
+-- no-op upsert rather than a duplicate.
+create table if not exists push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists push_subs_player_idx on push_subscriptions (player_id);
+
 -- ---------- jackpot_wins (log of jackpot payouts, for the Hall of Fame) ----------
 create table if not exists jackpot_wins (
   id          uuid primary key default gen_random_uuid(),

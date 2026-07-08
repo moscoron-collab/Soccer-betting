@@ -38,6 +38,18 @@ function maskProfanity(text: string): string {
   return out;
 }
 
+// Pull @mentions out of a message: an "@" followed by 2–20 letters/digits/
+// underscores. Returns lowercased, de-duplicated tokens (without the "@"). Note
+// this only catches single-token usernames — names with spaces aren't mentionable
+// this way. Used to notify/ping mentioned players.
+export function extractMentions(text: string): string[] {
+  const out = new Set<string>();
+  const re = /@([\p{L}\p{N}_]{2,20})/gu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) out.add(m[1].toLowerCase());
+  return [...out];
+}
+
 export type CleanResult =
   | { ok: true; text: string }
   | { ok: false; code: "EMPTY" | "TOO_LONG" | "NO_LINKS" };

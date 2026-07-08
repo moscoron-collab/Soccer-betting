@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest } from "@/lib/auth";
 import { cleanMessage } from "@/lib/chat";
+import { sendPushToPlayer } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,6 +98,13 @@ export async function POST(req: Request) {
     player_id: otherId,
     kind: "gift_reply",
     data: { from: player.username, giftId: gift.id },
+  });
+
+  // Phone push (best-effort).
+  await sendPushToPlayer(otherId, {
+    title: "💬 New reply",
+    body: `${player.username}: ${cleaned.text}`,
+    tag: `gift-${gift.id}`,
   });
 
   return NextResponse.json({ ok: true });

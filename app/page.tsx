@@ -1829,6 +1829,7 @@ function Game({
             </span>
           )}
         </button>
+        <PushToggle token={token} />
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           {t("game.invite")}
         </button>
@@ -2373,6 +2374,115 @@ function resizeImage(file: File, size: number): Promise<string> {
   });
 }
 
+/* --------------------------- Phone push alerts ---------------------------- */
+// The little "Enable phone alerts" control next to the bell. Registers the
+// service worker, asks the browser for notification permission, subscribes to
+// Web Push and stores the subscription server-side. Handles the iOS quirk where
+// push only works once the site is installed to the home screen.
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function PushToggle({ token }: { token: string }) {
+  const { t } = useLang();
+  const [supported, setSupported] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const isIOS =
+    typeof navigator !== "undefined" &&
+    (/iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1));
+  const standalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      (navigator as any).standalone === true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    setSupported(ok);
+    if (!ok) return;
+    // Reflect any existing subscription so the button reads "on" on revisits.
+    navigator.serviceWorker.getRegistration().then(async (reg) => {
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub && Notification.permission === "granted") setEnabled(true);
+    });
+  }, []);
+
+  async function enable() {
+    setMsg(null);
+    // iOS only allows push from an installed (home-screen) PWA.
+    if (isIOS && !standalone) {
+      setMsg(t("push.iosHint"));
+      return;
+    }
+    if (!supported) {
+      setMsg(t("push.unsupported"));
+      return;
+    }
+    setBusy(true);
+    try {
+      // Ask permission FIRST, still inside the click gesture — Safari drops the
+      // gesture if we await anything (SW register, fetch) before this.
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setMsg(t("push.denied"));
+        return;
+      }
+      await navigator.serviceWorker.register("/sw.js");
+      const reg = await navigator.serviceWorker.ready;
+      const keyRes = await fetch("/api/push", { cache: "no-store" });
+      const { publicKey } = await keyRes.json();
+      if (!publicKey) {
+        setMsg(t("push.error"));
+        return;
+      }
+      const sub =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+        }));
+      const res = await fetch("/api/push", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ subscription: sub }),
+      });
+      if (res.ok) setEnabled(true);
+      else setMsg(t("push.error"));
+    } catch {
+      setMsg(t("push.error"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!supported && !isIOS) return null; // truly no support and not iOS — hide it
+
+  return (
+    <>
+      <button
+        onClick={enable}
+        disabled={busy || enabled}
+        className={`rounded-lg px-3 py-1.5 text-sm ${
+          enabled ? "bg-green-600/30 text-green-200" : "bg-white/10"
+        } disabled:opacity-70`}
+      >
+        {enabled ? t("push.on") : busy ? t("push.enabling") : t("push.enable")}
+      </button>
+      {msg && <p className="basis-full text-xs text-blue-100/70">{msg}</p>}
+    </>
+  );
+}
+
 /* -------------------------- Notifications inbox --------------------------- */
 // The header bell opens this. Lists the player's recent notifications (right now
 // just "someone gifted you coins") and marks them read on open so the badge
@@ -2387,6 +2497,9 @@ function notifText(t: T, n: NotifRow): string | null {
   }
   if (n.kind === "gift_reply") {
     return t("notif.giftReplyLine", { name: n.data.from ?? "?" });
+  }
+  if (n.kind === "chat_mention") {
+    return t("notif.mentionLine", { name: n.data.from ?? "?" });
   }
   return null;
 }

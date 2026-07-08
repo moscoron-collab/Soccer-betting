@@ -296,7 +296,19 @@ const DICT: Record<string, { en: string; he: string }> = {
   "notif.empty": { en: "No notifications yet.", he: "אין התראות עדיין." },
   "notif.giftLine": { en: "🎁 {name} gifted you 🪙{amount}", he: "🎁 {name} נתן/ה לכם 🪙{amount} במתנה" },
   "notif.giftReplyLine": { en: "💬 {name} replied to your gift", he: "💬 {name} הגיב/ה למתנה שלכם" },
+  "notif.mentionLine": { en: "💬 {name} mentioned you in chat", he: "💬 {name} הזכיר/ה אתכם בצ'אט" },
   "notif.tapOpen": { en: "Tap to read & reply", he: "הקישו כדי לקרוא ולהגיב" },
+  // --- Phone push alerts (the bell's "Enable" control) ---
+  "push.enable": { en: "🔔 Phone alerts", he: "🔔 התראות לנייד" },
+  "push.enabling": { en: "Enabling…", he: "מפעיל…" },
+  "push.on": { en: "🔔 Alerts on", he: "🔔 התראות פעילות" },
+  "push.denied": { en: "Alerts blocked in your browser settings.", he: "ההתראות חסומות בהגדרות הדפדפן." },
+  "push.iosHint": {
+    en: "On iPhone: tap Share → Add to Home Screen, open the app from that icon, then enable alerts.",
+    he: "באייפון: הקישו שיתוף → הוסף למסך הבית, פתחו את האפליקציה מהאייקון, ואז הפעילו התראות.",
+  },
+  "push.unsupported": { en: "This browser doesn't support alerts.", he: "הדפדפן הזה לא תומך בהתראות." },
+  "push.error": { en: "Couldn't enable alerts. Try again.", he: "לא ניתן להפעיל התראות. נסו שוב." },
   // --- Gift conversation thread ---
   "giftThread.titleFrom": { en: "🎁 Gift from {name}", he: "🎁 מתנה מ-{name}" },
   "giftThread.titleTo": { en: "🎁 Gift to {name}", he: "🎁 מתנה ל-{name}" },
