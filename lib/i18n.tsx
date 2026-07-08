@@ -276,6 +276,18 @@ const DICT: Record<string, { en: string; he: string }> = {
   "loan.historyTitle": { en: "History", he: "היסטוריה" },
   "loan.repaidOweLine": { en: "You repaid 🪙{amount} to {name}", he: "החזרתם 🪙{amount} ל-{name}" },
   "loan.repaidOwedToMeLine": { en: "{name} repaid you 🪙{amount}", he: "{name} החזיר/ה לכם 🪙{amount}" },
+  // --- Gifts (coins given outright, never repaid) ---
+  "gift.giftTitle": { en: "🎁 Gift coins to {name}", he: "🎁 מתנת מטבעות ל-{name}" },
+  "gift.giftBtn": { en: "Gift", he: "מתנה" },
+  "gift.sending": { en: "Sending…", he: "שולח…" },
+  "gift.sent": { en: "Gifted 🪙{amount} to {name}! 🎁", he: "נתתם 🪙{amount} במתנה ל-{name}! 🎁" },
+  "gift.tooSmall": { en: "Gifts start at 🪙{min}.", he: "מתנות מתחילות מ-🪙{min}." },
+  "gift.errGeneric": { en: "Could not send the gift. Try again.", he: "לא הצלחנו לשלוח את המתנה. נסו שוב." },
+  // --- Notifications inbox (the header bell) ---
+  "notif.bell": { en: "Alerts", he: "התראות" },
+  "notif.title": { en: "🔔 Notifications", he: "🔔 התראות" },
+  "notif.empty": { en: "No notifications yet.", he: "אין התראות עדיין." },
+  "notif.giftLine": { en: "🎁 {name} gifted you 🪙{amount}", he: "🎁 {name} נתן/ה לכם 🪙{amount} במתנה" },
 
   // Changelog
   "changelog.title": { en: "🆕 What's new", he: "🆕 מה חדש" },

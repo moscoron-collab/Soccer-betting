@@ -242,6 +242,14 @@ export async function GET(req: Request) {
     username: r.borrower?.username ?? "?",
   }));
 
+  // Unread notification count for the header bell badge. The full list is fetched
+  // lazily by /api/notifications only when the player opens the inbox.
+  const { count: unreadNotifications } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("player_id", player.id)
+    .eq("read", false);
+
   // Serve the leaderboard from here too: /api/me is always dynamic (it reads the
   // player token), so it can't be edge-cached the way the public /api/leaderboard
   // can — guaranteeing live totals and avatars for everyone. Ranked by Net Worth
@@ -290,6 +298,7 @@ export async function GET(req: Request) {
       canPenalty,
       loansOwed,
       loansOwedToMe,
+      unreadNotifications: unreadNotifications ?? 0,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
       myRank,
       myInPlay,

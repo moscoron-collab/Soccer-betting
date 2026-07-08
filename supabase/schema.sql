@@ -246,6 +246,34 @@ create table if not exists loans (
 create index if not exists loans_lender_idx on loans (lender_id) where not repaid;
 create index if not exists loans_borrower_idx on loans (borrower_id) where not repaid;
 
+-- ---------- gifts (peer-to-peer coin gifts — given outright, never repaid) ----------
+-- Like a loan but with no repayment at all: the sender gives coins straight from
+-- their own balance and never expects them back. The recipient gets a
+-- notification (see below) telling them who gifted them and how much.
+create table if not exists gifts (
+  id           uuid primary key default gen_random_uuid(),
+  sender_id    uuid not null references players(id) on delete cascade,
+  recipient_id uuid not null references players(id) on delete cascade,
+  amount       integer not null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists gifts_recipient_idx on gifts (recipient_id, created_at desc);
+
+-- ---------- notifications (per-player inbox; powers the header bell) ----------
+-- A lightweight per-player feed. Today the only kind is 'gift' (someone gifted
+-- you coins), but the shape is generic so more kinds can be added later. The
+-- text is rendered client-side from `kind` + `data` so it stays translatable
+-- (English / Hebrew) instead of being frozen into one language at write time.
+create table if not exists notifications (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references players(id) on delete cascade,
+  kind        text not null,                        -- 'gift'
+  data        jsonb not null default '{}'::jsonb,   -- e.g. { "from": "ex", "amount": 1000 }
+  read        boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists notifications_player_idx on notifications (player_id, read, created_at desc);
+
 -- ---------- jackpot_wins (log of jackpot payouts, for the Hall of Fame) ----------
 create table if not exists jackpot_wins (
   id          uuid primary key default gen_random_uuid(),

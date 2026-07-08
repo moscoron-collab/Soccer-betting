@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.2",
+    date: "2026-07-08",
+    changes: [
+      {
+        en: "🎁 Gifts + a notification bell: open any player's profile to gift them coins outright (no repaying — it's a gift, not a loan). Whoever you gift now gets an alert — 'ex gifted you 🪙1,000' — in the new 🔔 bell up top, so coins never just show up with no idea who sent them.",
+        he: "🎁 מתנות + פעמון התראות: פתחו את הפרופיל של כל שחקן כדי לתת לו מטבעות במתנה (בלי החזר — זו מתנה, לא הלוואה). מי שתתנו לו יקבל עכשיו התראה — 'ex נתן לכם 🪙1,000 במתנה' — בפעמון 🔔 החדש למעלה, כך שמטבעות לא סתם מופיעים בלי לדעת מי שלח.",
+      },
+    ],
+  },
+  {
     version: "5.1",
     date: "2026-07-06",
     changes: [

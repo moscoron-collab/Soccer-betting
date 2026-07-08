@@ -9,6 +9,7 @@ import { FREE_BET_STAKE, MOTD_BONUS, isKnockoutStage } from "@/lib/payout";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { MAX_MESSAGE_LEN } from "@/lib/chat";
 import { MIN_LOAN_AMOUNT } from "@/lib/loan";
+import { MIN_GIFT_AMOUNT } from "@/lib/gift";
 import type { Bracket, BracketMatch, BracketTeam } from "@/lib/bracket";
 
 // Translator type, so helpers can take `t` without importing React context.
@@ -281,6 +282,14 @@ type LoanRow = {
   repaid_at?: string | null;
 };
 
+type NotifRow = {
+  id: string;
+  kind: string; // 'gift'
+  data: { from?: string; amount?: number };
+  read: boolean;
+  created_at: string;
+};
+
 function authHeaders(token: string): HeadersInit {
   return { "Content-Type": "application/json", "x-player-token": token };
 }
@@ -368,6 +377,7 @@ function Home() {
   const [canPenalty, setCanPenalty] = useState(false);
   const [loansOwed, setLoansOwed] = useState<LoanRow[]>([]);
   const [loansOwedToMe, setLoansOwedToMe] = useState<LoanRow[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
   const [welcomeBack, setWelcomeBack] = useState<{ giftAmount: number; awayHours: number } | null>(null);
@@ -467,6 +477,7 @@ function Home() {
     setCanPenalty(!!data.canPenalty);
     setLoansOwed(data.loansOwed ?? []);
     setLoansOwedToMe(data.loansOwedToMe ?? []);
+    setUnreadNotifications(data.unreadNotifications ?? 0);
     setLeaderboard(data.leaderboard ?? []);
     setMyRank(data.myRank ?? null);
     if (data.welcomeBack) {
@@ -537,6 +548,7 @@ function Home() {
           canPenalty={canPenalty}
           loansOwed={loansOwed}
           loansOwedToMe={loansOwedToMe}
+          unreadNotifications={unreadNotifications}
           leaderboard={leaderboard}
           myRank={myRank}
           welcomeBack={welcomeBack}
@@ -1509,6 +1521,7 @@ function Game({
   canPenalty,
   loansOwed,
   loansOwedToMe,
+  unreadNotifications,
   leaderboard,
   myRank,
   welcomeBack,
@@ -1529,6 +1542,7 @@ function Game({
   canPenalty: boolean;
   loansOwed: LoanRow[];
   loansOwedToMe: LoanRow[];
+  unreadNotifications: number;
   leaderboard: LeaderRow[];
   myRank: number | null;
   welcomeBack: { giftAmount: number; awayHours: number } | null;
@@ -1546,6 +1560,7 @@ function Game({
   const [view, setView] = useState<"play" | "log" | "bracket">("play");
   const [showChanges, setShowChanges] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [viewPlayer, setViewPlayer] = useState<string | null>(null);
   const [seenVersion, setSeenVersion] = useState<string>(VERSION);
   // How many claimable challenges / badges are waiting, for the reminder dots.
@@ -1780,6 +1795,17 @@ function Game({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <LangToggle />
+        <button
+          onClick={() => setShowNotifications(true)}
+          className="relative rounded-lg bg-white/10 px-3 py-1.5 text-sm"
+        >
+          🔔 {t("notif.bell")}
+          {unreadNotifications > 0 && (
+            <span className="absolute -end-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+              {unreadNotifications > 9 ? "9+" : unreadNotifications}
+            </span>
+          )}
+        </button>
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           {t("game.invite")}
         </button>
@@ -2091,6 +2117,13 @@ function Game({
           onSaved={refreshAll}
         />
       )}
+      {showNotifications && (
+        <NotificationsModal
+          token={token}
+          onClose={() => setShowNotifications(false)}
+          onRead={onRefresh}
+        />
+      )}
       {viewPlayer && (
         <PlayerLogModal
           username={viewPlayer}
@@ -2296,6 +2329,104 @@ function resizeImage(file: File, size: number): Promise<string> {
   });
 }
 
+/* -------------------------- Notifications inbox --------------------------- */
+// The header bell opens this. Lists the player's recent notifications (right now
+// just "someone gifted you coins") and marks them read on open so the badge
+// clears. Text is built from `kind` + `data` so it stays translatable.
+
+function notifText(t: T, n: NotifRow): string | null {
+  if (n.kind === "gift") {
+    return t("notif.giftLine", {
+      name: n.data.from ?? "?",
+      amount: (n.data.amount ?? 0).toLocaleString(),
+    });
+  }
+  return null;
+}
+
+function NotificationsModal({
+  token,
+  onClose,
+  onRead,
+}: {
+  token: string;
+  onClose: () => void;
+  onRead?: () => void | Promise<void>;
+}) {
+  const { t, lang } = useLang();
+  const [items, setItems] = useState<NotifRow[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/notifications", {
+          headers: authHeaders(token),
+          cache: "no-store",
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!live) return;
+        setItems(d.items ?? []);
+        // Mark everything read now that they're looking, then refresh the badge.
+        if ((d.unread ?? 0) > 0) {
+          await fetch("/api/notifications", { method: "POST", headers: authHeaders(token), body: "{}" });
+          await onRead?.();
+        }
+      } catch {
+        if (live) setItems([]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [token, onRead]);
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-[#0f2143] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">{t("notif.title")}</h2>
+          <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
+            {t("common.close")}
+          </button>
+        </div>
+
+        {items === null && <p className="mt-4 text-sm text-blue-100/70">{t("common.loading")}</p>}
+        {items !== null && items.length === 0 && (
+          <p className="mt-6 text-center text-sm text-blue-100/70">{t("notif.empty")}</p>
+        )}
+        {items !== null && items.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {items.map((n) => {
+              const text = notifText(t, n);
+              if (!text) return null;
+              return (
+                <div
+                  key={n.id}
+                  className={`rounded-lg p-3 text-sm ${n.read ? "bg-white/5" : "bg-yellow-400/10 ring-1 ring-yellow-300/30"}`}
+                >
+                  <p className="font-semibold text-blue-50">{text}</p>
+                  <p className="mt-0.5 text-[11px] text-blue-100/50">
+                    {new Date(n.created_at).toLocaleString(lang === "he" ? "he-IL" : "en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------- Player log modal ----------------------------- */
 // Opens when you tap another player's avatar — shows their profile + bet log.
 
@@ -2325,6 +2456,9 @@ function PlayerLogModal({
   const [lendAmount, setLendAmount] = useState("");
   const [lending, setLending] = useState(false);
   const [lendMsg, setLendMsg] = useState<string | null>(null);
+  const [giftAmount, setGiftAmount] = useState("");
+  const [gifting, setGifting] = useState(false);
+  const [giftMsg, setGiftMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -2378,6 +2512,37 @@ function PlayerLogModal({
       setLendMsg(t("loan.errGeneric"));
     } finally {
       setLending(false);
+    }
+  }
+
+  async function giftCoins() {
+    if (!token || gifting) return;
+    const amount = Math.floor(Number(giftAmount));
+    if (!Number.isFinite(amount) || amount < MIN_GIFT_AMOUNT) {
+      setGiftMsg(t("gift.tooSmall", { min: MIN_GIFT_AMOUNT }));
+      return;
+    }
+    setGifting(true);
+    setGiftMsg(null);
+    try {
+      const res = await fetch("/api/gift", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ toUsername: username, amount }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setGiftMsg(t("gift.sent", { amount: amount.toLocaleString(), name: username }));
+        setGiftAmount("");
+        celebrate(t("gift.sent", { amount: amount.toLocaleString(), name: username }));
+        await onLent?.();
+      } else {
+        setGiftMsg(d.error ?? t("gift.errGeneric"));
+      }
+    } catch {
+      setGiftMsg(t("gift.errGeneric"));
+    } finally {
+      setGifting(false);
     }
   }
 
@@ -2465,6 +2630,31 @@ function PlayerLogModal({
                   </button>
                 </div>
                 {lendMsg && <p className="mt-2 text-xs text-blue-100/80">{lendMsg}</p>}
+              </div>
+            )}
+
+            {canLend && (
+              <div className="mt-3 rounded-lg bg-white/5 p-3">
+                <p className="text-sm font-bold text-blue-100">{t("gift.giftTitle", { name: username })}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={MIN_GIFT_AMOUNT}
+                    step={10}
+                    value={giftAmount}
+                    onChange={(e) => setGiftAmount(e.target.value)}
+                    placeholder={t("loan.amountPlaceholder")}
+                    className="w-28 rounded-lg bg-white/10 px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    onClick={giftCoins}
+                    disabled={gifting}
+                    className="rounded-lg bg-pink-600 px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {gifting ? t("gift.sending") : t("gift.giftBtn")}
+                  </button>
+                </div>
+                {giftMsg && <p className="mt-2 text-xs text-blue-100/80">{giftMsg}</p>}
               </div>
             )}
 
