@@ -259,11 +259,27 @@ create table if not exists gifts (
 );
 create index if not exists gifts_recipient_idx on gifts (recipient_id, created_at desc);
 
+-- ---------- gift_messages (the note + reply thread attached to a gift) ----------
+-- A gift can carry a personal note, and from there the two players (sender and
+-- recipient) can reply back and forth. Every message of that conversation lives
+-- here; the very first row — written by the gifter — is the optional note.
+-- Bodies are kid-safe filtered like the chat lobby (see lib/chat.ts).
+create table if not exists gift_messages (
+  id          uuid primary key default gen_random_uuid(),
+  gift_id     uuid not null references gifts(id) on delete cascade,
+  sender_id   uuid not null references players(id) on delete cascade,
+  body        text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists gift_messages_gift_idx on gift_messages (gift_id, created_at);
+
 -- ---------- notifications (per-player inbox; powers the header bell) ----------
--- A lightweight per-player feed. Today the only kind is 'gift' (someone gifted
--- you coins), but the shape is generic so more kinds can be added later. The
--- text is rendered client-side from `kind` + `data` so it stays translatable
--- (English / Hebrew) instead of being frozen into one language at write time.
+-- A lightweight per-player feed. Kinds so far: 'gift' (someone gifted you coins)
+-- and 'gift_reply' (someone replied on a gift's note thread). The shape is
+-- generic so more kinds can be added later. The text is rendered client-side
+-- from `kind` + `data` so it stays translatable (English / Hebrew) instead of
+-- being frozen into one language at write time. For gift/gift_reply, `data`
+-- carries `giftId` so tapping the notification opens the conversation.
 create table if not exists notifications (
   id          uuid primary key default gen_random_uuid(),
   player_id   uuid not null references players(id) on delete cascade,

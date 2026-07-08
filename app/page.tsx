@@ -284,8 +284,8 @@ type LoanRow = {
 
 type NotifRow = {
   id: string;
-  kind: string; // 'gift'
-  data: { from?: string; amount?: number };
+  kind: string; // 'gift' | 'gift_reply'
+  data: { from?: string; amount?: number; giftId?: string; note?: string };
   read: boolean;
   created_at: string;
 };
@@ -2341,6 +2341,9 @@ function notifText(t: T, n: NotifRow): string | null {
       amount: (n.data.amount ?? 0).toLocaleString(),
     });
   }
+  if (n.kind === "gift_reply") {
+    return t("notif.giftReplyLine", { name: n.data.from ?? "?" });
+  }
   return null;
 }
 
@@ -2355,6 +2358,7 @@ function NotificationsModal({
 }) {
   const { t, lang } = useLang();
   const [items, setItems] = useState<NotifRow[] | null>(null);
+  const [openGiftId, setOpenGiftId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -2403,25 +2407,196 @@ function NotificationsModal({
             {items.map((n) => {
               const text = notifText(t, n);
               if (!text) return null;
-              return (
-                <div
-                  key={n.id}
-                  className={`rounded-lg p-3 text-sm ${n.read ? "bg-white/5" : "bg-yellow-400/10 ring-1 ring-yellow-300/30"}`}
-                >
+              const giftId = n.data.giftId;
+              const when = new Date(n.created_at).toLocaleString(lang === "he" ? "he-IL" : "en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              });
+              const cls = `w-full rounded-lg p-3 text-start text-sm ${
+                n.read ? "bg-white/5" : "bg-yellow-400/10 ring-1 ring-yellow-300/30"
+              } ${giftId ? "cursor-pointer hover:bg-white/10" : ""}`;
+              const inner = (
+                <>
                   <p className="font-semibold text-blue-50">{text}</p>
-                  <p className="mt-0.5 text-[11px] text-blue-100/50">
-                    {new Date(n.created_at).toLocaleString(lang === "he" ? "he-IL" : "en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                  {n.kind === "gift" && n.data.note && (
+                    <p className="mt-1 rounded bg-black/20 px-2 py-1 text-xs text-blue-100/90">“{n.data.note}”</p>
+                  )}
+                  <p className="mt-1 flex items-center justify-between text-[11px] text-blue-100/50">
+                    <span>{when}</span>
+                    {giftId && <span className="text-blue-200/70">{t("notif.tapOpen")}</span>}
                   </p>
+                </>
+              );
+              return giftId ? (
+                <button key={n.id} onClick={() => setOpenGiftId(giftId)} className={cls}>
+                  {inner}
+                </button>
+              ) : (
+                <div key={n.id} className={cls}>
+                  {inner}
                 </div>
               );
             })}
           </div>
         )}
+      </div>
+      {openGiftId && (
+        <GiftThreadModal token={token} giftId={openGiftId} onClose={() => setOpenGiftId(null)} />
+      )}
+    </div>
+  );
+}
+
+/* --------------------------- Gift conversation --------------------------- */
+// The note + reply thread for a single gift. Opened by tapping a gift (or reply)
+// notification in the inbox. Either participant can keep replying; each reply
+// notifies the other side. Bodies are kid-safe filtered server-side.
+
+function GiftThreadModal({
+  token,
+  giftId,
+  onClose,
+}: {
+  token: string;
+  giftId: string;
+  onClose: () => void;
+}) {
+  const { t, lang } = useLang();
+  const [thread, setThread] = useState<{
+    amount: number;
+    iAmSender: boolean;
+    otherName: string;
+    messages: { id: string; mine: boolean; body: string; created_at: string }[];
+  } | null>(null);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/gift/thread?giftId=${encodeURIComponent(giftId)}`, {
+        headers: authHeaders(token),
+        cache: "no-store",
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) setThread(d);
+    } catch {
+      /* keep whatever we have */
+    }
+  }, [giftId, token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function send() {
+    const body = reply.trim();
+    if (!body || sending) return;
+    setSending(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/gift/thread", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ giftId, body }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setReply("");
+        await load();
+      } else {
+        setErr(d.error ?? t("giftThread.errGeneric"));
+      }
+    } catch {
+      setErr(t("giftThread.errGeneric"));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const title = thread
+    ? thread.iAmSender
+      ? t("giftThread.titleTo", { name: thread.otherName })
+      : t("giftThread.titleFrom", { name: thread.otherName })
+    : t("common.loading");
+
+  return (
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => {
+        // Stop the click from bubbling to the notifications backdrop behind us,
+        // which would otherwise close the whole inbox too.
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-[#0f2143] p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold">{title}</h2>
+            {thread && (
+              <p className="text-sm font-extrabold text-yellow-300">
+                {t("giftThread.amount", { amount: thread.amount.toLocaleString() })}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="rounded-lg bg-white/10 px-3 py-1 text-sm">
+            {t("common.close")}
+          </button>
+        </div>
+
+        <div className="mt-4 flex-1 space-y-2 overflow-y-auto">
+          {!thread && <p className="text-sm text-blue-100/70">{t("common.loading")}</p>}
+          {thread && thread.messages.length === 0 && (
+            <p className="py-6 text-center text-sm text-blue-100/70">{t("giftThread.empty")}</p>
+          )}
+          {thread?.messages.map((m) => (
+            <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                  m.mine ? "bg-pink-600 text-white" : "bg-white/10 text-blue-50"
+                }`}
+              >
+                <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                <p className="mt-0.5 text-[10px] opacity-60">
+                  {new Date(m.created_at).toLocaleString(lang === "he" ? "he-IL" : "en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            maxLength={MAX_MESSAGE_LEN}
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") send();
+            }}
+            placeholder={t("giftThread.replyPlaceholder")}
+            className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm"
+          />
+          <button
+            onClick={send}
+            disabled={sending || !reply.trim()}
+            className="rounded-lg bg-pink-600 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {sending ? t("giftThread.sending") : t("giftThread.send")}
+          </button>
+        </div>
+        {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
       </div>
     </div>
   );
@@ -2457,6 +2632,7 @@ function PlayerLogModal({
   const [lending, setLending] = useState(false);
   const [lendMsg, setLendMsg] = useState<string | null>(null);
   const [giftAmount, setGiftAmount] = useState("");
+  const [giftNote, setGiftNote] = useState("");
   const [gifting, setGifting] = useState(false);
   const [giftMsg, setGiftMsg] = useState<string | null>(null);
 
@@ -2528,12 +2704,13 @@ function PlayerLogModal({
       const res = await fetch("/api/gift", {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ toUsername: username, amount }),
+        body: JSON.stringify({ toUsername: username, amount, note: giftNote.trim() || undefined }),
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
         setGiftMsg(t("gift.sent", { amount: amount.toLocaleString(), name: username }));
         setGiftAmount("");
+        setGiftNote("");
         celebrate(t("gift.sent", { amount: amount.toLocaleString(), name: username }));
         await onLent?.();
       } else {
@@ -2654,6 +2831,14 @@ function PlayerLogModal({
                     {gifting ? t("gift.sending") : t("gift.giftBtn")}
                   </button>
                 </div>
+                <input
+                  type="text"
+                  maxLength={MAX_MESSAGE_LEN}
+                  value={giftNote}
+                  onChange={(e) => setGiftNote(e.target.value)}
+                  placeholder={t("gift.notePlaceholder")}
+                  className="mt-2 w-full rounded-lg bg-white/10 px-2 py-1.5 text-sm"
+                />
                 {giftMsg && <p className="mt-2 text-xs text-blue-100/80">{giftMsg}</p>}
               </div>
             )}

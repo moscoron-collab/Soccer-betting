@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.3",
+    date: "2026-07-08",
+    changes: [
+      {
+        en: "💬 Gift notes + replies: when you gift coins you can add a personal note, and now you and whoever you gifted can chat back and forth about it — tap the gift in your 🔔 bell to read it and reply. Notes are kept kid-safe just like the chat lobby.",
+        he: "💬 הודעות ותשובות למתנות: כששולחים מתנה אפשר להוסיף הודעה אישית, ועכשיו אתם ומי שקיבל את המתנה יכולים להתכתב על זה — הקישו על המתנה בפעמון 🔔 כדי לקרוא ולהגיב. ההודעות נשמרות בטוחות לילדים בדיוק כמו בצ'אט.",
+      },
+    ],
+  },
+  {
     version: "5.2",
     date: "2026-07-08",
     changes: [

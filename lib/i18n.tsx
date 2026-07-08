@@ -283,11 +283,23 @@ const DICT: Record<string, { en: string; he: string }> = {
   "gift.sent": { en: "Gifted 🪙{amount} to {name}! 🎁", he: "נתתם 🪙{amount} במתנה ל-{name}! 🎁" },
   "gift.tooSmall": { en: "Gifts start at 🪙{min}.", he: "מתנות מתחילות מ-🪙{min}." },
   "gift.errGeneric": { en: "Could not send the gift. Try again.", he: "לא הצלחנו לשלוח את המתנה. נסו שוב." },
+  "gift.notePlaceholder": { en: "Add a note (optional)…", he: "הוסיפו הודעה (רשות)…" },
   // --- Notifications inbox (the header bell) ---
   "notif.bell": { en: "Alerts", he: "התראות" },
   "notif.title": { en: "🔔 Notifications", he: "🔔 התראות" },
   "notif.empty": { en: "No notifications yet.", he: "אין התראות עדיין." },
   "notif.giftLine": { en: "🎁 {name} gifted you 🪙{amount}", he: "🎁 {name} נתן/ה לכם 🪙{amount} במתנה" },
+  "notif.giftReplyLine": { en: "💬 {name} replied to your gift", he: "💬 {name} הגיב/ה למתנה שלכם" },
+  "notif.tapOpen": { en: "Tap to read & reply", he: "הקישו כדי לקרוא ולהגיב" },
+  // --- Gift conversation thread ---
+  "giftThread.titleFrom": { en: "🎁 Gift from {name}", he: "🎁 מתנה מ-{name}" },
+  "giftThread.titleTo": { en: "🎁 Gift to {name}", he: "🎁 מתנה ל-{name}" },
+  "giftThread.amount": { en: "🪙{amount}", he: "🪙{amount}" },
+  "giftThread.empty": { en: "No messages yet. Say hi!", he: "אין הודעות עדיין. תגידו שלום!" },
+  "giftThread.replyPlaceholder": { en: "Write a reply…", he: "כתבו תשובה…" },
+  "giftThread.send": { en: "Send", he: "שליחה" },
+  "giftThread.sending": { en: "Sending…", he: "שולח…" },
+  "giftThread.errGeneric": { en: "Could not send. Try again.", he: "לא הצלחנו לשלוח. נסו שוב." },
 
   // Changelog
   "changelog.title": { en: "🆕 What's new", he: "🆕 מה חדש" },

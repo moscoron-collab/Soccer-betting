@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, escapeLike } from "@/lib/auth";
 import { MIN_GIFT_AMOUNT } from "@/lib/gift";
+import { cleanMessage } from "@/lib/chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,25 @@ export async function POST(req: Request) {
   if (!Number.isFinite(amount) || amount < MIN_GIFT_AMOUNT) {
     return NextResponse.json({ error: `Gifts start at 🪙${MIN_GIFT_AMOUNT}.` }, { status: 400 });
   }
+
+  // Optional personal note. When present it's kid-safe filtered exactly like a
+  // chat message (profanity mask, no links/phone numbers, length cap) and becomes
+  // the first message of the gift's reply thread.
+  const rawNote = body?.note;
+  let note: string | null = null;
+  if (rawNote != null && String(rawNote).trim() !== "") {
+    const cleaned = cleanMessage(rawNote);
+    if (!cleaned.ok) {
+      const msg =
+        cleaned.code === "TOO_LONG"
+          ? "That note is too long."
+          : cleaned.code === "NO_LINKS"
+          ? "Notes can't contain links or phone numbers."
+          : "That note can't be sent.";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+    note = cleaned.text;
+  }
   if (player.coins < amount) {
     return NextResponse.json({ error: "You don't have enough coins to gift that much." }, { status: 400 });
   }
@@ -51,24 +71,38 @@ export async function POST(req: Request) {
   await supabase.rpc("increment_coins", { p_player: player.id, p_amount: -amount });
   await supabase.rpc("increment_coins", { p_player: recipient.id, p_amount: amount });
 
-  const { error: giftErr } = await supabase.from("gifts").insert({
-    sender_id: player.id,
-    recipient_id: recipient.id,
-    amount,
-  });
-  if (giftErr) {
+  const { data: gift, error: giftErr } = await supabase
+    .from("gifts")
+    .insert({
+      sender_id: player.id,
+      recipient_id: recipient.id,
+      amount,
+    })
+    .select("id")
+    .single();
+  if (giftErr || !gift) {
     // Roll back the transfer so a broken gifts table can't mint free coins.
     await supabase.rpc("increment_coins", { p_player: player.id, p_amount: amount });
     await supabase.rpc("increment_coins", { p_player: recipient.id, p_amount: -amount });
     return NextResponse.json({ error: "Could not send the gift. Try again." }, { status: 500 });
   }
 
-  // Notify the recipient so they know who gifted them. Best-effort: the coins have
-  // already moved, so a failed notification must not fail the whole request.
+  // The note (if any) is the first message of the gift's conversation thread.
+  if (note) {
+    await supabase.from("gift_messages").insert({
+      gift_id: gift.id,
+      sender_id: player.id,
+      body: note,
+    });
+  }
+
+  // Notify the recipient so they know who gifted them (and can open the thread to
+  // read the note / reply). Best-effort: the coins have already moved, so a failed
+  // notification must not fail the whole request.
   await supabase.from("notifications").insert({
     player_id: recipient.id,
     kind: "gift",
-    data: { from: player.username, amount },
+    data: { from: player.username, amount, giftId: gift.id, note: note ?? undefined },
   });
 
   return NextResponse.json({ ok: true, amount, toUsername: recipient.username });
