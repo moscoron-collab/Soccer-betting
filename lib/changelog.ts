@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.6",
+    date: "2026-07-08",
+    changes: [
+      {
+        en: "👀 Loans & Gifts went public: the two panels now show the whole community — who owes whom and who gifted whom, amounts included, newest first. Your own rows still have your Repay button and your gift conversations (those stay private to the two of you).",
+        he: "👀 הלוואות ומתנות עכשיו ציבוריות: שני הפאנלים מציגים עכשיו את כל הקהילה — מי חייב למי ומי נתן מתנה למי, כולל סכומים, מהחדש לישן. השורות שלכם עדיין עם כפתור ההחזר ושיחות המתנה שלכם (אלה נשארות פרטיות בין שניכם).",
+      },
+    ],
+  },
+  {
     version: "5.5",
     date: "2026-07-08",
     changes: [

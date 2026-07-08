@@ -274,20 +274,26 @@ type LeaderRow = {
   xp?: number; // drives the tier emoji shown next to the name
 };
 
+// Community-wide rows: loans and gifts are public boards, so each row names both
+// sides. `iOwe`/`participant` mark what the signed-in player can act on.
 type LoanRow = {
   id: string;
   amount: number;
   created_at: string;
-  username: string; // the other party: who I owe, or who owes me
+  lender: string;
+  borrower: string;
   repaid?: boolean;
   repaid_at?: string | null;
+  iOwe?: boolean; // I'm the borrower and it's still open -> show Repay
 };
 
 type GiftRow = {
   id: string;
   amount: number;
   created_at: string;
-  username: string; // the other party: who gifted me, or who I gifted
+  sender: string;
+  recipient: string;
+  participant?: boolean; // I'm one of the two -> tapping opens the note thread
 };
 
 type NotifRow = {
@@ -383,11 +389,9 @@ function Home() {
   const [mustSpinToBet, setMustSpinToBet] = useState(false);
   const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
-  const [loansOwed, setLoansOwed] = useState<LoanRow[]>([]);
-  const [loansOwedToMe, setLoansOwedToMe] = useState<LoanRow[]>([]);
-  const [giftsReceived, setGiftsReceived] = useState<GiftRow[]>([]);
-  const [giftsSent, setGiftsSent] = useState<GiftRow[]>([]);
-  const [giftTotals, setGiftTotals] = useState<{ received: number; sent: number }>({ received: 0, sent: 0 });
+  const [loansPublic, setLoansPublic] = useState<LoanRow[]>([]);
+  const [giftsPublic, setGiftsPublic] = useState<GiftRow[]>([]);
+  const [giftsTotal, setGiftsTotal] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
@@ -486,11 +490,9 @@ function Home() {
     setMustSpinToBet(!!data.mustSpinToBet);
     setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
-    setLoansOwed(data.loansOwed ?? []);
-    setLoansOwedToMe(data.loansOwedToMe ?? []);
-    setGiftsReceived(data.giftsReceived ?? []);
-    setGiftsSent(data.giftsSent ?? []);
-    setGiftTotals(data.giftTotals ?? { received: 0, sent: 0 });
+    setLoansPublic(data.loansPublic ?? []);
+    setGiftsPublic(data.giftsPublic ?? []);
+    setGiftsTotal(data.giftsTotal ?? 0);
     setUnreadNotifications(data.unreadNotifications ?? 0);
     setLeaderboard(data.leaderboard ?? []);
     setMyRank(data.myRank ?? null);
@@ -609,11 +611,9 @@ function Home() {
           mustSpinToBet={mustSpinToBet}
           comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
-          loansOwed={loansOwed}
-          loansOwedToMe={loansOwedToMe}
-          giftsReceived={giftsReceived}
-          giftsSent={giftsSent}
-          giftTotals={giftTotals}
+          loansPublic={loansPublic}
+          giftsPublic={giftsPublic}
+          giftsTotal={giftsTotal}
           unreadNotifications={unreadNotifications}
           leaderboard={leaderboard}
           myRank={myRank}
@@ -1585,11 +1585,9 @@ function Game({
   mustSpinToBet,
   comebackSpinsLeft,
   canPenalty,
-  loansOwed,
-  loansOwedToMe,
-  giftsReceived,
-  giftsSent,
-  giftTotals,
+  loansPublic,
+  giftsPublic,
+  giftsTotal,
   unreadNotifications,
   leaderboard,
   myRank,
@@ -1609,11 +1607,9 @@ function Game({
   mustSpinToBet: boolean;
   comebackSpinsLeft: number;
   canPenalty: boolean;
-  loansOwed: LoanRow[];
-  loansOwedToMe: LoanRow[];
-  giftsReceived: GiftRow[];
-  giftsSent: GiftRow[];
-  giftTotals: { received: number; sent: number };
+  loansPublic: LoanRow[];
+  giftsPublic: GiftRow[];
+  giftsTotal: number;
   unreadNotifications: number;
   leaderboard: LeaderRow[];
   myRank: number | null;
@@ -1894,22 +1890,19 @@ function Game({
         <LowCoinsPanel canBailout={canBailout} onBailout={bailout} />
       )}
 
-      {(loansOwed.length > 0 ||
-        loansOwedToMe.length > 0 ||
-        giftsReceived.length > 0 ||
-        giftsSent.length > 0) && (
+      {(loansPublic.length > 0 || giftsPublic.length > 0) && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <LoansPanel
-            owed={loansOwed}
-            owedToMe={loansOwedToMe}
+            loans={loansPublic}
+            myUsername={player.username}
             myCoins={player.coins}
             repayingId={repayingId}
             onRepay={repayLoan}
           />
           <GiftsPanel
-            received={giftsReceived}
-            sent={giftsSent}
-            totals={giftTotals}
+            gifts={giftsPublic}
+            total={giftsTotal}
+            myUsername={player.username}
             onOpenThread={(id) => setThreadGiftId(id)}
           />
         </div>
@@ -3966,79 +3959,74 @@ function LowCoinsPanel({
   );
 }
 
-// Outstanding coin loans: what I still owe (repay button, only enabled once I can
-// actually afford it) and what's still owed to me (informational — repayment is
-// never enforced, so this is just a reminder of who owes what).
+// Community loans board — public by design: every player sees who owes whom.
+// Open loans first; rows where I'M the borrower get the Repay button (enabled
+// once I can afford it). Repaid loans show as greyed-out history below.
 function LoansPanel({
-  owed,
-  owedToMe,
+  loans,
+  myUsername,
   myCoins,
   repayingId,
   onRepay,
 }: {
-  owed: LoanRow[];
-  owedToMe: LoanRow[];
+  loans: LoanRow[];
+  myUsername: string;
   myCoins: number;
   repayingId: string | null;
   onRepay: (loanId: string) => void;
 }) {
   const { t } = useLang();
 
-  // Split each direction into still-open (actionable) and already-repaid (history).
-  const owedOpen = owed.filter((l) => !l.repaid);
-  const owedToMeOpen = owedToMe.filter((l) => !l.repaid);
-  // Merged, most-recent-first history of everything that's been paid back, tagging
-  // each with which side of the loan I was on so we can word it correctly.
-  const history = [
-    ...owed.filter((l) => l.repaid).map((l) => ({ ...l, mine: true })),
-    ...owedToMe.filter((l) => l.repaid).map((l) => ({ ...l, mine: false })),
-  ]
-    .sort((a, b) => new Date(b.repaid_at ?? 0).getTime() - new Date(a.repaid_at ?? 0).getTime())
-    .slice(0, 10);
+  const open = loans.filter((l) => !l.repaid); // newest-first from the server
+  const history = loans.filter((l) => l.repaid).slice(0, 10);
+  const isEmpty = open.length === 0 && history.length === 0;
 
-  const hasOpen = owedOpen.length > 0 || owedToMeOpen.length > 0;
-  const isEmpty = !hasOpen && history.length === 0;
+  // Word each row from the viewer's perspective: "You owe…", "… owes you…",
+  // or the neutral third-person line for loans between two other players.
+  const openLine = (l: LoanRow) =>
+    l.iOwe
+      ? t("loan.oweLine", { amount: l.amount.toLocaleString(), name: l.lender })
+      : l.lender === myUsername
+      ? t("loan.owedToMeLine", { name: l.borrower, amount: l.amount.toLocaleString() })
+      : t("loan.publicOweLine", { borrower: l.borrower, lender: l.lender, amount: l.amount.toLocaleString() });
+  const historyLine = (l: LoanRow) =>
+    l.borrower === myUsername
+      ? t("loan.repaidOweLine", { amount: l.amount.toLocaleString(), name: l.lender })
+      : l.lender === myUsername
+      ? t("loan.repaidOwedToMeLine", { name: l.borrower, amount: l.amount.toLocaleString() })
+      : t("loan.publicRepaidLine", { borrower: l.borrower, lender: l.lender, amount: l.amount.toLocaleString() });
 
   return (
     <div className="h-full rounded-xl bg-purple-500/15 p-4 ring-1 ring-purple-400/30">
       <p className="text-sm font-bold text-purple-200">{t("loan.panelTitle")}</p>
       {isEmpty && <p className="mt-2 text-xs text-blue-100/50">{t("loan.none")}</p>}
-      {owedOpen.length > 0 && (
+      {open.length > 0 && (
         <div className="mt-2 space-y-1.5">
-          {owedOpen.map((l) => (
+          {open.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2 text-sm">
-              <span>{t("loan.oweLine", { amount: l.amount.toLocaleString(), name: l.username })}</span>
-              <button
-                onClick={() => onRepay(l.id)}
-                disabled={repayingId === l.id || myCoins < l.amount}
-                className="shrink-0 rounded-lg bg-purple-500 px-2.5 py-1 text-xs font-bold disabled:opacity-40"
-              >
-                {repayingId === l.id ? t("loan.repaying") : t("loan.repayBtn")}
-              </button>
+              <span className={l.iOwe || l.lender === myUsername ? "" : "text-blue-100/70"}>{openLine(l)}</span>
+              {l.iOwe && (
+                <button
+                  onClick={() => onRepay(l.id)}
+                  disabled={repayingId === l.id || myCoins < l.amount}
+                  className="shrink-0 rounded-lg bg-purple-500 px-2.5 py-1 text-xs font-bold disabled:opacity-40"
+                >
+                  {repayingId === l.id ? t("loan.repaying") : t("loan.repayBtn")}
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
-      {owedToMeOpen.length > 0 && (
-        <div className={owedOpen.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
-          {owedToMeOpen.map((l) => (
-            <p key={l.id} className="text-xs text-blue-100/70">
-              {t("loan.owedToMeLine", { name: l.username, amount: l.amount.toLocaleString() })}
-            </p>
-          ))}
-        </div>
-      )}
       {history.length > 0 && (
-        <div className={hasOpen ? "mt-3 border-t border-white/10 pt-2" : "mt-2"}>
+        <div className={open.length > 0 ? "mt-3 border-t border-white/10 pt-2" : "mt-2"}>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-100/40">
             {t("loan.historyTitle")}
           </p>
           <div className="mt-1 space-y-0.5">
             {history.map((l) => (
               <p key={l.id} className="text-xs text-blue-100/40 line-through decoration-blue-100/30">
-                {l.mine
-                  ? t("loan.repaidOweLine", { amount: l.amount.toLocaleString(), name: l.username })
-                  : t("loan.repaidOwedToMeLine", { name: l.username, amount: l.amount.toLocaleString() })}
+                {historyLine(l)}
               </p>
             ))}
           </div>
@@ -4048,59 +4036,55 @@ function LoansPanel({
   );
 }
 
-// A record of coin gifts, sitting next to the Loans panel. Gifts are one-way and
-// never repaid, so there's no repay button or history split — just who gave what,
-// plus all-time totals. Tapping a gift opens its note + reply conversation.
+// Community gifts board — public like the loans: the newest gifts between ALL
+// players, plus an all-time total. Amounts are public; a gift's note + reply
+// conversation stays private, so only its two participants can tap a row open.
 function GiftsPanel({
-  received,
-  sent,
-  totals,
+  gifts,
+  total,
+  myUsername,
   onOpenThread,
 }: {
-  received: GiftRow[];
-  sent: GiftRow[];
-  totals: { received: number; sent: number };
+  gifts: GiftRow[];
+  total: number;
+  myUsername: string;
   onOpenThread: (giftId: string) => void;
 }) {
   const { t } = useLang();
-  const isEmpty = received.length === 0 && sent.length === 0;
+
+  const line = (g: GiftRow) =>
+    g.sender === myUsername
+      ? t("gift.sentLine", { name: g.recipient, amount: g.amount.toLocaleString() })
+      : g.recipient === myUsername
+      ? t("gift.receivedLine", { name: g.sender, amount: g.amount.toLocaleString() })
+      : t("gift.publicLine", { sender: g.sender, recipient: g.recipient, amount: g.amount.toLocaleString() });
 
   return (
     <div className="h-full rounded-xl bg-pink-500/15 p-4 ring-1 ring-pink-400/30">
       <p className="text-sm font-bold text-pink-200">{t("gift.panelTitle")}</p>
-      {(totals.received > 0 || totals.sent > 0) && (
+      {total > 0 && (
         <p className="mt-1 text-[11px] text-blue-100/60">
-          {t("gift.totalsLine", {
-            recv: totals.received.toLocaleString(),
-            sent: totals.sent.toLocaleString(),
-          })}
+          {t("gift.publicTotal", { total: total.toLocaleString() })}
         </p>
       )}
-      {isEmpty && <p className="mt-2 text-xs text-blue-100/50">{t("gift.none")}</p>}
-      {received.length > 0 && (
+      {gifts.length === 0 && <p className="mt-2 text-xs text-blue-100/50">{t("gift.none")}</p>}
+      {gifts.length > 0 && (
         <div className="mt-2 space-y-1">
-          {received.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => onOpenThread(g.id)}
-              className="block w-full rounded-lg px-1.5 py-1 text-start text-sm hover:bg-white/10"
-            >
-              {t("gift.receivedLine", { name: g.username, amount: g.amount.toLocaleString() })}
-            </button>
-          ))}
-        </div>
-      )}
-      {sent.length > 0 && (
-        <div className={received.length > 0 ? "mt-3 space-y-1 border-t border-white/10 pt-2" : "mt-2 space-y-1"}>
-          {sent.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => onOpenThread(g.id)}
-              className="block w-full rounded-lg px-1.5 py-1 text-start text-xs text-blue-100/70 hover:bg-white/10"
-            >
-              {t("gift.sentLine", { name: g.username, amount: g.amount.toLocaleString() })}
-            </button>
-          ))}
+          {gifts.map((g) => {
+            const mine = g.participant === true;
+            const cls = `block w-full rounded-lg px-1.5 py-1 text-start text-sm ${
+              mine ? "hover:bg-white/10" : "text-blue-100/70"
+            }`;
+            return mine ? (
+              <button key={g.id} onClick={() => onOpenThread(g.id)} className={cls}>
+                {line(g)}
+              </button>
+            ) : (
+              <p key={g.id} className={cls}>
+                {line(g)}
+              </p>
+            );
+          })}
         </div>
       )}
     </div>

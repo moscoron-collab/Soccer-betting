@@ -207,73 +207,51 @@ export async function GET(req: Request) {
 
   const canPenalty = isNewLocalDay(player.last_penalty_at, tz);
 
-  // Loans I'm involved in, as borrower (what I owe) and as lender (what's owed to
-  // me). We include repaid ones too so the panel can show a greyed-out history;
-  // outstanding come first, then the most recent repaid ones (capped). Repayment
-  // is manual, so unpaid loans just stick around until the borrower clears them.
-  const { data: owedRows } = await supabase
+  // Community loans board — public by design: every player sees who owes whom.
+  // Open loans come first (the borrower's rows get a Repay button client-side),
+  // then the most recent repaid ones as greyed-out history. `iOwe` marks the
+  // rows the CALLER can act on.
+  const { data: loanRows } = await supabase
     .from("loans")
-    .select("id, amount, created_at, repaid, repaid_at, lender:lender_id(username)")
-    .eq("borrower_id", player.id)
+    .select(
+      "id, amount, created_at, repaid, repaid_at, borrower_id, lender:lender_id(username), borrower:borrower_id(username)"
+    )
     .order("repaid", { ascending: true })
     .order("created_at", { ascending: false })
     .limit(50);
-  const { data: owedToMeRows } = await supabase
-    .from("loans")
-    .select("id, amount, created_at, repaid, repaid_at, borrower:borrower_id(username)")
-    .eq("lender_id", player.id)
-    .order("repaid", { ascending: true })
-    .order("created_at", { ascending: false })
-    .limit(50);
-  const loansOwed = (owedRows ?? []).map((r: any) => ({
+  const loansPublic = (loanRows ?? []).map((r: any) => ({
     id: r.id,
     amount: r.amount,
     created_at: r.created_at,
     repaid: r.repaid === true,
     repaid_at: r.repaid_at ?? null,
-    username: r.lender?.username ?? "?",
-  }));
-  const loansOwedToMe = (owedToMeRows ?? []).map((r: any) => ({
-    id: r.id,
-    amount: r.amount,
-    created_at: r.created_at,
-    repaid: r.repaid === true,
-    repaid_at: r.repaid_at ?? null,
-    username: r.borrower?.username ?? "?",
+    lender: r.lender?.username ?? "?",
+    borrower: r.borrower?.username ?? "?",
+    iOwe: r.borrower_id === player.id && r.repaid !== true,
   }));
 
-  // Gifts I'm involved in, both directions, for the Gifts panel (a record next to
-  // Loans). Gifts are one-way and never repaid, so there's no open/history split —
-  // just who gave what. We pull up to 200 each way: the newest 50 are shown, and
-  // all fetched rows feed the all-time totals line.
-  const { data: giftsRecvRows } = await supabase
+  // Community gifts board — public like the loans: the newest ~20 gifts across
+  // ALL players ("Dani gifted Ron121 🪙500"), plus an all-time total. Amounts
+  // are public; a gift's note/reply THREAD stays private to its two players —
+  // `participant` marks the rows the caller may tap open.
+  const { data: giftRows } = await supabase
     .from("gifts")
-    .select("id, amount, created_at, sender:sender_id(username)")
-    .eq("recipient_id", player.id)
+    .select(
+      "id, amount, created_at, sender_id, recipient_id, sender:sender_id(username), recipient:recipient_id(username)"
+    )
     .order("created_at", { ascending: false })
-    .limit(200);
-  const { data: giftsSentRows } = await supabase
-    .from("gifts")
-    .select("id, amount, created_at, recipient:recipient_id(username)")
-    .eq("sender_id", player.id)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  const giftsReceived = (giftsRecvRows ?? []).slice(0, 50).map((r: any) => ({
+    .limit(20);
+  const giftsPublic = (giftRows ?? []).map((r: any) => ({
     id: r.id,
     amount: r.amount,
     created_at: r.created_at,
-    username: r.sender?.username ?? "?",
+    sender: r.sender?.username ?? "?",
+    recipient: r.recipient?.username ?? "?",
+    participant: r.sender_id === player.id || r.recipient_id === player.id,
   }));
-  const giftsSent = (giftsSentRows ?? []).slice(0, 50).map((r: any) => ({
-    id: r.id,
-    amount: r.amount,
-    created_at: r.created_at,
-    username: r.recipient?.username ?? "?",
-  }));
-  const giftTotals = {
-    received: (giftsRecvRows ?? []).reduce((s: number, r: any) => s + (r.amount || 0), 0),
-    sent: (giftsSentRows ?? []).reduce((s: number, r: any) => s + (r.amount || 0), 0),
-  };
+  // All-time coins gifted between players (small table; summing amounts is fine).
+  const { data: giftAmts } = await supabase.from("gifts").select("amount").limit(5000);
+  const giftsTotal = (giftAmts ?? []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
 
   // Unread notification count for the header bell badge. The full list is fetched
   // lazily by /api/notifications only when the player opens the inbox.
@@ -329,11 +307,9 @@ export async function GET(req: Request) {
       mustSpinToBet,
       comebackSpinsLeft: comebackLeft,
       canPenalty,
-      loansOwed,
-      loansOwedToMe,
-      giftsReceived,
-      giftsSent,
-      giftTotals,
+      loansPublic,
+      giftsPublic,
+      giftsTotal,
       unreadNotifications: unreadNotifications ?? 0,
       leaderboard: toPublic(rankedAll.slice(0, 50)),
       myRank,
