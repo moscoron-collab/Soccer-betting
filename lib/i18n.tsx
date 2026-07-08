@@ -291,9 +291,9 @@ const DICT: Record<string, { en: string; he: string }> = {
   "gift.none": { en: "No gifts yet", he: "אין מתנות עדיין" },
   "loan.none": { en: "No loans yet", he: "אין הלוואות עדיין" },
   // --- Notifications inbox (the header bell) ---
-  "notif.bell": { en: "Alerts", he: "התראות" },
-  "notif.title": { en: "🔔 Notifications", he: "🔔 התראות" },
-  "notif.empty": { en: "No notifications yet.", he: "אין התראות עדיין." },
+  "notif.bell": { en: "Messages", he: "הודעות" },
+  "notif.title": { en: "💬 Messages", he: "💬 הודעות" },
+  "notif.empty": { en: "No messages yet.", he: "אין הודעות עדיין." },
   "notif.giftLine": { en: "🎁 {name} gifted you 🪙{amount}", he: "🎁 {name} נתן/ה לכם 🪙{amount} במתנה" },
   "notif.giftReplyLine": { en: "💬 {name} replied to your gift", he: "💬 {name} הגיב/ה למתנה שלכם" },
   "notif.mentionLine": { en: "💬 {name} mentioned you in chat", he: "💬 {name} הזכיר/ה אתכם בצ'אט" },

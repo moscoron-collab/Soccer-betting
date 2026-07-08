@@ -13,8 +13,8 @@ export const CHANGELOG: Release[] = [
     date: "2026-07-08",
     changes: [
       {
-        en: "📲 Phone alerts: tap “🔔 Phone alerts” next to the bell to get push notifications on your phone — even with the game closed — when someone gifts you coins, replies to a gift, or @mentions you in chat. (On iPhone, first add the app to your Home Screen.)",
-        he: "📲 התראות לנייד: הקישו על “🔔 התראות לנייד” ליד הפעמון כדי לקבל התראות לטלפון — גם כשהמשחק סגור — כשמישהו נותן לכם מטבעות במתנה, מגיב למתנה, או מזכיר אתכם בצ'אט עם @. (באייפון, קודם הוסיפו את האפליקציה למסך הבית.)",
+        en: "💬 Messages, live: the Alerts bell is now a Messages button — and it updates by itself while you play. When someone gifts you coins, replies to a gift, or @mentions you in chat, the badge pops up within seconds and a little toast tells you right away. No reloading needed.",
+        he: "💬 הודעות, בשידור חי: פעמון ההתראות הפך לכפתור הודעות — והוא מתעדכן מעצמו בזמן שאתם משחקים. כשמישהו נותן לכם מטבעות במתנה, מגיב למתנה, או מזכיר אתכם בצ'אט עם @, המספר קופץ תוך שניות והודעה קטנה מעדכנת אתכם מיד. בלי לרענן את הדף.",
       },
     ],
   },

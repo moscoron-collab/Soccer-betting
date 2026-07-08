@@ -504,6 +504,55 @@ function Home() {
     if (token) loadMe(token);
   }, [token, loadMe]);
 
+  // Live message check: while signed in, poll the notifications feed every ~20s
+  // (skipping ticks while the tab is hidden, re-checking the moment it's visible
+  // again) so the 💬 badge updates on its own and a toast announces new messages
+  // as they land — no reload needed. The first check only sets a baseline: old
+  // unread mail should show on the badge, not re-toast on every page load.
+  const lastNotifSeen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    let stopped = false;
+
+    const check = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch("/api/notifications", {
+          headers: authHeaders(token),
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (stopped || !Array.isArray(d.items)) return;
+        setUnreadNotifications(d.unread ?? 0);
+        const newest: NotifRow | undefined = d.items[0];
+        if (newest) {
+          if (lastNotifSeen.current !== null && newest.id !== lastNotifSeen.current && !newest.read) {
+            const text = notifText(t, newest);
+            if (text) toast(text);
+          }
+          lastNotifSeen.current = newest.id;
+        } else {
+          lastNotifSeen.current = ""; // baseline set: an inbox that's still empty
+        }
+      } catch {
+        // Network blip — the next tick will try again.
+      }
+    };
+
+    const id = setInterval(check, 20_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    check();
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [token, t]);
+
   // Show the one-time welcome once the new player's profile has loaded. The flag
   // is set by the signup form (see AuthScreen).
   useEffect(() => {
@@ -1822,14 +1871,13 @@ function Game({
           onClick={() => setShowNotifications(true)}
           className="relative rounded-lg bg-white/10 px-3 py-1.5 text-sm"
         >
-          🔔 {t("notif.bell")}
+          💬 {t("notif.bell")}
           {unreadNotifications > 0 && (
             <span className="absolute -end-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
               {unreadNotifications > 9 ? "9+" : unreadNotifications}
             </span>
           )}
         </button>
-        <PushToggle token={token} />
         <button onClick={share} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold">
           {t("game.invite")}
         </button>
@@ -2375,10 +2423,12 @@ function resizeImage(file: File, size: number): Promise<string> {
 }
 
 /* --------------------------- Phone push alerts ---------------------------- */
-// The little "Enable phone alerts" control next to the bell. Registers the
-// service worker, asks the browser for notification permission, subscribes to
-// Web Push and stores the subscription server-side. Handles the iOS quirk where
-// push only works once the site is installed to the home screen.
+// DORMANT — not rendered anywhere right now (the owner chose in-app Messages
+// over phone push for launch). Kept so switching push on later is just:
+// render <PushToggle token={token} /> in the header and set the VAPID env vars
+// in Vercel. Registers the service worker, asks for notification permission,
+// subscribes to Web Push and stores the subscription server-side. Handles the
+// iOS quirk where push only works once the site is installed to the home screen.
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
