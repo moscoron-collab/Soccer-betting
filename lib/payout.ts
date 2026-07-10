@@ -29,7 +29,7 @@ export const BOOST_MULTIPLIER = 2; // a "2x payout" power-up doubles a winning b
 
 // A "free bet" token (won from the wheel) places a bet at this fixed stake with no
 // coins risked: a win pays the full payout, a loss costs nothing.
-export const FREE_BET_STAKE = 100;
+export const FREE_BET_STAKE = 200000;
 
 // "We missed you" welcome-back gift: granted once when a player returns after being
 // away at least this many hours. Re-armed only by another absence of this length.

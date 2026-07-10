@@ -4604,7 +4604,7 @@ function BetForm({
             className="h-4 w-4 accent-purple-400"
           />
           <span className="font-semibold text-purple-200">
-            {t("form.useFreeBet", { stake: FREE_BET_STAKE })}{" "}
+            {t("form.useFreeBet", { stake: FREE_BET_STAKE.toLocaleString() })}{" "}
             <span className="text-purple-200/70">{t("form.freeBetLeft", { n: freeBets })}</span>
           </span>
         </label>

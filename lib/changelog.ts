@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.7",
+    date: "2026-07-10",
+    changes: [
+      {
+        en: "🎟️ Free bet tokens are now HUGE: a free bet from the wheel is placed at a 🪙200,000 stake (up from 🪙100) — win and the full payout is yours, lose and it still costs nothing.",
+        he: "🎟️ אסימוני הימור חינם הם עכשיו ענקיים: הימור חינם מהגלגל מונח בסכום של 🪙200,000 (במקום 🪙100) — זכיתם? כל הזכייה שלכם. הפסדתם? זה עדיין לא עולה כלום.",
+      },
+    ],
+  },
+  {
     version: "5.6",
     date: "2026-07-08",
     changes: [
