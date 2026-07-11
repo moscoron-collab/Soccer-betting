@@ -60,8 +60,21 @@ export async function POST(req: Request) {
     );
   }
 
-  // Decide the prize.
-  const sliceIndex = pickSliceIndex();
+  // Decide the prize — excluding whatever slice this player got on their PREVIOUS
+  // spin, so the wheel can never land on the same pie twice in a row. The last
+  // result is read separately (not via the shared player lookup) so the app keeps
+  // working even before the new column exists in the database.
+  let lastIndex: number | null = null;
+  {
+    const { data: lastRow } = await supabase
+      .from("players")
+      .select("last_spin_slice")
+      .eq("id", player.id)
+      .maybeSingle();
+    const v = (lastRow as { last_spin_slice?: number | null } | null)?.last_spin_slice;
+    if (typeof v === "number") lastIndex = v;
+  }
+  const sliceIndex = pickSliceIndex(WHEEL, lastIndex);
   const slice = WHEEL[sliceIndex];
 
   // The amount actually awarded for this slice. The jackpot is a random prize, so
@@ -98,8 +111,15 @@ export async function POST(req: Request) {
   update.spin_day = today;
   update.spins_today = used + 1;
   update.last_spin_at = new Date().toISOString();
+  update.last_spin_slice = sliceIndex; // remembered so the next spin can't repeat it
 
-  const { error } = await supabase.from("players").update(update).eq("id", player.id);
+  let { error } = await supabase.from("players").update(update).eq("id", player.id);
+  if (error) {
+    // `last_spin_slice` may not exist yet (schema.sql not re-run) — retry without it
+    // so spinning keeps working; the no-repeat guarantee kicks in after the migration.
+    delete update.last_spin_slice;
+    ({ error } = await supabase.from("players").update(update).eq("id", player.id));
+  }
   if (error) return NextResponse.json({ error: "Try again." }, { status: 500 });
 
   // A little XP for playing, so progress moves even without a betting win.

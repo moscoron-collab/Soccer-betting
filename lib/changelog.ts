@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "5.8",
+    date: "2026-07-11",
+    changes: [
+      {
+        en: "🎡 Fairer wheel: both wheels now remember your last prize and can NEVER land on the same slice twice in a row — no more déjà-vu spins.",
+        he: "🎡 גלגל הוגן יותר: שני הגלגלים זוכרים עכשיו את הפרס האחרון שלכם ולעולם לא ינחתו על אותה פרוסה פעמיים ברצף — נגמרו סיבובי הדז'ה-וו.",
+      },
+    ],
+  },
+  {
     version: "5.7",
     date: "2026-07-10",
     changes: [

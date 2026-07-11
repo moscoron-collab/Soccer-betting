@@ -36,11 +36,25 @@ export async function POST(req: Request) {
     );
   }
 
+  // The previous spin's slice, so this wheel also never lands on the same pie twice
+  // in a row. Read separately from the shared player lookup so the app keeps working
+  // even before the new column exists in the database.
+  let lastIndex: number | null = null;
+  {
+    const { data: lastRow } = await supabase
+      .from("players")
+      .select("last_comeback_slice")
+      .eq("id", player.id)
+      .maybeSingle();
+    const v = (lastRow as { last_comeback_slice?: number | null } | null)?.last_comeback_slice;
+    if (typeof v === "number") lastIndex = v;
+  }
+
   // Admins see this wheel as a PREVIEW only: roll a real-looking result for the
   // animation, but DON'T touch coins/inventory or the daily counter — so testing it
   // never changes anything. (Real eligible players fall through to the live spin below.)
   if (player.is_admin === true) {
-    const sliceIndex = pickSliceIndex(COMEBACK_WHEEL);
+    const sliceIndex = pickSliceIndex(COMEBACK_WHEEL, lastIndex);
     const slice = COMEBACK_WHEEL[sliceIndex];
     let awarded = slice.amount;
     if (slice.kind === "JACKPOT") awarded = rollJackpot() * 2;
@@ -64,8 +78,9 @@ export async function POST(req: Request) {
     );
   }
 
-  // Decide the prize (free — no coin cost for the catch-up spin).
-  const sliceIndex = pickSliceIndex(COMEBACK_WHEEL);
+  // Decide the prize (free — no coin cost for the catch-up spin), never repeating
+  // the previous spin's slice.
+  const sliceIndex = pickSliceIndex(COMEBACK_WHEEL, lastIndex);
   const slice = COMEBACK_WHEEL[sliceIndex];
   let awarded = slice.amount;
   if (slice.kind === "JACKPOT") awarded = rollJackpot() * 2; // doubled, like the rest of this wheel
@@ -82,8 +97,15 @@ export async function POST(req: Request) {
     update.free_bets = (player.free_bets ?? 0) + slice.amount;
   }
   update.coins = coins;
+  update.last_comeback_slice = sliceIndex; // remembered so the next spin can't repeat it
 
-  const { error } = await supabase.from("players").update(update).eq("id", player.id);
+  let { error } = await supabase.from("players").update(update).eq("id", player.id);
+  if (error) {
+    // `last_comeback_slice` may not exist yet (schema.sql not re-run) — retry without
+    // it so spinning keeps working; the no-repeat guarantee kicks in after the migration.
+    delete update.last_comeback_slice;
+    ({ error } = await supabase.from("players").update(update).eq("id", player.id));
+  }
   if (error) return NextResponse.json({ error: "Try again." }, { status: 500 });
 
   await markComebackSpin(player.id, today);

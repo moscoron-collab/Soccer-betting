@@ -45,6 +45,9 @@ alter table players add column if not exists last_login_day   date;
 alter table players add column if not exists last_cashback_at timestamptz;
 alter table players add column if not exists last_seen_at     timestamptz;
 alter table players add column if not exists device_id        text;
+-- Previous wheel results, so a spin can never land on the same slice twice in a row.
+alter table players add column if not exists last_spin_slice     integer;
+alter table players add column if not exists last_comeback_slice integer;
 
 -- "One device = one account": at most one player per device_id. Legacy rows have
 -- device_id = null and are exempt (Postgres treats nulls as distinct), so existing

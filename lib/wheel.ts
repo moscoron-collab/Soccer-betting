@@ -86,11 +86,27 @@ export function spinsUsedToday(spinDay: string | null, spinsToday: number, today
 
 // Picks a winning slice index, weighted by each slice's `weight`. Defaults to the
 // regular wheel; pass COMEBACK_WHEEL (or any wheel) to roll on a different prize set.
-export function pickSliceIndex(wheel: WheelSlice[] = WHEEL): number {
-  const total = wheel.reduce((s, w) => s + w.weight, 0);
+// Pass `avoidIndex` (the slice the player got on their PREVIOUS spin) to take that
+// prize — and any identical-looking slice — out of this draw, so nobody ever lands
+// on the same pie twice in a row.
+export function pickSliceIndex(
+  wheel: WheelSlice[] = WHEEL,
+  avoidIndex?: number | null
+): number {
+  const avoid =
+    typeof avoidIndex === "number" && avoidIndex >= 0 && avoidIndex < wheel.length
+      ? wheel[avoidIndex]
+      : null;
+  // Slices that look the same to the player (same kind + amount, e.g. the comeback
+  // wheel's two 🪙200 slices) are all excluded together, not just the exact index.
+  const weights = wheel.map((w) =>
+    avoid && w.kind === avoid.kind && w.amount === avoid.amount ? 0 : w.weight
+  );
+  const total = weights.reduce((s, w) => s + w, 0);
+  if (total <= 0) return Math.floor(Math.random() * wheel.length);
   let r = Math.random() * total;
   for (let i = 0; i < wheel.length; i++) {
-    r -= wheel[i].weight;
+    r -= weights[i];
     if (r < 0) return i;
   }
   return wheel.length - 1;
