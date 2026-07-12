@@ -9,6 +9,16 @@ export type Release = { version: string; date: string; changes: Change[] };
 // 5.2 … 5.9, then 6.0. No two-digit/decimal suffixes like "4.44".
 export const CHANGELOG: Release[] = [
   {
+    version: "6.0",
+    date: "2026-07-12",
+    changes: [
+      {
+        en: "🎡 The wheel got a full makeover: every prize is now a % of YOUR coins, so it matters no matter how rich you are — 📈 gain 5/10/15%, 📉 lose 5/10/15%, ⚡ 2× boost, 😬 no win, and a 💰 JACKPOT worth +20% of your balance. Gains always pay at least 🪙200 (jackpot at least 🪙1,000).",
+        he: "🎡 הגלגל עבר מהפך מלא: כל פרס הוא עכשיו אחוז מהמטבעות שלכם, אז הוא משמעותי לא משנה כמה אתם עשירים — 📈 רווח 5/10/15%, 📉 הפסד 5/10/15%, ⚡ בוסט 2×, 😬 אין זכייה, ו-💰 ג'קפוט של +20% מהיתרה שלכם. רווחים משלמים תמיד לפחות 🪙200 (ג'קפוט לפחות 🪙1,000).",
+      },
+    ],
+  },
+  {
     version: "5.9",
     date: "2026-07-12",
     changes: [

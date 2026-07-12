@@ -5,9 +5,10 @@ import {
   WHEEL,
   EXTRA_SPIN_COST,
   MAX_SPINS_PER_DAY,
+  PCT_GAIN_FLOOR,
+  PCT_JACKPOT_FLOOR,
   pickSliceIndex,
   spinsUsedToday,
-  rollJackpot,
 } from "@/lib/wheel";
 import { localDate } from "@/lib/time";
 import { comebackStatus, comebackAccess } from "@/lib/comeback";
@@ -77,10 +78,7 @@ export async function POST(req: Request) {
   const sliceIndex = pickSliceIndex(WHEEL, lastIndex);
   const slice = WHEEL[sliceIndex];
 
-  // The amount actually awarded for this slice. The jackpot is a random prize, so
-  // it differs from the slice's display amount ("up to 2K").
   let awarded = slice.amount;
-  if (slice.kind === "JACKPOT") awarded = rollJackpot();
 
   // Build the update: pay the cost (if any), apply the prize, bump the counter.
   const update: Record<string, number | string> = {};
@@ -91,12 +89,17 @@ export async function POST(req: Request) {
   // compute it here (a % of their current cash) rather than trusting a fixed amount.
   let pctDelta = 0;
 
-  if (slice.kind === "COINS" || slice.kind === "JACKPOT") {
+  if (slice.kind === "COINS") {
     coins += awarded;
   } else if (slice.kind === "PCT") {
-    // % of the cash balance (after any spin cost). Gains add; losses subtract but
-    // never below 0, and only touch spendable coins (in-play stakes are untouched).
-    const magnitude = Math.floor((coins * Math.abs(slice.amount)) / 100);
+    // % of the cash balance (after any spin cost). Gains add and never pay less than
+    // the floor (so a player whose coins are locked in open bets still wins something
+    // real); losses subtract but never below 0, and only touch spendable coins
+    // (in-play stakes are untouched).
+    let magnitude = Math.floor((coins * Math.abs(slice.amount)) / 100);
+    if (slice.amount > 0) {
+      magnitude = Math.max(magnitude, slice.jackpot ? PCT_JACKPOT_FLOOR : PCT_GAIN_FLOOR);
+    }
     pctDelta = slice.amount >= 0 ? magnitude : -Math.min(magnitude, coins);
     coins += pctDelta;
     awarded = pctDelta;
@@ -125,8 +128,8 @@ export async function POST(req: Request) {
   // A little XP for playing, so progress moves even without a betting win.
   await supabase.rpc("increment_xp", { p_player: player.id, p_amount: 5 });
 
-  // Echo the actual prize back so the UI shows it. Jackpot amount is randomised;
-  // a PCT slice keeps its % in `amount` but carries the real coin change in `delta`.
+  // Echo the actual prize back so the UI shows it. A PCT slice keeps its % in
+  // `amount` but carries the real coin change in `delta`.
   const resultSlice =
     slice.kind === "PCT"
       ? { ...slice, delta: pctDelta }

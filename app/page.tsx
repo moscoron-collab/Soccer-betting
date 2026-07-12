@@ -29,6 +29,7 @@ function prizeText(t: T, slice: WheelSlice): string {
     case "PCT": {
       const pct = Math.abs(slice.amount);
       const delta = slice.delta ?? 0;
+      if (slice.jackpot) return t("prize.jackpotPct", { pct, n: delta.toLocaleString() });
       return delta >= 0
         ? t("prize.gain", { pct, n: delta.toLocaleString() })
         : t("prize.lose", { pct, n: Math.abs(delta).toLocaleString() });
@@ -42,6 +43,7 @@ function prizeText(t: T, slice: WheelSlice): string {
 
 // The short label drawn on a wheel slice (numbers stay as-is, words translate).
 function sliceLabel(t: T, slice: WheelSlice): string {
+  if (slice.jackpot) return t("wheel.jackpotPct", { pct: Math.abs(slice.amount) });
   if (slice.kind === "JACKPOT") return t("wheel.jackpot");
   if (slice.kind === "BOOST") return t("wheel.boost");
   if (slice.kind === "SHIELD") return t("wheel.shield");
@@ -3555,7 +3557,7 @@ function SpinWheel({
       if (isWinningSlice(slice)) {
         celebrate(prizeText(t, slice));
         // Layer a brass fanfare over the cheer for the biggest wins: a triumphant
-        // one for the jackpot, a short one for the big coin prizes (250 / 500).
+        // one for the jackpot, a short one for the other big prizes.
         if (!isMuted()) {
           const tier = bigWinTier(slice);
           if (tier === "jackpot") winFanfareTriumph();

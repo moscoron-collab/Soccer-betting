@@ -373,8 +373,8 @@ const DICT: Record<string, { en: string; he: string }> = {
   // Spin wheel
   "spin.title": { en: "🎡 Spin the Wheel", he: "🎡 סובבו את הגלגל" },
   "spin.desc": {
-    en: "First spin free daily, then 🪙{cost} each (up to {max}/day). Win coins, a jackpot, or power-ups!",
-    he: "סיבוב ראשון חינם כל יום, אחר כך 🪙{cost} לסיבוב (עד {max} ביום). זכו במטבעות, ג'קפוט או כוחות-על!",
+    en: "First spin free daily, then 🪙{cost} each (up to {max}/day). Win (or lose!) a % of your coins, hit the 💰 jackpot, or grab a ⚡ boost!",
+    he: "סיבוב ראשון חינם כל יום, אחר כך 🪙{cost} לסיבוב (עד {max} ביום). זכו (או הפסידו!) אחוז מהמטבעות שלכם, קחו את ה-💰 ג'קפוט או ⚡ בוסט!",
   },
   "spin.spinning": { en: "Spinning…", he: "מסתובב…" },
   "spin.noSpins": { en: "No spins left today", he: "אין עוד סיבובים היום" },
@@ -410,7 +410,8 @@ const DICT: Record<string, { en: string; he: string }> = {
   "wheel.noWin": { en: "No win", he: "אין זכייה" },
   "wheel.boost": { en: "2× Boost", he: "בוסט 2×" },
   "wheel.shield": { en: "Shield", he: "מגן" },
-  "wheel.jackpot": { en: "up to 2K", he: "עד 2K" },
+  "wheel.jackpot": { en: "up to 4K", he: "עד 4K" },
+  "wheel.jackpotPct": { en: "JACKPOT +{pct}%", he: "ג'קפוט +{pct}%" },
   "wheel.freebet": { en: "Free bet", he: "הימור חינם" },
   "wheel.gain": { en: "Gain {pct}%", he: "רווח {pct}%" },
   "wheel.lose": { en: "Lose {pct}%", he: "הפסד {pct}%" },
@@ -419,6 +420,10 @@ const DICT: Record<string, { en: string; he: string }> = {
   "prize.boost": { en: "⚡ {n} × 2× payout power-up!", he: "⚡ {n} × כוח הכפלת זכייה 2×!" },
   "prize.shield": { en: "🛡️ {n} × streak shield!", he: "🛡️ {n} × מגן רצף!" },
   "prize.jackpot": { en: "💰 JACKPOT! +🪙{n}", he: "💰 ג'קפוט! +🪙{n}" },
+  "prize.jackpotPct": {
+    en: "💰 JACKPOT! +{pct}% — +🪙{n} coins!",
+    he: "💰 ג'קפוט! +{pct}% — +🪙{n} מטבעות!",
+  },
   "prize.freebet": { en: "🎟️ {n} × free bet token!", he: "🎟️ {n} × אסימון הימור חינם!" },
   "prize.noWin": {
     en: "😬 No win this time — try another spin!",

@@ -13,12 +13,16 @@ export type WheelSlice = {
   emoji: string;
   color: string; // slice fill colour (hex)
   weight: number; // relative probability (bigger = more common)
+  // Marks the regular wheel's 💰 jackpot (a PCT slice with jackpot styling/fanfare
+  // and a bigger minimum payout).
+  jackpot?: boolean;
   // RESULT ONLY: for a PCT slice the server fills in the actual signed coin change
   // (e.g. -9,000), since the percentage depends on the spinner's live balance.
   delta?: number;
 };
 
-// The jackpot pays a RANDOM amount in this range (shown on the wheel as "up to 2K").
+// The COMEBACK wheel's jackpot pays a RANDOM coin amount in this range (its slice
+// shows "up to 4K" = 2× this roll). The regular wheel's jackpot is percentage-based.
 export const JACKPOT_MIN = 1000;
 export const JACKPOT_MAX = 2000;
 
@@ -27,19 +31,26 @@ export function rollJackpot(): number {
   return Math.floor(JACKPOT_MIN + Math.random() * (JACKPOT_MAX - JACKPOT_MIN + 1));
 }
 
+// Minimum coin payout of a PCT GAIN on the regular wheel, so a player whose coins are
+// mostly locked in open bets still wins something real (jackpot floor is higher).
+export const PCT_GAIN_FLOOR = 200;
+export const PCT_JACKPOT_FLOOR = 1000;
+
 // Order matters: this is the clockwise order the slices are drawn in.
-// PCT slices win/lose a % of the spinner's OWN coin balance (self-balancing: they scale
-// with how rich you are, which keeps the wheel meaningful even for huge balances).
+// Every prize/loss is a % of the spinner's OWN coin balance (self-balancing: it scales
+// with how rich you are, which keeps the wheel meaningful even for huge balances —
+// fixed coin prizes became pocket change once free bets started staking 🪙200,000).
+// Roughly: 47% of spins gain, 32% lose, 11% boost, 11% nothing; average ≈ +2%/spin.
 export const WHEEL: WheelSlice[] = [
-  { kind: "COINS", amount: 100, label: "100", emoji: "🪙", color: "#3b82f6", weight: 4 },
-  { kind: "PCT", amount: 10, label: "Gain 10%", emoji: "📈", color: "#16a34a", weight: 3 },
+  { kind: "PCT", amount: 5, label: "Gain 5%", emoji: "📈", color: "#16a34a", weight: 4 },
+  { kind: "PCT", amount: -5, label: "Lose 5%", emoji: "📉", color: "#f87171", weight: 3 },
+  { kind: "PCT", amount: 10, label: "Gain 10%", emoji: "📈", color: "#22c55e", weight: 2 },
   { kind: "BOOST", amount: 1, label: "2× Boost", emoji: "⚡", color: "#f59e0b", weight: 2 },
   { kind: "PCT", amount: -10, label: "Lose 10%", emoji: "📉", color: "#dc2626", weight: 2 },
-  { kind: "COINS", amount: 250, label: "250", emoji: "🪙", color: "#60a5fa", weight: 2 },
-  { kind: "JACKPOT", amount: JACKPOT_MAX, label: "up to 2K", emoji: "💰", color: "#eab308", weight: 1 },
+  { kind: "PCT", amount: 15, label: "Gain 15%", emoji: "📈", color: "#15803d", weight: 2 },
+  { kind: "PCT", amount: 20, jackpot: true, label: "JACKPOT +20%", emoji: "💰", color: "#eab308", weight: 1 },
   { kind: "PCT", amount: -15, label: "Lose 15%", emoji: "💸", color: "#991b1b", weight: 1 },
-  { kind: "COINS", amount: 500, label: "500", emoji: "🪙", color: "#1e3a8a", weight: 1 },
-  { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#334155", weight: 1 },
+  { kind: "COINS", amount: 0, label: "No win", emoji: "😬", color: "#334155", weight: 2 },
 ];
 
 // The "comeback" wheel — offered only to trailing players (the bottom slice of the
@@ -126,6 +137,7 @@ export function describePrize(slice: WheelSlice): string {
     case "PCT": {
       const pct = Math.abs(slice.amount);
       const delta = slice.delta ?? 0;
+      if (slice.jackpot) return `💰 JACKPOT! +${pct}% — +🪙${delta.toLocaleString()} coins!`;
       return delta >= 0
         ? `📈 +${pct}% — +🪙${delta.toLocaleString()} coins!`
         : `📉 −${pct}% — −🪙${Math.abs(delta).toLocaleString()} coins`;
@@ -146,11 +158,12 @@ export function isWinningSlice(slice: WheelSlice): boolean {
 }
 
 // Celebration tier for a win, so big wins sound more special than small ones:
-//   "jackpot" — the 💰 jackpot (the biggest moment)
-//   "big"     — a large coin prize (250 or 500)
+//   "jackpot" — the 💰 jackpot (the biggest moment; either wheel)
+//   "big"     — a large prize (a +15% gain, or a 🪙250+ coin prize on the comeback wheel)
 //   null      — an ordinary win (normal cheer only, no extra fanfare)
 export function bigWinTier(slice: WheelSlice): "jackpot" | "big" | null {
-  if (slice.kind === "JACKPOT") return "jackpot";
+  if (slice.kind === "JACKPOT" || slice.jackpot) return "jackpot";
+  if (slice.kind === "PCT" && slice.amount >= 15) return "big";
   if (slice.kind === "COINS" && slice.amount >= 250) return "big";
   return null;
 }
