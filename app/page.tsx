@@ -386,7 +386,6 @@ function Home() {
   const [showComeback, setShowComeback] = useState(false);
   const [showComebackAlert, setShowComebackAlert] = useState(false);
   const [showRegularWheel, setShowRegularWheel] = useState(true);
-  const [mustSpinToBet, setMustSpinToBet] = useState(false);
   const [comebackSpinsLeft, setComebackSpinsLeft] = useState(0);
   const [canPenalty, setCanPenalty] = useState(false);
   const [loansPublic, setLoansPublic] = useState<LoanRow[]>([]);
@@ -487,7 +486,6 @@ function Home() {
     setShowComeback(!!data.showComeback);
     setShowComebackAlert(!!data.showComebackAlert);
     setShowRegularWheel(data.showRegular !== false);
-    setMustSpinToBet(!!data.mustSpinToBet);
     setComebackSpinsLeft(data.comebackSpinsLeft ?? 0);
     setCanPenalty(!!data.canPenalty);
     setLoansPublic(data.loansPublic ?? []);
@@ -608,7 +606,6 @@ function Home() {
           showComeback={showComeback}
           showComebackAlert={showComebackAlert}
           showRegularWheel={showRegularWheel}
-          mustSpinToBet={mustSpinToBet}
           comebackSpinsLeft={comebackSpinsLeft}
           canPenalty={canPenalty}
           loansPublic={loansPublic}
@@ -1582,7 +1579,6 @@ function Game({
   showComeback,
   showComebackAlert,
   showRegularWheel,
-  mustSpinToBet,
   comebackSpinsLeft,
   canPenalty,
   loansPublic,
@@ -1604,7 +1600,6 @@ function Game({
   showComeback: boolean;
   showComebackAlert: boolean;
   showRegularWheel: boolean;
-  mustSpinToBet: boolean;
   comebackSpinsLeft: number;
   canPenalty: boolean;
   loansPublic: LoanRow[];
@@ -2105,21 +2100,6 @@ function Game({
 
       {/* Matches */}
       <Section title={t("game.upcoming")}>
-        {mustSpinToBet && (
-          <button
-            onClick={() => scrollToId("minigames")}
-            className="mb-3 flex w-full items-center gap-3 rounded-xl bg-amber-500/15 px-4 py-3 text-left ring-1 ring-amber-400/40"
-          >
-            <span className="text-2xl">🎡</span>
-            <span className="flex-1">
-              <span className="block text-sm font-bold text-amber-200">{t("gate.title")}</span>
-              <span className="block text-xs text-amber-100/80">{t("gate.desc")}</span>
-            </span>
-            <span className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-black">
-              {t("gate.cta")}
-            </span>
-          </button>
-        )}
         {matches.length === 0 ? (
           <Empty text={t("game.noMatches")} />
         ) : (
@@ -2151,7 +2131,6 @@ function Game({
                   featuredMult={featuredMults[m.id] ?? featuredMult}
                   boost={player.boost_2x ?? 0}
                   freeBets={player.free_bets ?? 0}
-                  mustSpin={mustSpinToBet}
                   onOpenPlayer={setViewPlayer}
                   onPlaced={refreshAll}
                 />
@@ -4759,7 +4738,6 @@ function MatchCard({
   featuredMult,
   boost,
   freeBets,
-  mustSpin,
   onOpenPlayer,
   onPlaced,
 }: {
@@ -4772,7 +4750,6 @@ function MatchCard({
   featuredMult?: number;
   boost?: number;
   freeBets?: number;
-  mustSpin?: boolean; // regular-wheel player still owes today's spins — block new bets
   onOpenPlayer?: (username: string) => void;
   onPlaced: () => void;
 }) {
@@ -4901,13 +4878,6 @@ function MatchCard({
         <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-center text-sm text-blue-100/70">
           {t("card.closedNotice")}
         </div>
-      ) : mustSpin ? (
-        <button
-          onClick={() => scrollToId("minigames")}
-          className="mt-3 w-full rounded-lg bg-amber-500/15 px-3 py-2.5 text-center text-sm font-semibold text-amber-200 ring-1 ring-amber-400/40"
-        >
-          🎡 {t("gate.card")}
-        </button>
       ) : (
         <div className="mt-3">
           <BetForm

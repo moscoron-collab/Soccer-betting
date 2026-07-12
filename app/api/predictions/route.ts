@@ -3,8 +3,6 @@ import { supabase } from "@/lib/supabase";
 import { getPlayerFromRequest, Player } from "@/lib/auth";
 import { computeBonusMult } from "@/lib/bonus";
 import { PredictionType, validateSelection, FREE_BET_STAKE, isKnockoutStage } from "@/lib/payout";
-import { needsSpinBeforeBet } from "@/lib/betgate";
-import { localDate } from "@/lib/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,14 +105,6 @@ export async function POST(req: Request) {
   const matchId = Number(body?.matchId);
   if (!Number.isFinite(matchId)) {
     return NextResponse.json({ error: "Missing match" }, { status: 400 });
-  }
-
-  // Must use up all of today's regular-wheel spins before betting (regular wheel only).
-  if (await needsSpinBeforeBet(player, localDate(body?.tz))) {
-    return NextResponse.json(
-      { error: "🎡 Spin the wheel first! Use up all of today's spins before placing a bet.", code: "SPIN_REQUIRED" },
-      { status: 403 }
-    );
   }
 
   const parsed = parsePrediction(body);
